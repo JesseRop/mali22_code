@@ -1,0 +1,13 @@
+.nextflow*
+work/
+nextflow.config
+backup_scripts/
+html_nbooks_share/
+html_outputs/
+local_rmd_nbooks/.DS_Store
+local_rmd_nbooks/.RData
+local_rmd_nbooks/.Rhistory
+local_rmd_nbooks/.ipynb_checkpoints/
+local_scripts/
+manuscript_rmd_nbooks_snapshot_b4_git_050124/
+other_projects_code_4_reference/
