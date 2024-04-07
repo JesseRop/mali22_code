@@ -306,14 +306,13 @@ Run soupX
 ```{r ,include=FALSE, message=FALSE, warning=FALSE}
 # path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
 
-all_msc_nosct_corrected_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
-
+all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
 
 ```
 
 Doublet detection is applied on the soup corrected counts as the correction seems to improve doublet detection
 ```{r , message=FALSE, warning=FALSE}
-map(all_msc_nosct_corrected_dblt, ElbowPlot)
+map(all_msc_nosct_supx_4_dblt, ElbowPlot)
 
 
 ```
@@ -326,14 +325,14 @@ pc_list <-list(5L,3L,4L, 5L, 5L, 5L)
 #### Preprocess soup-corrected objects
 Calculate UMAP for soupX corrected objects
 ```{r, warning=FALSE, message=FALSE}
-all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt %>%
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>%
   map2(., pc_list, ~RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 532))
 ```
 
 Find neighbours
 ```{r}
 
-all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt %>%
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>%
   map2(., pc_list, ~FindNeighbors(.x, dims = 1:.y, verbose = FALSE))
 
 ```
@@ -344,26 +343,26 @@ all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt %>%
 res_list <- c(0.1,0.1,0.2,0.2,0.2,0.2)
 res_list <- res_list
 
-all_msc_nosct_corrected_dblt <-all_msc_nosct_corrected_dblt %>%
+all_msc_nosct_supx_4_dblt <-all_msc_nosct_supx_4_dblt %>%
   map2(., res_list, ~FindClusters(.x, resolution = .y, verbose=F)
   )
 
-map(all_msc_nosct_corrected_dblt, DimPlot)
+map(all_msc_nosct_supx_4_dblt, DimPlot)
 ```
 
 ```{r}
-# rm(all_msc_nosct_corrected_dblt)
+# rm(all_msc_nosct_supx_4_dblt)
 ```
 
 ```{r}
 
-map(all_msc_nosct_corrected_dblt, DimPlot)
+map(all_msc_nosct_supx_4_dblt, DimPlot)
 ```
 
 #### Visualize gene count in soup corrected {.tabset}
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_nosct_corrected_dblt  %>% 
+all_msc_nosct_supx_4_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
@@ -384,10 +383,10 @@ all_msc_nosct_corrected_dblt  %>%
 
 ```{r}
 ## calculate mitochondrial proportions
-all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt%>% 
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt'))
 
-all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt%>% 
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api'))
 
 ## filter less based on mitochondrial proportions
@@ -395,7 +394,7 @@ all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt%>%
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_nosct_corrected_dblt  %>% 
+all_msc_nosct_supx_4_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
@@ -410,11 +409,16 @@ all_msc_nosct_corrected_dblt  %>%
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_nosct_corrected_dblt  %>% 
+#PF3D7_0208900 - p230p - male marker 
+#PF3D7_0109100 - ccp5 - female marker
+#PF3D7_0935900 - rex1 - asexual marker
+#PF3D7_0406200 - pfs16 - gam marker
+
+all_msc_nosct_supx_4_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
-    p <- FeaturePlot(., features = c("PF3D7-0935900","PF3D7-0406200"), dims = c(1,2))
+    p <- FeaturePlot(., features = c("PF3D7-0935900","PF3D7-0406200", "PF3D7-0208900", "PF3D7-0109100"), dims = c(1,2))
     print(p)
     cat('\n')
     cat("\n")
@@ -424,23 +428,16 @@ all_msc_nosct_corrected_dblt  %>%
 
 
 
-## Calculate doublets using scDblFinder
+## scDblFinder
+
+## Calculate doublets using scDblFinder for soupx adjusted counts
 ```{r}
 ## scdblfinder better and sct minimally improves perfomance https://github.com/plger/scDblFinder/issues/67 
 #Convert to SCE and subset
-all_msc_nosct_corrected_dblt_sce <- all_msc_nosct_corrected_dblt %>%
-  map(. %>% as.SingleCellExperiment(.))
+all_msc_nosct_corrected_dblt_sce <- all_msc_nosct_supx_4_dblt %>%
+  map(. %>% as.SingleCellExperiment(., assay = "RNA"))
 
 ```
-
-
-```{r, message=FALSE, eval=FALSE}
-##Doublet removal
-ritss()
-
-```
-
-## scDblFinder
 
 scdblfinder cluster
 ```{r, message=FALSE}
@@ -460,28 +457,78 @@ all_msc_nosct_corrected_dblt_rand <- all_msc_nosct_corrected_dblt_sce %>%
 ```
 
 
+## Calculate doublets using scDblFinder for raw counts
+```{r}
+## scdblfinder better and sct minimally improves perfomance https://github.com/plger/scDblFinder/issues/67 
+#Convert to SCE and subset
+all_msc_nosct_dblt_sce <- all_msc_filt %>%
+  map(. %>% as.SingleCellExperiment(., assay = "RNA"))
+
+```
+
+## scDblFinder
+
+scdblfinder cluster
 ```{r, message=FALSE}
 ##Doublet removal
-all_msc_w_dblts <- list(all_msc_filt, all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand) %>%
+all_msc_nosct_dblt_clst <- all_msc_nosct_dblt_sce %>%
+  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table")) #%>%
+  # map(. %>% scDblFinder(.))
+```
+
+
+scdblfinder random
+```{r, message=FALSE}
+##Doublet removal
+all_msc_nosct_dblt_rand <- all_msc_nosct_dblt_sce %>%
+  map(. %>% scDblFinder(., returnType = "table")) #%>%
+  # map(. %>% scDblFinder(.))
+```
+
+Format the scdblfinder outputs and merge before adding to seurat object as metadata
+```{r, message=FALSE}
+
+# scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand, all_msc_nosct_dblt_clst, all_msc_nosct_dblt_rand) %>%
+#   pmap(~ {
+#     spx <- list(..1, ..2, ..3, ..4)
+#     pmap(list(spx, list("_supx_norm", "_supx_rand", "_norm", "_rand")), ~ {
+#       ..1 %>% 
+#       data.frame()  %>% 
+#       dplyr::select('class', 'score') %>% 
+#       dplyr::rename_with(.fn = ~paste0("scf_",., ..2), .cols = everything()) %>% 
+#       mutate(across(scf_class, str_to_sentence)) %>% 
+#       rownames_to_column("bcode") 
+#        }) %>%
+#       purrr::reduce(., .f = full_join, 
+#                           by = "bcode")
+#   })
+
+```
+
+```{r, message=FALSE}
+
+scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand, all_msc_nosct_dblt_clst, all_msc_nosct_dblt_rand) %>%
   pmap(~ {
-    ..2 %>% 
-      data.frame()  %>% 
-      dplyr::select('class', 'score') %>% 
-      # dplyr::rename('scf_class' = class) %>% 
-      dplyr::rename_with(.fn = ~paste0("scf_",.), .cols = everything()) %>% 
-      mutate(across(scf_class, str_to_sentence)) %>% 
-      rownames_to_column("bcode") %>% 
-      dplyr::left_join(., ..3 %>% 
-                         data.frame()  %>% 
-                         dplyr::select('class', 'score') %>% 
-                         # dplyr::rename('scf_class' = class) %>% 
-                         dplyr::rename_with(.fn = ~paste0("scf_",.), .cols = everything()) %>% 
-                         mutate(across(scf_class, str_to_sentence)) %>% 
-                         rownames_to_column("bcode"), 
-                       suffix = c("_norm", "_rand"), 
-                       by = "bcode") %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
+    spx <- list(..1, ..2, ..3, ..4)
+    pmap(list(spx, list("_supx_norm", "_supx_rand", "_norm", "_rand")), ~ {
+      tbl <- data.frame(..1) %>% 
+        select(score, class) %>%
+        mutate(across(class, str_to_sentence)) 
+      
+      names(tbl) <- paste0("scf_", names(tbl), ..2)
+      tbl <- tbl %>% 
+        rownames_to_column("bcode")
+       }) %>%
+      purrr::reduce(., .f = full_join, by = "bcode")
+  })
+
+```
+
+```{r, message=FALSE}
+##Doublet removal
+all_msc_w_dblts <- list(all_msc_filt, scf_outputs) %>%
+  pmap(~ {
+    AddMetaData(..1, ..2)
        })
 
 ```
@@ -491,7 +538,7 @@ all_msc_w_dblts <- list(all_msc_filt, all_msc_nosct_corrected_dblt_clst, all_msc
 ```{r}
 ## Add UMAP dimensions from the soupx corrected object used to get doublets
 for (i in names(all_msc_w_dblts)) {
-  all_msc_w_dblts[[i]]@reductions[["umap_n_soupx"]] <- all_msc_nosct_corrected_dblt[[i]]@reductions$umap
+  all_msc_w_dblts[[i]]@reductions[["umap_n_soupx"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions$umap
 }
 ```
 
@@ -633,7 +680,7 @@ all_msc_w_dblts  %>%
 #### End of scdblfinder visualizations
 
 ```{r}
-rm(all_msc_nosct_corrected_dblt_sce, all_msc_nosct_corrected_dblt)
+# rm(all_msc_nosct_corrected_dblt_sce, all_msc_nosct_supx_4_dblt)
 ```
 
 ```{r}
@@ -1425,7 +1472,7 @@ list(map(cell_qc_objs, ~.x[[1]][,.x[[1]]@meta.data$QC_reason %in% c('pass')]), m
 ##Seurat object
 ##Add doublet assignment to counts not corrected by soupX
 # 
-# all_msc_filt_w_dblts <- list(all_msc_nosct_corrected_dblt, all_msc_filt) %>%
+# all_msc_filt_w_dblts <- list(all_msc_nosct_supx_4_dblt, all_msc_filt) %>%
 #   pmap(~ ..1@meta.data %>% 
 #          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
 #          dplyr::select(any_of(c('scrub_doublet', 'scf_class_rand', 'scf_class_norm', 'seurat_clusters_dblt','old_seu_cluster', 'scf_score_norm')))  %>%
