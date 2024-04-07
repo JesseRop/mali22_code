@@ -308,6 +308,7 @@ Run soupX
 
 all_msc_nosct_corrected_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
 
+
 ```
 
 Doublet detection is applied on the soup corrected counts as the correction seems to improve doublet detection
@@ -350,60 +351,19 @@ all_msc_nosct_corrected_dblt <-all_msc_nosct_corrected_dblt %>%
 map(all_msc_nosct_corrected_dblt, DimPlot)
 ```
 
-```{r ,include=FALSE, message=FALSE, warning=FALSE}
-
-all_msc_corrected_dblt_sct <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2, seu_fun = seurat_SCT))
-
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-all_msc_corrected_dblt_sct <- all_msc_corrected_dblt_sct %>%
-  map2(., pc_list, ~RunUMAP(.x, dims = 1:30, n.components = 3L, verbose=F, seed.use = 532))
+```{r}
+# rm(all_msc_nosct_corrected_dblt)
 ```
 
 ```{r}
 
-all_msc_corrected_dblt_sct <- all_msc_corrected_dblt_sct %>%
-  map2(., pc_list, ~FindNeighbors(.x, dims = 1:30, verbose = FALSE))
-
-```
-
-
-```{r}
-##Using the default resolution - though quite high it may help find clusters that contain doublets
-res_list <- c(0.1,0.1,0.2,0.2,0.2,0.2)
-res_list <- res_list
-
-all_msc_corrected_dblt_sct <-all_msc_corrected_dblt_sct %>%
-  map2(., res_list, ~FindClusters(.x, resolution = .y, verbose=F)
-  )
-
-map(all_msc_corrected_dblt_sct, DimPlot)
-```
-
-
-```{r}
-## !!NB - CHEATING - replacing nosct with sct to avoid renaming everything downstream
-names(all_msc_nosct_corrected_dblt) <- paste0(names(all_msc_nosct_corrected_dblt), "_norm")
-names(all_msc_corrected_dblt_sct) <- paste0(names(all_msc_corrected_dblt_sct), "_sct")
-
-all_msc_corrected_dblt <- c(all_msc_corrected_dblt_sct, all_msc_nosct_corrected_dblt)
-```
-
-```{r}
-rm(all_msc_nosct_corrected_dblt, all_msc_corrected_dblt_sct)
-```
-
-```{r}
-
-map(all_msc_corrected_dblt, DimPlot)
+map(all_msc_nosct_corrected_dblt, DimPlot)
 ```
 
 #### Visualize gene count in soup corrected {.tabset}
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_corrected_dblt  %>% 
+all_msc_nosct_corrected_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
@@ -424,10 +384,10 @@ all_msc_corrected_dblt  %>%
 
 ```{r}
 ## calculate mitochondrial proportions
-all_msc_corrected_dblt <- all_msc_corrected_dblt%>% 
+all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt%>% 
   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt'))
 
-all_msc_corrected_dblt <- all_msc_corrected_dblt%>% 
+all_msc_nosct_corrected_dblt <- all_msc_nosct_corrected_dblt%>% 
   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api'))
 
 ## filter less based on mitochondrial proportions
@@ -435,7 +395,7 @@ all_msc_corrected_dblt <- all_msc_corrected_dblt%>%
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_corrected_dblt  %>% 
+all_msc_nosct_corrected_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
@@ -450,7 +410,7 @@ all_msc_corrected_dblt  %>%
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_corrected_dblt  %>% 
+all_msc_nosct_corrected_dblt  %>% 
   purrr::imap(.,~{
     # create tabset for each group 
     cat('##### ',.y,'   \n')
@@ -463,20 +423,87 @@ all_msc_corrected_dblt  %>%
 ```
 
 
-### doubletFinder
 
-#### Estimate doublets using doubletFinder
+## Calculate doublets using scDblFinder
+```{r}
+## scdblfinder better and sct minimally improves perfomance https://github.com/plger/scDblFinder/issues/67 
+#Convert to SCE and subset
+all_msc_nosct_corrected_dblt_sce <- all_msc_nosct_corrected_dblt %>%
+  map(. %>% as.SingleCellExperiment(.))
 
-##### MSC14 doublet cells
-```{r, warning=FALSE, message=FALSE}
+```
+
+
+```{r, message=FALSE, eval=FALSE}
+##Doublet removal
+ritss()
+
+```
+
+## scDblFinder
+
+scdblfinder cluster
+```{r, message=FALSE}
+##Doublet removal
+all_msc_nosct_corrected_dblt_clst <- all_msc_nosct_corrected_dblt_sce %>%
+  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table")) #%>%
+  # map(. %>% scDblFinder(.))
+```
+
+
+scdblfinder random
+```{r, message=FALSE}
+##Doublet removal
+all_msc_nosct_corrected_dblt_rand <- all_msc_nosct_corrected_dblt_sce %>%
+  map(. %>% scDblFinder(., returnType = "table")) #%>%
+  # map(. %>% scDblFinder(.))
+```
+
+
+```{r, message=FALSE}
+##Doublet removal
+all_msc_w_dblts <- list(all_msc_filt, all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand) %>%
+  pmap(~ {
+    ..2 %>% 
+      data.frame()  %>% 
+      dplyr::select('class', 'score') %>% 
+      # dplyr::rename('scf_class' = class) %>% 
+      dplyr::rename_with(.fn = ~paste0("scf_",.), .cols = everything()) %>% 
+      mutate(across(scf_class, str_to_sentence)) %>% 
+      rownames_to_column("bcode") %>% 
+      dplyr::left_join(., ..3 %>% 
+                         data.frame()  %>% 
+                         dplyr::select('class', 'score') %>% 
+                         # dplyr::rename('scf_class' = class) %>% 
+                         dplyr::rename_with(.fn = ~paste0("scf_",.), .cols = everything()) %>% 
+                         mutate(across(scf_class, str_to_sentence)) %>% 
+                         rownames_to_column("bcode"), 
+                       suffix = c("_norm", "_rand"), 
+                       by = "bcode") %>%
+      column_to_rownames("bcode") %>%
+      AddMetaData(..1, .)
+       })
+
+```
+
+
+
+```{r}
+## Add UMAP dimensions from the soupx corrected object used to get doublets
+for (i in names(all_msc_w_dblts)) {
+  all_msc_w_dblts[[i]]@reductions[["umap_n_soupx"]] <- all_msc_nosct_corrected_dblt[[i]]@reductions$umap
+}
+```
+
+
+##### scdblfinder visualizations
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 # Display the combined datasets as an interactive 3D plot
-##!! WILL NEED TO BE UNDONE - RETAIN MSC14 ONLY WHOSE POSITION HAS CHANGED FROM 4 TO 1
-# all_msc_corrected_dblt[[1]] : all_msc_corrected_dblt[[4]]
 
-plot_ly(data = as.data.frame(all_msc_corrected_dblt[[4]]@reductions[["umap"]]@cell.embeddings),
+plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embeddings),
         x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,
-        color= all_msc_corrected_dblt[[4]]@meta.data$dblt_finder2,
+        color= all_msc_w_dblts[[4]]@meta.data$scf_class_norm,
         colors = c('blue', 'red'),
         opacity = 0.8,
         size = 1, 
@@ -490,11 +517,11 @@ doublet score UMAP plus grouping by seurat clusters to see if some clusters are 
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-all_msc_corrected_dblt  %>% 
+all_msc_w_dblts  %>% 
   imap(.,~{
     # create tabset for each group 
     cat('###### ',.y,'   \n')
-    p1 <- FeaturePlot(.x, features = 'dblt_finder_pANN', pt.size = 0.2)
+    p1 <- FeaturePlot(.x, features = 'scf_score_norm', pt.size = 0.2)
     print(p1)
     cat('\n ')
     
@@ -513,13 +540,13 @@ all_msc_corrected_dblt  %>%
 
 
 ##### MSC14 doublet scores
-```{r, message=F, warning=F}
+```{r, message=F, warning=F, eval=FALSE}
 ##dimplot
 
 # Display the combined datasets as an interactive 3D plot
-plot_ly(data = as.data.frame(all_msc_corrected_dblt[[4]]@reductions[["umap"]]@cell.embeddings),
+plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embeddings),
         x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,
-        color= all_msc_corrected_dblt[[4]]@meta.data$dblt_finder_pANN,
+        color= all_msc_w_dblts[[4]]@meta.data$scf_score_norm,
         colors = c('blue', 'red'),
         opacity = 0.8,
         size = 1, 
@@ -534,14 +561,14 @@ plot_ly(data = as.data.frame(all_msc_corrected_dblt[[4]]@reductions[["umap"]]@ce
 
 
 ```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
-all_msc_corrected_dblt %>%
+all_msc_w_dblts %>%
   imap(.,  ~ {
     # create tabset for each group
     cat('######', .y, '   \n')
     a_gns = .x@meta.data  %>%
-      ggplot(., aes(x=seurat_clusters, y=nCount_RNA, color = dblt_finder1)) +
-      geom_boxplot(aes( color = dblt_finder1)) +
-      geom_point(aes(group=dblt_finder1), size = 0.7, position = position_jitterdodge(jitter.width = 0.2))  +
+      ggplot(., aes(x=seurat_clusters, y=nCount_RNA, color = scf_class_rand)) +
+      geom_boxplot(aes( color = scf_class_rand)) +
+      geom_point(aes(group=scf_class_rand), size = 0.7, position = position_jitterdodge(jitter.width = 0.2))  +
       stat_summary(
         fun.data = stat_box_data, 
         geom = "label", 
@@ -569,12 +596,12 @@ all_msc_corrected_dblt %>%
 ##### Boxplots gene count vs doublet status stratified by Strain_DN {.tabset}
 
 ```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5, eval=FALSE}
-all_msc_corrected_dblt  %>%
+all_msc_w_dblts  %>%
   imap(.,  ~ {
     # create tabset for each group
     cat('######', .y, '   \n')
     a_gns = .x@meta.data  %>%
-      ggplot(., aes(x=dblt_finder1, y=nFeature_RNA, color = strain_gt)) +
+      ggplot(., aes(x=scf_class_rand, y=nFeature_RNA, color = strain_gt)) +
       geom_boxplot(aes( color = strain_gt)) +
       geom_point(aes(group=strain_gt), size = 0.7, position = position_jitterdodge(jitter.width = 0.2)) +
       stat_summary(
@@ -603,130 +630,10 @@ all_msc_corrected_dblt  %>%
 ```
 
 
-
-```{r, message=FALSE}
-##Doublet removal
-# all_msc_w_dblts <- list(all_msc_corrected_dblt[paste0(names(all_msc_filt), "_norm")], all_msc_corrected_dblt[paste0(names(all_msc_filt), "_sct")], all_msc_filt) %>%
-#   pmap(~ ..1@meta.data %>% 
-#          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          mutate(scrub_doublet = case_when(scrub_doublet == T ~ "Doublet", scrub_doublet == F ~ "Singlet")) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'dblt_finder1', 'dblt_finder2', 'seurat_clusters_dblt', 'dblt_finder_pANN')))  %>%
-#          # dplyr::select(scrub_doublet, dblt_finder1, dblt_finder2)  %>%
-#          AddMetaData(..2, .))
-```
-
-
-```{r, message=FALSE}
-##Doublet removal
-list(all_msc_filt, all_msc_corrected_dblt[paste0(names(all_msc_filt), "_norm")], all_msc_corrected_dblt[paste0(names(all_msc_filt), "_sct")]) %>%
-  pmap(~ {
-    ..2@meta.data %>% 
-      dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>% 
-      select(dblt_finder1, dblt_finder2, seurat_clusters_dblt, dblt_finder_pANN) %>%
-      rownames_to_column("bcode") %>% 
-      dplyr::left_join(., ..3@meta.data %>% 
-                         dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>% 
-                         select(dblt_finder1, dblt_finder2, seurat_clusters_dblt, dblt_finder_pANN) %>%
-                         rownames_to_column("bcode"), 
-                       suffix = c("_norm", "_sct"), 
-                       by = "bcode") %>%
-      # column_to_rownames("bcode") %>%
-      head
-       })
-```
-
-```{r, message=FALSE}
-##Doublet removal
-all_msc_w_dblts <- list(all_msc_filt, all_msc_corrected_dblt[paste0(names(all_msc_filt), "_norm")], all_msc_corrected_dblt[paste0(names(all_msc_filt), "_sct")]) %>%
-  pmap(~ {
-    ..2@meta.data %>% 
-      dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>% 
-      select(dblt_finder1, dblt_finder2, seurat_clusters_dblt, dblt_finder_pANN) %>%
-      rownames_to_column("bcode") %>% 
-      dplyr::left_join(., ..3@meta.data %>% 
-                         dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>% 
-                         select(dblt_finder1, dblt_finder2, seurat_clusters_dblt, dblt_finder_pANN) %>%
-                         rownames_to_column("bcode"), 
-                       suffix = c("_norm", "_sct"), 
-                       by = "bcode") %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
-       })
-```
-
-
-## Calculate doublets using scDblFinder
-```{r}
-## scdblfinder better and sct minimally improves perfomance https://github.com/plger/scDblFinder/issues/67 
-#Convert to SCE and subset
-all_msc_nosct_corrected_dblt_sce <- all_msc_corrected_dblt[paste0(names(all_msc_filt), "_norm")] %>%
-  map(. %>% as.SingleCellExperiment(.))
-
-```
-
-
-```{r, message=FALSE, eval=FALSE}
-##Doublet removal
-ritss()
-
-```
-
-## scDblFinder
-
-scdblfinder cluster
-```{r, message=FALSE}
-##Doublet removal
-all_msc_nosct_corrected_dblt_clst <- all_msc_nosct_corrected_dblt_sce[paste0(names(all_msc_filt), "_norm")] %>%
-  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table")) #%>%
-  # map(. %>% scDblFinder(.))
-```
-
-
-scdblfinder random
-```{r, message=FALSE}
-##Doublet removal
-all_msc_nosct_corrected_dblt_rand <- all_msc_nosct_corrected_dblt_sce[paste0(names(all_msc_filt), "_norm")] %>%
-  map(. %>% scDblFinder(., returnType = "table")) #%>%
-  # map(. %>% scDblFinder(.))
-```
-
-
-```{r, message=FALSE}
-##Doublet removal
-all_msc_w_dblts <- list(all_msc_w_dblts, all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand) %>%
-  pmap(~ {
-    ..2 %>% 
-      data.frame()  %>% 
-      dplyr::select('class') %>% 
-      dplyr::rename('scDblFinder_class' = class) %>% 
-      mutate(across(scDblFinder_class, str_to_sentence)) %>% 
-      rownames_to_column("bcode") %>% 
-      dplyr::left_join(., ..3 %>% 
-                         data.frame()  %>% 
-                         dplyr::select('class') %>% 
-                         dplyr::rename('scDblFinder_class' = class) %>% 
-                         mutate(across(scDblFinder_class, str_to_sentence)) %>% 
-                         rownames_to_column("bcode"), 
-                       suffix = c("_norm", "_rand"), 
-                       by = "bcode") %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
-       })
-
-```
-
-
+#### End of scdblfinder visualizations
 
 ```{r}
-## Add UMAP dimensions from the soupx corrected object used to get doublets
-for (i in names(all_msc_w_dblts)) {
-  all_msc_w_dblts[[i]]@reductions[["umap_n_soupx"]] <- all_msc_corrected_dblt[[paste0(i, "_norm")]]@reductions$umap
-}
-```
-
-
-```{r}
-rm(all_msc_nosct_corrected_dblt_sce, all_msc_corrected_dblt)
+rm(all_msc_nosct_corrected_dblt_sce, all_msc_nosct_corrected_dblt)
 ```
 
 ```{r}
@@ -1045,19 +952,19 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scDblFinder_class_rand == "Doublet") %>% row.names()))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_rand == "Doublet") %>% row.names()))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scDblFinder_class_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(dblt_finder2_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
 ```
 
 
@@ -1080,7 +987,7 @@ map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scDblFinder_class_norm == "Doublet") %>% row.names()))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names()))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -1105,9 +1012,9 @@ list(all_msc_w_dblts[1], sample_id_lst[1])  %>%
     
     cat('nfeature \n')
     a_gns = ..1@meta.data %>%
-      ggplot(., aes(x=StagePrelim, y=nFeature_RNA, color = scDblFinder_class_norm)) +
-      geom_boxplot(aes( color = scDblFinder_class_norm)) +
-      geom_point(aes(group=scDblFinder_class_norm), size = 0.7, position = position_jitterdodge(jitter.width = 0.07)) + 
+      ggplot(., aes(x=StagePrelim, y=nFeature_RNA, color = scf_class_norm)) +
+      geom_boxplot(aes( color = scf_class_norm)) +
+      geom_point(aes(group=scf_class_norm), size = 0.7, position = position_jitterdodge(jitter.width = 0.07)) + 
       # scale_color_manual(values = sp_fld_colors) +
       # stat_summary(fun.data = stat_box_data, 
       #              geom = "label_repel", 
@@ -1165,12 +1072,12 @@ res_list <- pc_list
 
 ```{r}
 ##Seurat object
-# all_msc_w_dblts[[1]]@meta.data %>% dplyr::count(seurat_clusters_dblt, dblt_finder1, dblt_finder2)
-map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, dblt_finder2_norm, scrub_doublet))
-map(all_msc_w_dblts, ~.x@meta.data %>% mutate(strain_dblt = case_when(strain_gt != 'Doublet' ~ 'Singlet', T ~ strain_gt)) %>% dplyr::count(strain_dblt,dblt_finder2_norm, scrub_doublet))
+# all_msc_w_dblts[[1]]@meta.data %>% dplyr::count(seurat_clusters_dblt, scf_class_rand, scf_class_norm)
+map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm, scrub_doublet))
+map(all_msc_w_dblts, ~.x@meta.data %>% mutate(strain_dblt = case_when(strain_gt != 'Doublet' ~ 'Singlet', T ~ strain_gt)) %>% dplyr::count(strain_dblt,scf_class_norm, scrub_doublet))
 # all_msc_filt_w_dblts[[4]]@meta.data %>% 
 #   dplyr::group_by(seurat_clusters_dblt) %>% 
-#   dplyr::count(seurat_clusters_dblt, dblt_finder2) %>%
+#   dplyr::count(seurat_clusters_dblt, scf_class_norm) %>%
 #   mutate(freq = round(n / sum(n), 3)) 
 ```
 
@@ -1178,7 +1085,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>% mutate(strain_dblt = case_when(strain_gt 
 
 ```{r}
 
-map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scDblFinder_class_norm)  %>%
+map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm)  %>%
       group_by(strain_gt) %>%
       mutate(freq = round(n / sum(n), 3)))  
 
@@ -1196,7 +1103,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scrub_doublet)  %
 
 ```{r}
 
-map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, dblt_finder2_norm) %>%
+map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm) %>%
       group_by(strain_gt) %>%
       mutate(freq = round(n / sum(n), 3)))  
 
@@ -1204,8 +1111,10 @@ map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, dblt_finder2_norm
 
 
 ```{r}
-# dbt_methods <- c("scDblFinder_class", "scrub_doublet", "dblt_finder2")
-dbt_methods <- c(paste0(c("scDblFinder_class"), c("_norm", "_rand")), paste0(c("dblt_finder2"), rep(c("_norm", "_sct"))), "scrub_doublet")
+# dbt_methods <- c("scf_class", "scrub_doublet", "scf_class_norm")
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class_norm"), rep(c("_norm", "_sct"))), "scrub_doublet")
+dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), "scrub_doublet")
+
 
 dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_dblts)), ~{
   dblt_calls <- .x@meta.data %>% 
@@ -1220,8 +1129,8 @@ dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_d
 
 
 ```{r}
-# # dbt_methods <- c("scDblFinder_class_norm", "scrub_doublet", "dblt_finder2")
-# dbt_methods <- c(paste0(c("scDblFinder_class_norm", "dblt_finder2"), rep(c("_norm", "_rand"), each=2)), "scrub_doublet")
+# # dbt_methods <- c("scf_class_norm", "scrub_doublet", "scf_class_norm")
+# dbt_methods <- c(paste0(c("scf_class_norm", "scf_class_norm"), rep(c("_norm", "_rand"), each=2)), "scrub_doublet")
 # 
 # dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_dblts)), ~{
 #   dblt_calls <- .x@meta.data %>% 
@@ -1237,9 +1146,9 @@ dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_d
 ```{r}
 dblt_calls <- all_msc_w_dblts[[1]]@meta.data %>% dplyr::select(strain_gt, dbt_methods) %>% mutate(across(everything(), ~factor(., levels = c("Singlet", "Doublet")))) 
 
-sensitivity(reference = dblt_calls[,"strain_gt"], data = dblt_calls[,"scDblFinder_class_norm"])
+sensitivity(reference = dblt_calls[,"strain_gt"], data = dblt_calls[,"scf_class_norm"])
 
-specificity(reference = dblt_calls[,"strain_gt"], data = dblt_calls[,"scDblFinder_class_norm"])
+specificity(reference = dblt_calls[,"strain_gt"], data = dblt_calls[,"scf_class_norm"])
 
 ```
 
@@ -1273,7 +1182,7 @@ map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(dblt_finder2_norm == 'Doublet') %>% row.names()))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == 'Doublet') %>% row.names()))
 ```
 
 
@@ -1285,8 +1194,8 @@ map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x
 # all_msc_w_dblts <- list(all_msc_w_dblts, all_msc_anotd) %>%
 #   pmap(~ ..1@meta.data %>% 
 #          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'dblt_finder1', 'dblt_finder2', 'seurat_clusters_dblt', 'dblt_finder_pANN')))  %>%
-#          # dplyr::select(scrub_doublet, dblt_finder1, dblt_finder2)  %>%
+#          dplyr::select(any_of(c('scrub_doublet', 'scf_class_rand', 'scf_class_norm', 'seurat_clusters_dblt', 'scf_score_norm')))  %>%
+#          # dplyr::select(scrub_doublet, scf_class_rand, scf_class_norm)  %>%
 #          AddMetaData(..2, .))
 
 ```
@@ -1322,14 +1231,14 @@ cell_qc_objs<- list(all_msc_w_dblts, gn_lc, rna_lc, rna_uc, mt_filt, gn_uc) %>%
                                 nFeature_RNA<=..2 | nCount_RNA <= ..3 ~ 'lo_gn_cnt', 
                                 nFeature_RNA>=..6 | nCount_RNA >= ..4 ~ 'hi_gn_cnt', 
                                 percent.mt>=..5 ~ 'hi_mtp',
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt != 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == F ~ 'stg_db',
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
+                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
+                                strain_gt != 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'stg_db',
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
   dplyr::select(QC_reason, StagePrelim)
 
 ##tabulate cells  
@@ -1401,14 +1310,14 @@ map(cell_qc_objs, ~.x[2])
                                 nFeature_RNA<=..2 | nCount_RNA <= ..3 ~ 'lo_gn_cnt', 
                                 nCount_RNA >= ..4 ~ 'hi_gn_cnt', 
                                 percent.mt>=..5 ~ 'hi_mtp',
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt != 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt == 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Doublet' & scrub_doublet == F ~ 'stg_db',
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt!= 'Doublet' & dblt_finder2 == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
+                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
+                                strain_gt != 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
+                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'stg_db',
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
+                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
   dplyr::select(StagePrelim, QC_reason)
 
 ##Order the QC filt reasons with the lowest prevalent to the highest prevalent 
@@ -1516,11 +1425,11 @@ list(map(cell_qc_objs, ~.x[[1]][,.x[[1]]@meta.data$QC_reason %in% c('pass')]), m
 ##Seurat object
 ##Add doublet assignment to counts not corrected by soupX
 # 
-# all_msc_filt_w_dblts <- list(all_msc_corrected_dblt, all_msc_filt) %>%
+# all_msc_filt_w_dblts <- list(all_msc_nosct_corrected_dblt, all_msc_filt) %>%
 #   pmap(~ ..1@meta.data %>% 
 #          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'dblt_finder1', 'dblt_finder2', 'seurat_clusters_dblt','old_seu_cluster', 'dblt_finder_pANN')))  %>%
-#          # dplyr::select(scrub_doublet, dblt_finder1, dblt_finder2)  %>%
+#          dplyr::select(any_of(c('scrub_doublet', 'scf_class_rand', 'scf_class_norm', 'seurat_clusters_dblt','old_seu_cluster', 'scf_score_norm')))  %>%
+#          # dplyr::select(scrub_doublet, scf_class_rand, scf_class_norm)  %>%
 #          AddMetaData(..2, .))
 
 ```
@@ -1531,13 +1440,13 @@ list(map(cell_qc_objs, ~.x[[1]][,.x[[1]]@meta.data$QC_reason %in% c('pass')]), m
 
 ##!! WILL NEED TO BE UNDONE - RETAIN MSC14 ONLY WHOSE POSITION HAS CHANGED FROM 4 TO 1
 # all_msc_filt_w_dblts[[4]] : all_msc_filt_w_dblts[[4]]
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(seurat_clusters_dblt, dblt_finder1, dblt_finder2))
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(dblt_finder1, dblt_finder2))
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, dblt_finder2, scrub_doublet))
+map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(seurat_clusters_dblt, scf_class_rand, scf_class_norm))
+map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(scf_class_rand, scf_class_norm))
+map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm, scrub_doublet))
 
 map(all_msc_filt_w_dblts, ~.x@meta.data %>% 
   dplyr::group_by(seurat_clusters_dblt) %>% 
-  dplyr::count(seurat_clusters_dblt, dblt_finder2) %>%
+  dplyr::count(seurat_clusters_dblt, scf_class_norm) %>%
   mutate(freq = round(n / sum(n), 3))) 
 ```
 
@@ -1557,7 +1466,7 @@ all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
 ```{r}
 ##Seurat object
 ##Remove cluster 7 with lots of doublets MSC14
-# subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(dblt_finder2, scrub_doublet)
+# subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet)
 
 ##Remove cluster 8 with lots of doublets (0.205) MSC14 - losing 31 singlets
 # all_msc_filt_w_dblts[[4]] <- subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt != "7")
@@ -1572,7 +1481,7 @@ all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_w_dblts, ~.@meta.data %>% dplyr::count(dblt_finder2, scrub_doublet))
+map(all_msc_filt_w_dblts, ~.@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet))
 
 ```
 
@@ -1581,7 +1490,7 @@ map(all_msc_filt_w_dblts, ~.@meta.data %>% dplyr::count(dblt_finder2, scrub_doub
 ##Remove doublets
 
 all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
-  map(. %>% subset(., subset = dblt_finder2 == "Singlet" & scrub_doublet == 'FALSE'))
+  map(. %>% subset(., subset = scf_class_norm == "Singlet" & scrub_doublet == 'FALSE'))
 
 ```
 
