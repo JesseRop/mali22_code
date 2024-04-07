@@ -467,186 +467,6 @@ all_msc_corrected_dblt  %>%
 
 #### Estimate doublets using doubletFinder
 
-
-```{r, results="hide", warning=FALSE, message=FALSE}
-## # ## pK Identification (ground-truth) ------------------------------------------------------------------------------------------
-# m14_sweep.res = map(all_msc_corrected_dblt[4], ~paramSweep_v3(.x, PCs = 1:10, sct = T))
-# # m14_sweep.res = list(a)
-# m14_gt.calls = map2(all_msc_corrected_dblt[4], m14_sweep.res, ~.x@meta.data[rownames(.y[[1]]), "GT"])
-# m14_sweep.stats <- map2(m14_sweep.res , m14_gt.calls, ~summarizeSweep(.x, GT = TRUE, GT.calls = .y))
-# m14_bcmvn <- map(m14_sweep.stats, ~find.pK(.x))
-```
-
-
-```{r, results="hide", warning=FALSE, message=FALSE, error=FALSE}
-## # ## pK Identification (ground-truth) ------------------------------------------------------------------------------------------
-# m_sweep.res = map(all_msc_corrected_dblt, ~paramSweep_v3(.x, PCs = 1:10, sct = T))
-sct_logcl <- rep(c(T,F), each = length(all_msc_corrected_dblt)/2)
-m_sweep.res = map2(all_msc_corrected_dblt, sct_logcl, ~paramSweep_v3(.x, PCs = 1:10, sct = .y))
-```
-
-
-```{r, results="hide", warning=FALSE, message=FALSE}
-## # ## pK Identification (ground-truth) ------------------------------------------------------------------------------------------
-m_gt.calls = map2(all_msc_corrected_dblt, m_sweep.res, ~.x@meta.data[rownames(.y[[1]]), "GT"])
-
-# m_sweep.stats <- map2(m_sweep.res , m_gt.calls, ~summarizeSweep(.x, GT = TRUE, GT.calls = .y))
-# m_sweep.stats <- map(m_sweep.res , ~summarizeSweep(.x, GT = F))
-
-## MSC13 at position 3 seems to have very few doublets from error "Not enough distinct predictions to compute area under the ROC curve" hence the solution below to use no groundtruth for MSC13.
-# m_sweep.stats1_2_4 <- map2(m_sweep.res[c(1,2,4,5)] , m_gt.calls[c(1,2,4,5)], ~summarizeSweep(.x, GT = TRUE, GT.calls = .y))
-# m_sweep.stats_3 <- map(m_sweep.res[c(3)], ~summarizeSweep(.x, GT = F))
-# m_sweep.stats <- c(m_sweep.stats1_2_4[1:2], m_sweep.stats_3, m_sweep.stats1_2_4[3:4])
-
-# m_sweep.stats2_4 <- map2(m_sweep.res[c(2,4,5)] , m_gt.calls[c(2,4,5)], ~summarizeSweep(.x, GT = TRUE, GT.calls = .y))
-# m_sweep.stats1_3 <- map(m_sweep.res[c(1,3)], ~summarizeSweep(.x, GT = F))
-m_sweep.stats <- map(m_sweep.res, ~summarizeSweep(.x, GT = F))
-# m_sweep.stats <- c(m_sweep.stats1_3[1], m_sweep.stats2_4[1], m_sweep.stats1_3[2], m_sweep.stats2_4[2:3])
-# m_sweep.stats <- map2(m_sweep.res , m_gt.calls, ~summarizeSweep(.x, GT = TRUE, GT.calls = .y))
-
-
-m_bcmvn <- map(m_sweep.stats, ~find.pK(.x))
-
-# m_sweep.stats_nogt <- map(m_sweep.res, ~summarizeSweep(.x, GT = F))
-# m_bcmvn <- map(m_sweep.stats_nogt, ~find.pK(.x))
-
-```
-
-```{r}
-# pK_choose_gt <- sweep_all_gt %>%
-#     map(
-#         . %>%
-#             mutate(across(pK, ~as.character(.))) %>%
-#             mutate(across(pK, ~as.numeric(.))) %>%
-#             slice_max(BCmetric) %>%
-#             pull(pK)
-#     )
-
-```
-
-```{r, include=FALSE, message=FALSE, warning=FALSE}
-##!! NOTE may need to switch this back on if ground truth fails
-# sweep params to estimate pk - no ground-truth
-# sweep_all <- all_msc_corrected_dblt %>%
-#   # map(. %>% paramSweep_v3(., PCs = 1:10, sct = F) %>%
-#   map(. %>% paramSweep_v3(., PCs = 1:10, sct = T) %>%
-#         summarizeSweep(., GT = FALSE) %>%
-#         find.pK()
-#   )
-```
-
-
-```{r, message=FALSE, warning=FALSE}
-##!! NOTE may need to switch to sweep_all if ground truth fails
-# pK_choose <- sweep_all %>%
-# m14_pK_choose <- m14_bcmvn %>%
-#   map(
-#     . %>%
-#       mutate(across(pK, ~as.character(.))) %>%
-#       mutate(across(pK, ~as.numeric(.))) %>%
-#       slice_max(BCmetric) %>%
-#       pull(pK)
-#   )
-
-```
-
-
-```{r, message=FALSE, warning=FALSE}
-##!! NOTE may need to switch to sweep_all if ground truth fails
-# pK_choose <- sweep_all %>%
-pK_choose <- m_bcmvn %>%
-  map(
-    . %>%
-      mutate(across(pK, ~as.character(.))) %>%
-      mutate(across(pK, ~as.numeric(.))) %>%
-      slice_max(BCmetric) %>%
-      pull(pK)
-  )
-
-```
-
-```{r}
-# pK_choose_all <- c(pK_choose[1:3], m14_pK_choose, pK_choose[4])
-```
-
-```{r}
-##No ground truth option
-pK_choose_all <- pK_choose
-```
-
-```{r}
-## model homotypic doublet rates
-
-homo.prop_all <- all_msc_corrected_dblt %>%
-  map(. %>% .$seurat_clusters %>% modelHomotypic(.))
-
-nDub_all <- map(all_msc_corrected_dblt, ~ncol(.) * 0.00001)
-
-nExp_poi_all <- map2(nDub_all, all_msc_corrected_dblt, ~round(.x*nrow(.y)))
-
-nExp_poi_adj_all <- map2(nExp_poi_all, homo.prop_all, ~round(.x*(1-.y)))
-
-```
-
-```{r, results="hide", warning=FALSE, message=FALSE}
-## run doubletfinder
-
-# strains_bld_dFinder = list(all_msc_corrected_dblt, pK_choose_all, nExp_poi_all, nExp_poi_adj_all) %>%
-#   pmap(~ ..1 %>% doubletFinder_v3(., PCs = 1:10, pN = 0.25, pK = ..2, nExp = ..3, sct = T) %>%
-#          doubletFinder_v3(., PCs = 1:10, pN = 0.25, pK = ..2, nExp = ..4, reuse.pANN = paste0("pANN_0.25_",..2,"_",..3), sct = T))
-
-strains_bld_dFinder = list(all_msc_corrected_dblt, pK_choose_all, nExp_poi_all, nExp_poi_adj_all, sct_logcl) %>%
-  pmap(~ ..1 %>% doubletFinder_v3(., PCs = 1:10, pN = 0.25, pK = ..2, nExp = ..3, sct = ..5) %>%
-         doubletFinder_v3(., PCs = 1:10, pN = 0.25, pK = ..2, nExp = ..4, reuse.pANN = paste0("pANN_0.25_",..2,"_",..3), sct = ..5))
-
-
-```
-
-
-
-```{r}
-all_msc_corrected_dblt <- list(strains_bld_dFinder, pK_choose_all, nExp_poi_all, nExp_poi_adj_all, all_msc_corrected_dblt) %>%
-  pmap(~ ..1 %>% 
-         .@meta.data %>% 
-         dplyr::rename(dblt_finder1 = !! rlang::sym(paste0("DF.classifications_0.25_",..2,"_",..3)), 
-                       dblt_finder2 = !! rlang::sym(paste0("DF.classifications_0.25_",..2,"_",..4)) , 
-                       dblt_finder_pANN = !! rlang::sym(paste0("pANN_0.25_",..2,"_",..3))) %>%
-         dplyr::select(starts_with('dblt_finder')) %>%
-         AddMetaData(..5, .))
-```
-
-
-```{r}
-## Takes long to run dbltfinder
-# saveRDS(all_msc_corrected_dblt, "data/processed/all_msc_corrected_dblt.RDS")
-```
-
-```{r}
-##No ground truth option
-all_msc_corrected_dblt <- readRDS("data/processed/all_msc_corrected_dblt.RDS")
-```
-
-#### Visualize identified doublets
-
-##### doublet cells 1 & 2 UMAP {.tabset}
-```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-all_msc_corrected_dblt %>% 
-  imap(.,~{
-    # create tabset for each group 
-    cat('###### ',.y,'   \n')
-    p1 <- DimPlot(.x, cells.highlight = .x@meta.data %>% filter(dblt_finder1=='Doublet') %>% row.names(), sizes.highlight = 1)
-    print(p1)
-    cat('\n  ')
-    
-    p2 <- DimPlot(.x, cells.highlight = .x@meta.data %>% filter(dblt_finder2=='Doublet') %>% row.names(), sizes.highlight = 1)
-    print(p2)
-    cat('\n')
-    cat("\n")
-  })
-
-```
-
 ##### MSC14 doublet cells
 ```{r, warning=FALSE, message=FALSE}
 # Display the combined datasets as an interactive 3D plot
@@ -853,67 +673,6 @@ ritss()
 
 ## scDblFinder
 
-```{r, message=FALSE, eval=FALSE}
-##Doublet removal
-all_msc_nosct_corrected_dblt_sce <- all_msc_nosct_corrected_dblt_sce %>%
-  map(. %>% scDblFinder(., clusters = "seurat_clusters")) #%>%
-  # map(. %>% scDblFinder(.))
-
-```
-
-
-#### Add doublet assignment to raw seurat object to visualize all the cells that are filter out
-```{r}
-##Seurat object
-##Add doublet assignment to counts not corrected by soupX
-
-# all_msc_w_dblts <- list(all_msc_corrected_dblt, all_msc_filt) %>%
-#   pmap(~ ..1@meta.data %>% 
-#          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          mutate(scrub_doublet = case_when(scrub_doublet == T ~ "Doublet", scrub_doublet == F ~ "Singlet")) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'dblt_finder1', 'dblt_finder2', 'seurat_clusters_dblt', 'dblt_finder_pANN')))  %>%
-#          # dplyr::select(scrub_doublet, dblt_finder1, dblt_finder2)  %>%
-#          AddMetaData(..2, .))
-
-```
-
-
-```{r}
-# all_msc_w_dblts <- list(all_msc_nosct_corrected_dblt_sce, all_msc_w_dblts) %>%
-#   pmap(~ ..1 %>% 
-#          SummarizedExperiment::colData() %>%
-#          data.frame()  %>% 
-#          dplyr::select('scDblFinder.class') %>% 
-#          dplyr::rename('scDblFinder_class' = `scDblFinder.class`) %>% 
-#          mutate(across(scDblFinder_class, str_to_sentence)) %>%
-#          AddMetaData(..2, .))
-```
-
-```{r, message=FALSE, eval=FALSE}
-##Doublet removal
-all_msc_w_dblts <- list(all_msc_w_dblts, all_msc_nosct_corrected_dblt_sce[paste0(names(all_msc_filt), "_norm")], all_msc_nosct_corrected_dblt_sce[paste0(names(all_msc_filt), "_sct")]) %>%
-  pmap(~ {
-    ..2 %>% 
-      SummarizedExperiment::colData() %>%
-      data.frame()  %>% 
-      dplyr::select('scDblFinder.class') %>% 
-      dplyr::rename('scDblFinder_class' = `scDblFinder.class`) %>% 
-      mutate(across(scDblFinder_class, str_to_sentence)) %>% 
-      rownames_to_column("bcode") %>% 
-      dplyr::left_join(., ..3 %>% 
-                         SummarizedExperiment::colData() %>%
-                         data.frame()  %>% 
-                         dplyr::select('scDblFinder.class') %>% 
-                         dplyr::rename('scDblFinder_class' = `scDblFinder.class`) %>% 
-                         mutate(across(scDblFinder_class, str_to_sentence)) %>% 
-                         rownames_to_column("bcode"), 
-                       suffix = c("_norm", "_sct"), 
-                       by = "bcode") %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
-       })
-```
-
 scdblfinder cluster
 ```{r, message=FALSE}
 ##Doublet removal
@@ -1099,7 +858,7 @@ plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embe
 
 ```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
 all_msc_w_dblts  %>%
-  purrr::pmap(.,  ~ {
+  purrr::imap(.,  ~ {
     # create tabset for each group
     cat('#####', .y, '   \n')
     a_gns = .x@meta.data  %>%
@@ -1286,7 +1045,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scDblFinder_class_sct == "Doublet") %>% row.names()))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scDblFinder_class_rand == "Doublet") %>% row.names()))
 ```
 
 
@@ -1446,7 +1205,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, dblt_finder2_norm
 
 ```{r}
 # dbt_methods <- c("scDblFinder_class", "scrub_doublet", "dblt_finder2")
-dbt_methods <- c(paste0(c("scDblFinder_class", "dblt_finder2"), rep(c("_norm", "_sct"), each=2)), "scrub_doublet")
+dbt_methods <- c(paste0(c("scDblFinder_class"), c("_norm", "_rand")), paste0(c("dblt_finder2"), rep(c("_norm", "_sct"))), "scrub_doublet")
 
 dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_dblts)), ~{
   dblt_calls <- .x@meta.data %>% 
@@ -1462,7 +1221,7 @@ dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_d
 
 ```{r}
 # # dbt_methods <- c("scDblFinder_class_norm", "scrub_doublet", "dblt_finder2")
-# dbt_methods <- c(paste0(c("scDblFinder_class_norm", "dblt_finder2"), rep(c("_norm", "_sct"), each=2)), "scrub_doublet")
+# dbt_methods <- c(paste0(c("scDblFinder_class_norm", "dblt_finder2"), rep(c("_norm", "_rand"), each=2)), "scrub_doublet")
 # 
 # dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_dblts)), ~{
 #   dblt_calls <- .x@meta.data %>% 
