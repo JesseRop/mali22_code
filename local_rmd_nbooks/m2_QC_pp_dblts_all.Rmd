@@ -168,6 +168,26 @@ algn_nm = 'minmap'
 ```
 
 
+```{r, message=FALSE}
+##Metadata from all p.falciparum genes downloaded from plasmoDB
+Pf3D7_genes_plasmoDB <- read_csv("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Pf3D7_genomes_gtfs_indexs/Pf3d7_Genes_Summary_270922.csv") %>% 
+  dplyr::rename("gene_id" = `Gene ID` ) %>% 
+  group_by(gene_id) %>% 
+  add_count(name='gn_iso') %>% 
+  ungroup() %>%
+  mutate(across(gene_id, ~case_when(gn_iso>1 ~ source_id,
+                                    TRUE ~ as.character(.)))) %>% 
+  mutate(across(gene_id, ~str_replace(.,"_", "-")))%>%
+  dplyr::rename('Gene_name' = `Gene Name or Symbol`, 'Ka_Ks' = `NonSyn/Syn SNP Ratio All Strains`, 'TM_domains'=`# TM Domains`) %>% 
+  mutate(across(where(is.character), ~na_if(., "N/A")),
+         Gene = coalesce(`Gene_name`, gene_id) )  %>%
+  group_by(Gene) %>% 
+  add_count() %>% 
+  ungroup() %>%
+  dplyr::mutate(across(Gene, ~case_when(n>1 ~ paste0(.,'_', gene_id),
+                                        TRUE ~ as.character(.)))) 
+
+```
 
 ### Common functions
 #### Average expression of gene sets
@@ -406,25 +426,24 @@ all_msc_nosct_supx_4_dblt  %>%
 
 ```
 
+```{r, fig.height = 5, fig.width = 15}
+# options(repr.plot.width=32, repr.plot.height=7)
+markers <- c("PF3D7-0935900", "PF3D7-0406200", "PF3D7-0109100", "PF3D7-0208900")
+marker_nms <- Pf3D7_genes_plasmoDB %>% filter(gene_id %in% markers)  %>% select(Gene, gene_id) %>% mutate(across(gene_id, ~factor(., levels = markers))) %>% arrange(gene_id)  %>% mutate(across(gene_id, as.character)) %>% deframe
 
-```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-#PF3D7_0208900 - p230p - male marker 
-#PF3D7_0109100 - ccp5 - female marker
-#PF3D7_0935900 - rex1 - asexual marker
-#PF3D7_0406200 - pfs16 - gam marker
+fp_fn <- function(obj = all_msc_nosct_supx_4_dblt[[1]], mks = marker_nms, mk_nms = names(marker_nms)) {
+  list(mks, mk_nms) %>%
+  pmap(.,~{
+    FeaturePlot(obj, features = ..1, dims = c(1,2)) + 
+      labs(title = ..2) +
+      theme(legend.position = 'none')
+    }) %>% 
+    plot_grid(plotlist = ., nrow = ceiling(length(markers)/4)) 
+}
 
-all_msc_nosct_supx_4_dblt  %>% 
-  purrr::imap(.,~{
-    # create tabset for each group 
-    cat('##### ',.y,'   \n')
-    p <- FeaturePlot(., features = c("PF3D7-0935900","PF3D7-0406200", "PF3D7-0208900", "PF3D7-0109100"), dims = c(1,2))
-    print(p)
-    cat('\n')
-    cat("\n")
-  })
-
+map(all_msc_nosct_supx_4_dblt, ~fp_fn(obj = .x))
 ```
+
 
 
 
@@ -443,7 +462,7 @@ scdblfinder cluster
 ```{r, message=FALSE}
 ##Doublet removal
 all_msc_nosct_corrected_dblt_clst <- all_msc_nosct_corrected_dblt_sce %>%
-  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table")) #%>%
+  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table", nfeatures = 500)) #%>%
   # map(. %>% scDblFinder(.))
 ```
 
@@ -452,7 +471,7 @@ scdblfinder random
 ```{r, message=FALSE}
 ##Doublet removal
 all_msc_nosct_corrected_dblt_rand <- all_msc_nosct_corrected_dblt_sce %>%
-  map(. %>% scDblFinder(., returnType = "table")) #%>%
+  map(. %>% scDblFinder(., returnType = "table", nfeatures = 500)) #%>%
   # map(. %>% scDblFinder(.))
 ```
 
@@ -472,7 +491,7 @@ scdblfinder cluster
 ```{r, message=FALSE}
 ##Doublet removal
 all_msc_nosct_dblt_clst <- all_msc_nosct_dblt_sce %>%
-  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table")) #%>%
+  map(. %>% scDblFinder(., clusters = "seurat_clusters", returnType = "table", nfeatures = 500)) #%>%
   # map(. %>% scDblFinder(.))
 ```
 
@@ -481,29 +500,46 @@ scdblfinder random
 ```{r, message=FALSE}
 ##Doublet removal
 all_msc_nosct_dblt_rand <- all_msc_nosct_dblt_sce %>%
-  map(. %>% scDblFinder(., returnType = "table")) #%>%
+  map(. %>% scDblFinder(., returnType = "table", nfeatures = 500)) #%>%
   # map(. %>% scDblFinder(.))
 ```
 
-Format the scdblfinder outputs and merge before adding to seurat object as metadata
-```{r, message=FALSE}
 
-# scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_dblt_rand, all_msc_nosct_dblt_clst, all_msc_nosct_dblt_rand) %>%
-#   pmap(~ {
-#     spx <- list(..1, ..2, ..3, ..4)
-#     pmap(list(spx, list("_supx_norm", "_supx_rand", "_norm", "_rand")), ~ {
-#       ..1 %>% 
-#       data.frame()  %>% 
-#       dplyr::select('class', 'score') %>% 
-#       dplyr::rename_with(.fn = ~paste0("scf_",., ..2), .cols = everything()) %>% 
-#       mutate(across(scf_class, str_to_sentence)) %>% 
-#       rownames_to_column("bcode") 
-#        }) %>%
-#       purrr::reduce(., .f = full_join, 
-#                           by = "bcode")
-#   })
+### scdblfinder sct
+
+```{r, message=FALSE}
+# assuming `x` is the count matrix:
+# nf <- 200
+# # sce <- SingleCellExperiment(list(counts=GetAssayData(all_msc_filt[[6]], slot="counts")))
+# # we create a dummy dataset; since it's small we set a higher doublet rate
+# sce <- mockDoubletSCE(dbl.rate=0.1, ngenes=2000 )
+# 
+# # assuming `x` is the count matrix:
+# nfeatures <- 1000
+# sce <- mockDoubletSCE(dbl.rate=0.1, ngenes=2000 )
+# # sctransform on real cells:
+# vst1 <- sctransform::vst(counts(sce), n_cells=min(ncol(sce),5000), verbosity=0)
+# sce <- sce[row.names(vst1$y),]
+# logcounts(sce) <- vst1$y
+# hvg <- row.names(sce)[head(order(vst1$gene_attr$residual_variance, decreasing=TRUE), nfeatures)]
+# 
+# # define a processing function that scDblFinder will use on the real+artificial doublets;
+# # the input should be a count matrix and the number of dimensions, and the output a PCA matrix
+#   
+# myfun <- function(e, dims){
+#   # we use the thetas calculated from the first vst on real cells
+#   e <- e[intersect(row.names(e), row.names(vst1$model_pars_fit[which(!is.na(vst1$model_pars_fit[,"theta"])),])),]
+#   vst2 <- sctransform::vst(e, n_cells=min(ncol(e),5000), method="nb_theta_given", 
+#                            theta_given=vst1$model_pars_fit[row.names(e),"theta"],
+#                            min_cells=1L, verbosity=0)
+#   scater::calculatePCA(vst2$y, ncomponents=dims)
+# }
+#   
+# sce <- scDblFinder(sce, processing=myfun, nfeatures=hvg)
 
 ```
+
+Format the scdblfinder outputs and merge before adding to seurat object as metadata
 
 ```{r, message=FALSE}
 
@@ -528,7 +564,9 @@ scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_d
 ##Doublet removal
 all_msc_w_dblts <- list(all_msc_filt, scf_outputs) %>%
   pmap(~ {
-    AddMetaData(..1, ..2)
+    ..2 %>%
+      column_to_rownames("bcode") %>%
+      AddMetaData(..1, .)
        })
 
 ```
@@ -1160,7 +1198,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm) %
 ```{r}
 # dbt_methods <- c("scf_class", "scrub_doublet", "scf_class_norm")
 # dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class_norm"), rep(c("_norm", "_sct"))), "scrub_doublet")
-dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), "scrub_doublet")
+dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet")
 
 
 dbt_sens_speci <-map2(all_msc_w_dblts, rep(list(dbt_methods), length(all_msc_w_dblts)), ~{
