@@ -155,7 +155,9 @@ knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents
 ##Copy souporcell files for the optimum clusters
 
 ##Sample ID
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
+
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 algn_nms = c('minmap', 'hsat', 'lr_ref')
 
@@ -166,7 +168,8 @@ algn_nms_al <- rep(algn_nms, each= length(sample_name_nms))
 sm_aln_nms_al <- paste(rep(sample_name_nms, length(algn_nms)), rep(algn_nms, each= length(sample_name_nms)), sep ='_')
 
 ## number of optimum clusters to investigate per sample
-opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11))
+# opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11))
+opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11), "MSC38" = c(2:6), "MSC40" = c(6:10), "MSC50_MACS" = c(2:6), "MSC53" = c(2:6), "MSC57" = c(2:6))
 # opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9))
 # opt_clusters_nms <- list("MSC33" = c(3:9),"MSC48" = c(2:3),"MSC49" = c(2:6),"MSC55" = c(4:10),"MSC60" = c(2:7), "MSC66")
 
@@ -260,11 +263,115 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 ```
 
 
+```{r, fig.width=16, fig.height=8} 
+optimum_kv2 <- optimum_k-1
+optimum_kv3 <- optimum_k+1
+
+
+sc_ll_knee_p_all <- map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")] , optimum_k, ~.x %>% mutate(opt_k = .y)) %>%
+  bind_rows(., .id = 'donor') %>% 
+  mutate(across(donor, ~factor(str_remove(., '_hsat'), levels = names(optimum_k)))) %>%
+    mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
+    ggplot(., aes(x = No_of_clusters, y = log10(-(log_likelihood)))) + 
+    scale_y_reverse() +
+    geom_point() +
+    geom_line(aes(group = 1)) + 
+    geom_vline(aes(xintercept = optimum_k), data.frame(optimum_k) %>% set_names("optimum_k") %>% rownames_to_column('donor') %>% mutate(across(donor, ~factor(., levels = sample_name_nms)))) +
+    scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
+    facet_wrap(donor~., nrow = 2)+
+    theme_classic() +
+    theme(axis.title = element_text(size=20, face = 'bold'),
+          axis.text.y = element_text(size=18),
+          axis.text.x = element_text(size=16),
+          strip.text =element_text(size=24,face="bold", colour = 'black'),
+          panel.border=element_rect(colour="black",fill='transparent')) +
+    labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
+
+sc_ll_knee_p_all
+# saveRDS(sc_ll_knee_p_all, "plots/fig_QC_s1/sc_ll_knee_p_all.RDS")
+```
+
+```{r, fig.width=7.5, fig.height= 5.5}
+  
+sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
+  pmap(., ~{
+      ..1 %>% 
+  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
+  ggplot(., aes(x = No_of_clusters, y = log10(-log_likelihood))) + 
+  scale_y_reverse() +
+  geom_point() +
+  scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
+  geom_vline(xintercept=..2)+
+  geom_vline(xintercept=..3)+
+  geom_vline(xintercept=..4)+
+  geom_line(aes(group = 1)) + 
+  theme_classic() +
+  theme(text = element_text(size=35)) +
+  labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
+    })
+
+sc_ll_knee_p_lst
+# saveRDS(sc_ll_knee_p_lst, "plots/fig_QC_s1/sc_ll_knee_p_lst.RDS")
+```
+
+```{r, fig.width = 12, fig.height = 4, message=FALSE, warning=FALSE}
+
+ss_bar_plt <-list( strn_c_mdata)  %>% 
+  purrr::pmap(.,~{
+  a_tbl <- ..1 %>%
+      mutate(across(stage_afm, ~factor(., levels=c('Asexual', 'Female', 'Male', 'Developing', 'Unassigned')))) %>%
+      dplyr::count(Strain_qc, stage_afm, .drop = FALSE) 
+  
+  ##get stage_ag labels and counts to add to the Strain_qc+stage_afm counts generated above
+  stage_ag_cnt <- ..1 %>% 
+    dplyr::select(Strain_qc, stage_ag, stage_afm) %>% 
+    add_count(Strain_qc, stage_ag, name = 'stage_ag_n') %>% 
+    distinct(pick(Strain_qc, stage_afm), .keep_all = T) %>% 
+    left_join(a_tbl, ., by =c('Strain_qc', 'stage_afm')) %>% 
+    rename(c('Stage'= stage_afm, 'Counts' =n, 'Strain' = Strain_qc))  
+  
+  print(stage_ag_cnt)
+  
+    b_plt <- stage_ag_cnt %>%
+      # ggplot(., aes(x = Stage, y = Counts, fill = Stage, color=stage_ag_n<30)) +
+      ggplot(., aes(x = Stage, y = Counts, fill = Stage)) +
+      geom_col(position = position_dodge2()) + #width=0.4, position = position_dodge(width=0.5) 
+      geom_text(aes(label=Counts), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 7, show.legend = F, fontface ='bold', colour='black')+
+      scale_fill_manual(values = c_stg_cols) + #'Asexual' = "#FFE5B4", 'Male' = "#BFD7B5", 'Female'="#8ab6d6"
+      # scale_color_manual(values = c('FALSE' = "white", 'TRUE' = "blue")) +
+  geom_tile(aes(x = Stage, y = -10, fill = Stage, height = 14)) +
+  facet_wrap( Strain ~ ., nrow = 1) +
+      scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
+      scale_x_discrete(expand = expansion(add = c(1, 1))) +
+      theme_classic() +
+  labs( y = 'Counts')+
+      theme(
+        axis.text.y  = element_text(size = 22),
+        axis.title.y  = element_text(size = 22, face = "bold"),
+        axis.title.x = element_blank(),
+        # axis.title = element_text(size = 18, face = "bold"),
+        legend.text = element_text(size = 22),
+        legend.title = element_text(size = 22, face = "bold"),
+        legend.position="bottom",
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.text =element_text(size=20,face="bold", colour = 'black'),
+        panel.border=element_rect(colour="black",fill='transparent')
+      )+ 
+      guides(color = F)
+    print(b_plt)
+    return(b_plt)
+})
+
+
+```
+
 ```{r, fig.width= 13, fig.height=4} 
 clusters_log_likelihoods_lst %>% 
   bind_rows(., .id = "sample_algnr") %>% 
-  separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*", "_",algnr = "[a-z].*")) %>%
+  separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",algnr = "[a-z].*")) %>%
   # separate_wider_delim(., "sample_algnr", names = c("sample", "algnr"), delim = "_") %>% 
+  mutate(across(c('sample'), ~factor(., levels = sample_name_nms))) %>%
   mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
   ggplot(., aes(x = No_of_clusters, y = log_likelihood)) +
     geom_point() +
@@ -370,7 +477,8 @@ soupo_kselect_al <- soupc_all_al %>%
 ```{r, eval=T}
 # Compare HISAT and MINIMAP
 soupo_kselect_al_cor <- soupo_kselect_al %>%
-  separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
+  # separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
+  separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
   unite(col = "sample_k", c('sample','k'), remove = FALSE)  %>%
   select("sample_k","aligner","barcode","Strain") %>% 
   dplyr::group_split(sample_k) %>%
@@ -771,8 +879,8 @@ snk_plts[str_detect(names(snk_plts), "lr_ref")]
 
 
 ```{r}
-optimum_k = c(8,6,6,7,7,9) %>% set_names(sample_name_nms)
-optimum_k_aln = rep(c(8,6,6,7,7,9),length(algn_nms)) %>% set_names(sm_aln_nms_al)
+optimum_k = c(8,6,6,7,7,9,3,8,3,3,3) %>% set_names(sample_name_nms)
+optimum_k_aln = rep(c(8,6,6,7,7,9,3,8,3,3,3),length(algn_nms)) %>% set_names(sm_aln_nms_al)
 # optimum_k = c(8,6, 4,5,5) %>% set_names(sample_name_nms)
 # optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
 # optimum_k_aln = rep(c(8,6,6,7,7),length(algn_nms)) %>% set_names(sm_aln_nms_al)
@@ -987,7 +1095,8 @@ Strain_qc_cutoff=0
 # optimum_k = c(8,6, 4,5,5) %>% set_names(sample_name_nms)
 # optimum_k = c(8,6, 4,5,5,10) %>% set_names(sample_name_nms)
 
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
+# opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
+opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2:4), "MSC57" = c(2:4))
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5))
 opt_narrow_clusters_nms_aln <- rep(opt_narrow_clusters_nms, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5), "MSC66" = c(8:10))
