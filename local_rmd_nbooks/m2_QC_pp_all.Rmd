@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
   library(sctransform)
   library(rgl)
   library(patchwork)
-  library(DoubletFinder)
+  # library(DoubletFinder)
   library(ggrepel)
   library(ggpubr)
   library(dplyr) 
@@ -34,7 +34,7 @@ suppressPackageStartupMessages({
   library(Hmisc)
   library(rmarkdown)
   library(RColorBrewer)
-  library(Platypus)
+  # library(Platypus)
   library(ggvenn)
   library(conflicted)
   library(SoupX)
@@ -234,7 +234,7 @@ initialize variable for the sample names
 ##Copy souporcell files for the optimum clusters
 
 ##Sample ID
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
 ##Samples
@@ -283,8 +283,23 @@ TURN CHUNKS FOR PROCESSING OF RAW CELLRANGER OUTPUTS TO FALSE -
 ```
 
 ```{r, message=F, warning=F}
-##Read filtered cellranger matrices into R
+##Read filtered cellranger matrices into R 4,6,10,12,15
 all_msc <- readRDS("data/processed/all_msc_anotd_preQC.RDS") %>% .[sample_id_lst]
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+##Seurat UMAP
+map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
+```
+
+```{r, warning=FALSE, message=FALSE}
+##Seurat UMAP
+res_list <-list(rep(0.4, length(sample_name)))
+
+all_msc <- all_msc %>%
+  map2(., res_list, ~FindClusters(.x, resolution = .y, verbose = FALSE, k.param = 30))
+
 ```
 
 ```{r, warning=FALSE, message=FALSE}
