@@ -14,6 +14,7 @@ output:
 suppressPackageStartupMessages({
   library(Seurat)
   library(sctransform)
+  library(glmGamPoi)
   library(rgl)
   library(patchwork)
   # library(DoubletFinder)
@@ -318,7 +319,7 @@ gn_lc <- rep(600, length(sample_id_lst))
 ugn_lc <- rep(list(NULL), length(sample_id_lst))
 nc_lst <- rep("nCount_RNA", length(sample_id_lst))
 
-vp_fn <- function(seu_lst = all_msc, gnc_lst = gn_lc, ugnc_lst= ugn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.01, nrws = 1) {
+vp_fn <- function(seu_lst = all_msc, gnc_lst = gn_lc, ugnc_lst= ugn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.01, nrws = ceiling(length(all_msc)/5)) {
   list(seu_lst, gnc_lst, ugnc_lst, ftr) %>% 
   pmap(.,~{VlnPlot(..1[,..1@meta.data[,..4[1]] < seu_thresh], features = ..4, group.by = grp,idents = NULL, pt.size = ptsz)+ 
         geom_hline(yintercept = ..2)+
@@ -376,7 +377,7 @@ vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 1000, ftr = nc_lst, grp =
 #### Violin plots
 ```{r, fig.height = 5, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
-gn_lc <- c(250, 250, 250, 300, 250, 250)
+gn_lc <- rep(550, length(sample_id_lst))
 
 all_mdata <- map(all_msc, ~.@meta.data) %>% 
   bind_rows(., .id = 'sample')
@@ -397,7 +398,7 @@ all_mdata %>%
 
 ```{r, fig.height = 5, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
-gn_lc <- c(260, 260, 330, 270, 250, 250)
+gn_lc <- c(260, 260, 330, 270, 250, 250, 260, 330, 270, 250, 250)
 
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = NULL, ptsz = 0.01)
 
@@ -407,9 +408,9 @@ vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = 
 ```{r, fig.height = 5, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
 # rna_lc <- c(530, 600, 530, 700, 600)
-rna_lc <- c(510, 510, 510, 510, 510, 510)
+rna_lc <- rep(510, length(sample_id_lst))
 # rna_uc <- c(7500, 13000, 24000, 40000, 17000)
-rna_uc <- c(7500, 13000, 23000, 37000, 17000, 17000)
+rna_uc <- c(7500, 13000, 23000, 37000, 17000, 17000, 13000, 23000, 37000, 17000, 17000)
 
 vp_fn(seu_lst = all_msc, gnc_lst = rna_lc, ugnc_lst = rna_uc, seu_thresh = 10000, ftr = nc_lst, grp = NULL, ptsz = 0.01)
 
@@ -609,7 +610,7 @@ all_msc <- list(all_msc, mt_avg_exp) %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-mt_filt <- c(0.4, 0.4, 0.4, 0.4, 0.4, 0.4)
+mt_filt <-list(rep(0.4, length(sample_name)))
 ```
 
 
@@ -1048,22 +1049,39 @@ map(all_msc_anotd, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@m
 
 ```
 
+
+```{r}
+## Add UMAP dimensions from the soupx corrected object used to get doublets
+for (i in names(all_msc_anotd)) {
+  all_msc_anotd[[i]]@reductions[["umap_norm"]] <- all_msc_anotd[[i]]@reductions$umap
+  all_msc_anotd[[i]]@meta.data[, "seurat_clusters_norm"] <- all_msc_anotd[[i]]@meta.data$seurat_clusters
+}
+```
+
 ```{r, warning=FALSE, message=FALSE}
 
-all_msc_anotd_ysct <- map(all_msc_anotd, ~{
-  .x %>%
+all_msc_anotd_ysct <- imap(all_msc_anotd, ~{
+  print(paste0("SCT starting ", .y))
+  
+  obj <- .x %>%
     seurat_SCT() %>%
     RunUMAP(reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
     FindNeighbors(reduction = "pca", dims = 1:30, verbose = FALSE) 
+  
+  print(paste0("done ", .y))
+  return(obj)
 })
 
 ```
+
+
 
 ```{r, warning=FALSE, message=FALSE}
 
 all_msc_anotd_ysct <- map(all_msc_anotd_ysct, ~{
   .x %>%
-    FindClusters(resolution = 0.7, verbose = FALSE)
+    # FindClusters(resolution = 0.7, verbose = FALSE)
+    FindClusters(resolution = 0.4, verbose = FALSE)
 })
 
 ```
@@ -1154,7 +1172,7 @@ list(strn_knee_p, sample_id_lst)  %>%
 ```{r}
 # options(repr.plot.width=32, repr.plot.height=7)
 
-md_don_all <- map(all_msc_anotd, ~.@meta.data #%>% 
+md_don_all <- map(all_msc_anotd_ysct, ~.@meta.data #%>% 
                        # mutate(across(c(sim_lab1, sim_lab2), as.numeric))
                      ) %>% 
   bind_rows(., .id = 'donor') 
@@ -1199,7 +1217,7 @@ md_don_all %>%
 ```
 
 #### Violin plots
-```{r, fig.height = 4.5, fig.width = 12}
+```{r, fig.height = 7, fig.width = 16}
 # options(repr.plot.width=32, repr.plot.height=7)
 
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
@@ -1212,7 +1230,7 @@ md_don_all %>%
   # geom_violin() +
   # ggforce::geom_sina(size = 0.01)+
   geom_boxplot()+
-  facet_wrap(donor ~., nrow = 1)+
+  facet_wrap(donor ~., nrow = 2, scales = "free_x")+
   labs(y = "Gene count (X 1000)")+
   geom_hline(yintercept = ..2/1000)+
     labs(x= 'Cluster', y= paste0(..3, ' count (X 1000)')) +
@@ -1224,7 +1242,7 @@ md_don_all %>%
 
 
 #### Violin plots
-```{r, fig.height = 4.5, fig.width = 12}
+```{r, fig.height = 7, fig.width = 16}
 # options(repr.plot.width=32, repr.plot.height=7)
 
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
@@ -1237,7 +1255,7 @@ md_don_all %>%
   geom_violin() +
   ggforce::geom_sina(size = 0.1,  alpha = 0.5)+
   # geom_boxplot()+
-  facet_wrap(donor ~., nrow = 1)+
+  facet_wrap(donor ~., nrow = 2, scales = "free_x")+
   labs(y = "Gene count (X 1000)")+
   geom_hline(yintercept = ..2/1000) +
     labs(x= 'Cluster', y= paste0(..3, ' count (X 1000)')) +
@@ -1247,7 +1265,7 @@ md_don_all %>%
 
 ```
 
-```{r, fig.height = 4.5, fig.width = 12}
+```{r, fig.height = 7, fig.width = 16}
 # options(repr.plot.width=32, repr.plot.height=7)
 
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 300), c('Transcript', 'Gene')), ~{
@@ -1258,10 +1276,10 @@ md_don_all %>%
   # scale_color_manual(values = sp_fld_colors) +
   theme_classic() +
   # geom_violin() +
-  ggforce::geom_sina(size = 0.1)+
+  ggforce::geom_sina(size = 0.1) +
   # geom_boxplot()+
-  facet_wrap(donor ~., nrow = 1)+
-  labs(y = "Gene count (X 1000)")+
+  facet_wrap(donor ~., nrow = 1) +
+  labs(y = "Gene count (X 1000)") +
   geom_hline(yintercept = ..2/1000) +
     labs(x= 'Cluster', y= paste0(..3, ' count (X 1000)')) +
   fct_theme+
@@ -1353,7 +1371,7 @@ scmap cosine similarities for the top 2 assigned stage labels among the top 10 s
 
 
 ```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
-list(all_msc_anotd, sample_id_lst)  %>%
+list(all_msc_anotd_ysct, sample_id_lst)  %>%
   purrr::pmap(.,  ~ {
     # create tabset for each group
     cat('#####', ..2, '   \n')
@@ -1403,7 +1421,7 @@ Remove those with less than 300 genes and 700 transcripts
 Number of cells per strain_gt to remove based on REVISED CUT-OFFS to assist souporcell to perform clustering correctly
 ```{r}
 
-pmap(list(all_msc_anotd), ~..1@meta.data %>% dplyr::count(nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl ))
+pmap(list(all_msc_anotd_ysct), ~..1@meta.data %>% dplyr::count(nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl ))
 ```
 
 
@@ -1412,7 +1430,7 @@ Number of cells per strain_gt to remove based on cut-off
 # gn_lc <- c(250, 250, 250, 300, 250)
 # rna_lc <- c(530, 600, 530, 700, 600)
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4 ))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4 ))
 # map(all_msc_anotd, ~.@meta.data %>% dplyr::count(nFeature_RNA<250 ,nCount_RNA < 600, nCount_RNA > 40000 ))
 ```
 
@@ -1421,7 +1439,7 @@ Number of cells per strain_gt to remove based on cut-off
 # gn_lc <- c(250, 250, 250, 300, 250)
 # rna_lc <- c(530, 600, 530, 700, 600)
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4 ))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4 ))
 # map(all_msc_anotd, ~.@meta.data %>% dplyr::count(nFeature_RNA<250 ,nCount_RNA < 600, nCount_RNA > 40000 ))
 ```
 
@@ -1440,24 +1458,24 @@ rna_lc <- gh_df_v[[3]]
 rna_uc <- gh_df_v[[1]]
 
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4, nFeature_RNA > ..5 ))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count(nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4, nFeature_RNA > ..5 ))
 # map(all_msc_anotd, ~.@meta.data %>% dplyr::count(nFeature_RNA<250 ,nCount_RNA < 600, nCount_RNA > 40000 ))
 ```
 
 ```{r}
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count(strain_gt == "Negative", nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4, nFeature_RNA > ..5 ))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count(strain_gt == "Negative", nFeature_RNA<..2 ,nCount_RNA < ..3, nCount_RNA > ..4, nFeature_RNA > ..5 ))
 # map(all_msc_anotd, ~.@meta.data %>% dplyr::count(nFeature_RNA<250 ,nCount_RNA < 600, nCount_RNA > 40000 ))
 ```
 
 
 ```{r}
-pmap(list(all_msc_anotd), ~..1@meta.data %>% dplyr::count(strain_gt == "Negative", nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl ))
+pmap(list(all_msc_anotd_ysct), ~..1@meta.data %>% dplyr::count(strain_gt == "Negative", nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl ))
 ```
 
 
 ```{r}
-pmap(list(all_msc_anotd), ~..1@meta.data %>% dplyr::count( nFeature_RNA>gn_lci_cl ,nCount_RNA > rna_lci_cl, nCount_RNA < rna_uci_cl, nFeature_RNA < gn_uci_cl ))
+pmap(list(all_msc_anotd_ysct), ~..1@meta.data %>% dplyr::count( nFeature_RNA>gn_lci_cl ,nCount_RNA > rna_lci_cl, nCount_RNA < rna_uci_cl, nFeature_RNA < gn_uci_cl ))
 ```
 
 Write out some minimally QCd (removing low count cells first) files for souporcell
@@ -1477,35 +1495,36 @@ trip='Mali'
 
 
 Visualize low clusters
+
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(nFeature_RNA<=..2 | nCount_RNA <= ..3 | nCount_RNA >= ..4 | nFeature_RNA >= ..5) %>% row.names()))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc, names(all_msc_anotd_ysct)), ~DimPlot(.x, dims = c(1,2), label = T, reduction = "umap_norm", group.by = "seurat_clusters_norm", cells.highlight = ..1@meta.data %>% filter(nFeature_RNA<=..2 | nCount_RNA <= ..3 | nCount_RNA >= ..4 | nFeature_RNA >= ..5) %>% row.names()) + labs(title = ..6))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(nFeature_RNA<=..2 | nCount_RNA <= ..3 | nCount_RNA >= ..4 | nFeature_RNA >= ..5) %>% row.names()))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc, names(all_msc_anotd_ysct)), ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(nFeature_RNA<=..2 | nCount_RNA <= ..3 | nCount_RNA >= ..4 | nFeature_RNA >= ..5) %>% row.names()) + labs(title = ..6))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd), ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(StagePrelim == "Unassigned") %>% row.names()))
-
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim, (nFeature_RNA<..2 | nCount_RNA < ..3 | nCount_RNA > ..4| nFeature_RNA > ..5)))
+imap(all_msc_anotd_ysct, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(StagePrelim == "Unassigned") %>% row.names())+ labs(title = .y))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim, nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim, (nFeature_RNA<..2 | nCount_RNA < ..3 | nCount_RNA > ..4| nFeature_RNA > ..5)))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim, nFeature_RNA<gn_lci_cl ,nCount_RNA < rna_lci_cl, nCount_RNA > rna_uci_cl, nFeature_RNA > gn_uci_cl))
 
 ```
 
@@ -1513,20 +1532,20 @@ pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim == "Unassigned", nFeature_RNA<..2 , nCount_RNA < ..3 , nCount_RNA > ..4, nFeature_RNA > ..5))
+pmap(list(all_msc_anotd_ysct, gn_lc, rna_lc, rna_uc, gn_uc), ~..1@meta.data %>% dplyr::count( StagePrelim == "Unassigned", nFeature_RNA<..2 , nCount_RNA < ..3 , nCount_RNA > ..4, nFeature_RNA > ..5))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd), ~..1@meta.data %>% dplyr::count( StagePrelim, seurat_clusters ))
+pmap(list(all_msc_anotd_ysct), ~..1@meta.data %>% dplyr::count( StagePrelim, seurat_clusters ))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 
-pmap(list(all_msc_anotd), ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-0935900"))
+imap(all_msc_anotd_ysct, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-0935900", reduction = "umap_norm")+ labs(title = .y))
 
 ```
 
@@ -1644,7 +1663,7 @@ all_msc_filt <- all_msc_filt %>%
 
 ```{r, warning=FALSE, message=FALSE}
 # pc_list <-list('12')
-pc_list <-list(5L,3L,4L, 5L, 5L, 5L)
+pc_list <-list(5L,3L,4L, 5L, 5L, 5L,3L,4L, 5L, 5L, 5L)
 
 all_msc_filt <- all_msc_filt %>%
   map2(., pc_list, ~RunUMAP(.x, reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
@@ -1668,7 +1687,7 @@ all_msc_filt <- all_msc_filt %>%
 
 # old_seurat_clusters <-  all_msc_filt %>% map(., ~.x@meta.data %>% dplyr::select(seurat_clusters) %>% rename('old_seu_cluster' = seurat_clusters))
 
-map(all_msc_filt, ~DimPlot(.x, dims = c(1,2), label = T))
+imap(all_msc_filt, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
 ```
 
 ##### Recheck mitochondrial percent {.tabset}
