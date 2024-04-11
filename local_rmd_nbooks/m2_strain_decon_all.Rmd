@@ -263,58 +263,8 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 ```
 
 
-```{r, fig.width=16, fig.height=8} 
-optimum_kv2 <- optimum_k-1
-optimum_kv3 <- optimum_k+1
 
-
-sc_ll_knee_p_all <- map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")] , optimum_k, ~.x %>% mutate(opt_k = .y)) %>%
-  bind_rows(., .id = 'donor') %>% 
-  mutate(across(donor, ~factor(str_remove(., '_hsat'), levels = names(optimum_k)))) %>%
-    mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-    ggplot(., aes(x = No_of_clusters, y = log10(-(log_likelihood)))) + 
-    scale_y_reverse() +
-    geom_point() +
-    geom_line(aes(group = 1)) + 
-    geom_vline(aes(xintercept = optimum_k), data.frame(optimum_k) %>% set_names("optimum_k") %>% rownames_to_column('donor') %>% mutate(across(donor, ~factor(., levels = sample_name_nms)))) +
-    scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
-    facet_wrap(donor~., nrow = 2)+
-    theme_classic() +
-    theme(axis.title = element_text(size=20, face = 'bold'),
-          axis.text.y = element_text(size=18),
-          axis.text.x = element_text(size=16),
-          strip.text =element_text(size=24,face="bold", colour = 'black'),
-          panel.border=element_rect(colour="black",fill='transparent')) +
-    labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
-
-sc_ll_knee_p_all
-# saveRDS(sc_ll_knee_p_all, "plots/fig_QC_s1/sc_ll_knee_p_all.RDS")
-```
-
-```{r, fig.width=7.5, fig.height= 5.5}
-  
-sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
-  pmap(., ~{
-      ..1 %>% 
-  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-  ggplot(., aes(x = No_of_clusters, y = log10(-log_likelihood))) + 
-  scale_y_reverse() +
-  geom_point() +
-  scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
-  geom_vline(xintercept=..2)+
-  geom_vline(xintercept=..3)+
-  geom_vline(xintercept=..4)+
-  geom_line(aes(group = 1)) + 
-  theme_classic() +
-  theme(text = element_text(size=35)) +
-  labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
-    })
-
-sc_ll_knee_p_lst
-# saveRDS(sc_ll_knee_p_lst, "plots/fig_QC_s1/sc_ll_knee_p_lst.RDS")
-```
-
-```{r, fig.width = 12, fig.height = 4, message=FALSE, warning=FALSE}
+```{r, fig.width = 12, fig.height = 4, message=FALSE, warning=FALSE, eval=FALSE}
 
 ss_bar_plt <-list( strn_c_mdata)  %>% 
   purrr::pmap(.,~{
@@ -887,6 +837,7 @@ optimum_k_aln = rep(c(8,6,6,7,7,9,3,8,3,3,3),length(algn_nms)) %>% set_names(sm_
 ```
 
 
+
 ```{r, fig.width=6, fig.height=4}
 ## Rename the initial k colnames which is unchanged when harmonizing strain annotation for Sankey plot and factorized newly generated strain harmonized vectors
 # strn_harmnzd_tbls_5 <- list(strn_harmnzd_tbls_5, map(don_k_names, ~.x[1]), map(don_hmonizd_k_names, ~.x[1])) %>%
@@ -1139,6 +1090,58 @@ map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst)
 )
 ```
 
+```{r, fig.width=16, fig.height=8} 
+optimum_k = c(8,6,6,7,7,9,3,8,3,3,3) %>% set_names(sample_name_nms)
+
+optimum_kv2 <- optimum_k-1
+optimum_kv3 <- optimum_k+1
+
+
+sc_ll_knee_p_all <- map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")] , optimum_k, ~.x %>% mutate(opt_k = .y)) %>%
+  bind_rows(., .id = 'donor') %>% 
+  mutate(across(donor, ~factor(str_remove(., '_hsat'), levels = names(optimum_k)))) %>%
+    mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
+    ggplot(., aes(x = No_of_clusters, y = log10(-(log_likelihood)))) + 
+    scale_y_reverse() +
+    geom_point() +
+    geom_line(aes(group = 1)) + 
+    geom_vline(aes(xintercept = optimum_k), data.frame(optimum_k) %>% set_names("optimum_k") %>% rownames_to_column('donor') %>% mutate(across(donor, ~factor(., levels = sample_name_nms)))) +
+    scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
+    facet_wrap(donor~., nrow = 2)+
+    theme_classic() +
+    theme(axis.title = element_text(size=20, face = 'bold'),
+          axis.text.y = element_text(size=18),
+          axis.text.x = element_text(size=16),
+          strip.text =element_text(size=24,face="bold", colour = 'black'),
+          panel.border=element_rect(colour="black",fill='transparent')) +
+    labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
+
+sc_ll_knee_p_all
+# saveRDS(sc_ll_knee_p_all, "plots/fig_QC_s1/sc_ll_knee_p_all.RDS")
+```
+
+```{r, fig.width=7.5, fig.height= 5.5}
+  
+sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
+  pmap(., ~{
+      ..1 %>% 
+  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
+  ggplot(., aes(x = No_of_clusters, y = log10(-log_likelihood))) + 
+  scale_y_reverse() +
+  geom_point() +
+  scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
+  geom_vline(xintercept=..2)+
+  geom_vline(xintercept=..3)+
+  geom_vline(xintercept=..4)+
+  geom_line(aes(group = 1)) + 
+  theme_classic() +
+  theme(text = element_text(size=35)) +
+  labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
+    })
+
+sc_ll_knee_p_lst
+# saveRDS(sc_ll_knee_p_lst, "plots/fig_QC_s1/sc_ll_knee_p_lst.RDS")
+```
 
 ```{r, eval=FALSE} 
 optimum_kv2 <- c(4,3,3,7,3) %>% set_names(sample_name_nms)
@@ -1521,7 +1524,7 @@ map(strn_c_mdata,
 
 Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk genotyping
 
-```{r, eval=T}
+```{r, eval=F}
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
 
@@ -1541,8 +1544,7 @@ for (s in names(strn_c_mdata)) {
 
     imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',optimum_k_aln[s],'/',.y, '.tsv')))
      
-    # print(paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',optimum_k_aln[s], ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
-    # )
+    
     system(
       paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',optimum_k_aln[s], ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
     )
@@ -1586,6 +1588,72 @@ for (s in names(strn_c_mdata)) {
 ```
 
 
+```{r, eval=T}
+## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
+# sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
+
+for (s in names(strn_c_mdata)) {
+  narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_.*")]]
+  
+  for (k in narrow_k) {
+    for (str_q in c('strain')){
+      ## Assign minimap/hsat mapper directory
+      algn_nm = str_remove(s, "MSC[0-9]*_")
+      s_nm = str_remove(s, "_.*")
+
+      # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rownames_to_column('bcode')%>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, bcode) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+      print(names(ss_qcd_ano[[1]]))
+
+      system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/',str_q,'_k',k,'/'))
+      system(paste0('rm /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/*'))
+
+      imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/',.y, '.tsv')))
+
+
+      system(
+        paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
+      )
+
+      ##Add doublets
+      # system(
+      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/')
+      # )
+
+
+      for(stg_c in c('stage_afm', 'stage_ag')){
+        ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
+        names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+        print(names(ss_qcd_ano[[1]]))
+
+        system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/'))
+        system(paste0('rm /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/*'))
+
+        imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/',.y, '.tsv')))
+
+        system(
+          paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
+        )
+
+         ##Add doublets
+      #   system(
+      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/')
+      # )
+
+      }
+    }
+      system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set, '/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
+
+      strn_c_mdata[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/Pf/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
+
+      ##Add barcodes after removing of doublets concordant across ks
+      system(
+        paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv ', 'jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/')
+      )
+  }
+}
+```
 
 
 
