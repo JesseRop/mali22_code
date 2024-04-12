@@ -67,10 +67,11 @@ bcodes_bam_ch.view()
 // - Algnment mapper tuples including references
 hsat_tup = ['hsat', 'HISAT2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/Pf66_hisat_refs/genome_w_tran_ref/genome_tran.fasta'] // reference generated using /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/scripts/hisat2_ref_build.sh
 minmap_tup = ['minmap', 'minimap2', '/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta']
-lr_tup = ['lr_ref', 'minimap2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/sk21_long_read_ref/Ref_pxPlaFalc47_hum_on_PfDB66_no_contigs_no_mit.fa']
+// lr_tup = ['lr_ref', 'minimap2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/sk21_long_read_ref/Ref_pxPlaFalc47_hum_on_PfDB66_no_contigs_no_mit.fa']
 
 
-algn_ch = Channel.from([hsat_tup, minmap_tup, lr_tup])
+// algn_ch = Channel.from([hsat_tup, minmap_tup, lr_tup])
+algn_ch = Channel.from([hsat_tup, minmap_tup])
 // algn_ch = Channel.from([minmap_tup])
 
 bcodes_bam_al_ch = bcodes_bam_ch
