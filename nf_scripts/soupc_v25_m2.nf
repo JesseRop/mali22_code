@@ -10,7 +10,8 @@ params.id_decode = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/
 params.bam = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" 
 
 // - cell barcodes
-params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+// params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/GE_qcd_bcodes.tsv"
 
 // - output directory
 params.o_dir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
@@ -20,7 +21,7 @@ ncores="10"
 mem="120 GB"
 
 // - souporcell output folder
-params.soup_dir = "soupc"
+params.soup_dir = "soupc_GE_postQC"
 
 // - Standard scripts for running souporcell
 params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh"
@@ -50,11 +51,18 @@ bcodes_ch = Channel
 
 // bcodes_ch.view()
 
-bcodes_bam_ch = bcodes_ch
-                    .combine(bam_ch, by:0)
-                    .combine(id_ch, by:0)
-                    .map { file -> tuple(file[4], file[1], file[2], file[3]) }
+// bcodes_bam_ch = bcodes_ch
+//                     .combine(bam_ch, by:0)
+//                     .combine(id_ch, by:0)
+//                     .map { file -> tuple(file[4], file[1], file[2], file[3]) }
 
+bcodes_bam_ch = id_ch
+                    .combine(bam_ch, by:0)
+                    .map { file -> tuple(file[1], file[0], file[2], file[3]) }
+                    .combine(bcodes_ch, by:0)
+                    .map { file -> tuple(file[0], file[4], file[2], file[3]) }
+
+bcodes_bam_ch.view()
 
 // - Algnment mapper tuples including references
 hsat_tup = ['hsat', 'HISAT2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/Pf66_hisat_refs/genome_w_tran_ref/genome_tran.fasta'] // reference generated using /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/scripts/hisat2_ref_build.sh
@@ -184,4 +192,3 @@ workflow {
     LL_KNEE_PLOT(soupc2plus_ll_ch)
 
 }
-
