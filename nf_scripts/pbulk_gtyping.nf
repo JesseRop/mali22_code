@@ -1,13 +1,14 @@
 #!/usr/bin/env nextflow
 
 // - Directory to store output - need to differentiate between preQC genotyping so as to verify souporcell assignments and postQC genotyping so as to perform relatedness analysis etc
-params.sv_dir = "pbulk_gtypes_preQC"
+// params.sv_dir = "pbulk_gtypes_preQC"
+params.sv_dir = "pbulk_gtypes_post_GE_QC"
 
 // - 2022 cellranger output
 params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/hs*/parent/possorted_genome_bam.bam" 
 
 // - cell barcodes
-params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/bcodes/hs*/stage_afm_strain_k*/*.tsv"
+params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/bcodes/hs*/stage_afm_strain_k[0-9]*/*.tsv"
 
 // - output directory
 params.odir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
@@ -67,6 +68,8 @@ process SUBSET {
 process TAGBAM {
     memory '50 GB'
     cpus '3'
+
+    errorStrategy 'ignore' // Some error coming up "terminated for an unknown reason -- Likely it has been terminated by the external system"
 
     tag "Tagging ${strn_stg}  reads"
 
@@ -132,7 +135,8 @@ process FREEBAYES {
 process VARTRIX_UMI {
     memory '120 GB'
     cpus '20'
-    debug true
+    
+    errorStrategy 'ignore'
 
     tag "Vartrix allele counting on ${strn_stg} from ${grp} ${sample_nm}"
         
