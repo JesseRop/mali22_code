@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
   library(Seurat)
   library(sctransform)
   library(glmGamPoi)
-  library(rgl)
+  # library(rgl)
   library(patchwork)
   # library(DoubletFinder)
   library(ggrepel)
@@ -43,7 +43,7 @@ suppressPackageStartupMessages({
   library(ggh4x)
   library(SingleCellExperiment)
   library(scmap)
-  library(ggsankey)
+  # library(ggsankey)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
@@ -64,12 +64,8 @@ suppressPackageStartupMessages({
 
 
 ```{r, setup}
-library(reticulate)
-use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
-matplotlib <- reticulate::import("matplotlib")
-matplotlib$use("Agg", force = TRUE)
-
-knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
+# knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
 ### Variable declarations
@@ -1764,7 +1760,7 @@ We use SCT since it has increased resolution to allow for soup (SoupX) removal d
 
 
 ```{r}
-imap(all_msc_filt, ~saveRDS(.x, paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/all_msc_filt_",.y,".RDS")))
+imap(all_msc_filt, ~saveRDS(.x, paste0("/data/processed/Pf/all_msc_filt_",.y,".RDS")))
 ```
 
 ```{r}
