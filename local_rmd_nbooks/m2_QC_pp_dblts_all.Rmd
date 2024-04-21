@@ -14,9 +14,10 @@ output:
 suppressPackageStartupMessages({
   library(Seurat)
   library(sctransform)
+  library(glmGamPoi)
   library(rgl)
   library(patchwork)
-  library(DoubletFinder)
+  # library(DoubletFinder)
   library(ggrepel)
   library(ggpubr)
   library(dplyr) 
@@ -34,7 +35,7 @@ suppressPackageStartupMessages({
   library(Hmisc)
   library(rmarkdown)
   library(RColorBrewer)
-  library(Platypus)
+  # library(Platypus)
   library(ggvenn)
   library(conflicted)
   library(SoupX)
@@ -69,6 +70,8 @@ use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
 matplotlib <- reticulate::import("matplotlib")
 matplotlib$use("Agg", force = TRUE)
 
+
+sample_set = "Mali2"
 knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
 ```
 
@@ -255,7 +258,11 @@ initialize variable for the sample names
 ##Copy souporcell files for the optimum clusters
 
 ##Sample ID
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+
+
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
 ##Samples
@@ -283,9 +290,43 @@ all_msc_raw_paths <- list.files("data/raw/", pattern = "raw_feature_bc_matrix$",
   .[sample_id_lst]
 ```
 
+```{r}
+all_msc_filt<-map(sample_name_nms, ~readRDS(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/all_msc_filt_",.x,".RDS")))
+```
+
 
 ```{r}
-all_msc_filt <- readRDS("data/processed/Pf/all_msc_filt.RDS")
+all_msc_filt <- all_msc_filt %>% set_names(sample_name_nms)
+```
+
+
+```{r}
+
+all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePrelim %in% c("Early trophozoite", "Late ring") ~ "Asexual", str_detect(StagePrelim, "ale") ~ "Gametocytes", T ~ StagePrelim)) %>% count(stage_c_ag, Strain_DN))
+
+```
+
+
+```{r}
+
+all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePrelim %in% c("Early trophozoite", "Late ring") ~ "Asexual", str_detect(StagePrelim, "ale") ~ "Gametocytes", T ~ StagePrelim)) %>% count(stage_c_ag))
+
+```
+
+```{r}
+
+all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePrelim %in% c("Early trophozoite", "Late ring") ~ "Asexual", str_detect(StagePrelim, "ale") ~ "Gametocytes", T ~ StagePrelim)) %>% count(stage_c_ag))
+
+```
+
+```{r}
+
+all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePrelim %in% c("Early trophozoite", "Late ring") ~ "Asexual", str_detect(StagePrelim, "ale") ~ "Gametocytes", T ~ StagePrelim)) %>% count(stage_c_ag))
+
+```
+
+```{r}
+# all_msc_filt <- readRDS("data/processed/Pf/all_msc_filt.RDS")
 # all_msc_anotd <- readRDS("data/processed/Pf/all_msc_anotd.RDS")
 soupo_kselect_list_pp <- readRDS("data/processed/Pf/soupo_kselect_list_pp.RDS")
 ```
@@ -298,8 +339,8 @@ SoupX function
 ```{r}
 get_SoupX <- function(data, path, seu_fun = seurat_norm_stand){
   
-  data <- FindNeighbors(data, k.param = 20)
-  data <- FindClusters(data, resolution = 0.5)
+  # data <- FindNeighbors(data, k.param = 20)
+  # data <- FindClusters(data, resolution = 0.5)
   
   # print(DimPlot(data, group.by <- 'seurat_clusters'))
   
@@ -321,12 +362,32 @@ get_SoupX <- function(data, path, seu_fun = seurat_norm_stand){
 }
 ```
 
+
 Run soupX
 
 ```{r ,include=FALSE, message=FALSE, warning=FALSE}
 # path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
 
-all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
+# all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
+all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~{
+  tryCatch({
+    get_SoupX(..1, ..2)
+    }, error = function(e)  e$message)
+})
+
+failed_supx <- names(all_msc_nosct_supx_4_dblt[map(all_msc_nosct_supx_4_dblt, ~class(.x)[1]) == "character"])
+
+```
+
+Replace with unadjusted object if soupx not successful
+```{r ,include=FALSE, message=FALSE, warning=FALSE}
+
+
+# str_detect(all_msc_nosct_supx_4_dblt[failed_supx], "No plausible marker genes")
+
+# all_msc_nosct_supx_4_dblt[failed_supx] <- all_msc_filt[failed_supx]
+# DefaultAssay(all_msc_nosct_supx_4_dblt[[failed_supx]]) <- "RNA"
+all_msc_nosct_supx_4_dblt[failed_supx] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx]]@assays$RNA@counts) %>% seurat_norm_stand() %>% list()
 
 ```
 
@@ -339,15 +400,11 @@ map(all_msc_nosct_supx_4_dblt, ElbowPlot)
 
 ```{r}
 # pc_list <-list(4L,3L,4L, 5L, 12L)
-pc_list <-list(5L,3L,4L, 5L, 5L, 5L)
+pc_list <-list(5L,3L,4L, 5L, 5L, 5L,3L,4L, 5L, 5L, 5L)
+pc_list <- list(rep(6L, length(sample_name_nms)))
 ```
 
 #### Preprocess soup-corrected objects
-Calculate UMAP for soupX corrected objects
-```{r, warning=FALSE, message=FALSE}
-all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>%
-  map2(., pc_list, ~RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 532))
-```
 
 Find neighbours
 ```{r}
@@ -360,15 +417,22 @@ all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>%
 
 ```{r}
 ##Using the default resolution - though quite high it may help find clusters that contain doublets
-res_list <- c(0.1,0.1,0.2,0.2,0.2,0.2)
+res_list <- list(rep(0.4, length(sample_name_nms)))
 res_list <- res_list
 
 all_msc_nosct_supx_4_dblt <-all_msc_nosct_supx_4_dblt %>%
   map2(., res_list, ~FindClusters(.x, resolution = .y, verbose=F)
   )
 
-map(all_msc_nosct_supx_4_dblt, DimPlot)
 ```
+
+Calculate UMAP for soupX corrected objects
+```{r, warning=FALSE, message=FALSE}
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>%
+  map2(., pc_list, ~RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 532, reduction.key = "umap_soupx_"))
+
+```
+
 
 ```{r}
 # rm(all_msc_nosct_supx_4_dblt)
@@ -379,27 +443,19 @@ map(all_msc_nosct_supx_4_dblt, DimPlot)
 map(all_msc_nosct_supx_4_dblt, DimPlot)
 ```
 
-#### Visualize gene count in soup corrected {.tabset}
+#### Visualize gene count in soup corrected
 ```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-all_msc_nosct_supx_4_dblt  %>% 
-  purrr::imap(.,~{
-    # create tabset for each group 
-    cat('##### ',.y,'   \n')
-    p <- FeaturePlot(.x, features = 'nFeature_RNA', dims = c(1,3)) +
+map(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'nFeature_RNA', dims = c(1,3)) +
       theme(axis.text=element_text(size=18), 
             axis.title=element_text(size=18,face="bold"), 
             legend.text = element_text(size=22), 
             legend.title = element_text(size=22,face="bold"),
             plot.title = element_blank())
-    print(p)
-    cat('\n')
-    cat("\n")
-  })
+)
 
 ```
 
-#### Mitochondrial percent in soup-corrected objects {.tabset}
+#### Mitochondrial percent in soup-corrected objects
 
 ```{r}
 ## calculate mitochondrial proportions
@@ -413,21 +469,11 @@ all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>%
 ```
 
 ```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-all_msc_nosct_supx_4_dblt  %>% 
-  purrr::imap(.,~{
-    # create tabset for each group 
-    cat('##### ',.y,'   \n')
-    p <- FeaturePlot(.x, features = 'percent.mt', dims = c(1,2))
-    print(p)
-    cat('\n')
-    cat("\n")
-  })
+map(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'percent.mt', dims = c(1,2)))
 
 ```
 
 ```{r, fig.height = 5, fig.width = 15}
-# options(repr.plot.width=32, repr.plot.height=7)
 markers <- c("PF3D7-0935900", "PF3D7-0406200", "PF3D7-0109100", "PF3D7-0208900")
 marker_nms <- Pf3D7_genes_plasmoDB %>% filter(gene_id %in% markers)  %>% select(Gene, gene_id) %>% mutate(across(gene_id, ~factor(., levels = markers))) %>% arrange(gene_id)  %>% mutate(across(gene_id, as.character)) %>% deframe
 
@@ -547,7 +593,8 @@ scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_d
   pmap(~ {
     spx <- list(..1, ..2, ..3, ..4)
     pmap(list(spx, list("_supx_norm", "_supx_rand", "_norm", "_rand")), ~ {
-      tbl <- data.frame(..1) %>% 
+      tbl <- data.frame(..1[,c("score", "class", "type")]) %>% 
+        filter(type == "real") %>%
         select(score, class) %>%
         mutate(across(class, str_to_sentence)) 
       
@@ -557,6 +604,28 @@ scf_outputs <- list(all_msc_nosct_corrected_dblt_clst, all_msc_nosct_corrected_d
        }) %>%
       purrr::reduce(., .f = full_join, by = "bcode")
   })
+
+```
+
+Assess agreement between the calls
+```{r, message=FALSE}
+map(scf_outputs, ~.x %>% select(contains("class")) %>% group_by_all() %>% count())
+
+```
+
+Chsqr of the different scdblfinder flavours tests
+```{r, message=FALSE}
+pw_scf_comp <- scf_outputs[[1]] %>% select(contains("class")) %>% colnames() %>% combn(., 2, simplify = F)
+
+pw_scf_comp_nms <- map(pw_scf_comp, ~{paste0(.x[[1]], '_VS_', .x[[2]])})
+
+a <- map(scf_outputs, ~{
+  tbl = .x
+  map(pw_scf_comp, ~{chisq.test(tbl[,.x[[1]]], tbl[,.x[[2]]])[c('statistic', 'p.value')]} %>% as.data.frame %>%  rownames_to_column('test') ) %>%  
+    set_names(pw_scf_comp_nms) %>% 
+    bind_rows(., .id = "comps")
+}) %>% 
+    bind_rows(., .id = "donor")
 
 ```
 
@@ -576,10 +645,16 @@ all_msc_w_dblts <- list(all_msc_filt, scf_outputs) %>%
 ```{r}
 ## Add UMAP dimensions from the soupx corrected object used to get doublets
 for (i in names(all_msc_w_dblts)) {
-  all_msc_w_dblts[[i]]@reductions[["umap_n_soupx"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions$umap
+  all_msc_w_dblts[[i]]@reductions[["umap_soupx"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions[["umap"]]
 }
 ```
 
+
+```{r, message=FALSE}
+##Doublet removal
+DimPlot(all_msc_w_dblts[[1]])
+# DimPlot(all_msc_w_dblts[[1]],reduction = "umap_soupx")
+```
 
 ##### scdblfinder visualizations
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
@@ -597,27 +672,17 @@ plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embe
 
 ```
 
-##### doublet score and seurat clusters UMAP {.tabset}
+##### doublet score and seurat clusters UMAP
 doublet score UMAP plus grouping by seurat clusters to see if some clusters are predominantly doublets
 
 ```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
 all_msc_w_dblts  %>% 
   imap(.,~{
-    # create tabset for each group 
-    cat('###### ',.y,'   \n')
-    p1 <- FeaturePlot(.x, features = 'scf_score_norm', pt.size = 0.2)
-    print(p1)
-    cat('\n ')
+    FeaturePlot(.x, features = 'scf_score_norm', pt.size = 0.2)
+    DimPlot(.x, group.by = 'seurat_clusters', label = T)
     
-    p2 <- DimPlot(.x, group.by = 'seurat_clusters', label = T)
-    print(p2)
-    cat('\n ')
+    #DimPlot(.x, group.by = 'StagePrelim', label = T)
     
-    # p2 <- DimPlot(.x, group.by = 'StagePrelim', label = T)
-    print(p2)
-    cat('\n ')
-    cat("\n")
   })
 
 ```
@@ -641,78 +706,6 @@ plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embe
 ```
 
 
-
-##### Boxplots transcript count vs seurat clusters stratified by doublets status {.tabset}
-
-
-```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
-all_msc_w_dblts %>%
-  imap(.,  ~ {
-    # create tabset for each group
-    cat('######', .y, '   \n')
-    a_gns = .x@meta.data  %>%
-      ggplot(., aes(x=seurat_clusters, y=nCount_RNA, color = scf_class_rand)) +
-      geom_boxplot(aes( color = scf_class_rand)) +
-      geom_point(aes(group=scf_class_rand), size = 0.7, position = position_jitterdodge(jitter.width = 0.2))  +
-      stat_summary(
-        fun.data = stat_box_data, 
-        geom = "label", 
-        hjust = 1.6,
-        vjust = 0.9,
-        size = 3.5,
-        label.padding = unit(0.1, "lines"), 
-        position = position_jitterdodge(jitter.width = 0.3)
-      )+
-      theme(axis.text=element_text(size=14),
-            axis.title=element_text(size=16,face="bold"),
-            legend.text = element_text(size=15),
-            title = element_text(size=16,face="bold"))
-    
-    print(a_gns)
-    
-    cat('\n\n<!-- -->\n\n')
-    cat('\n\n<!-- -->\n\n')
-    cat('\n')
-    cat('\n')
-  })
-
-```
-
-##### Boxplots gene count vs doublet status stratified by Strain_DN {.tabset}
-
-```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5, eval=FALSE}
-all_msc_w_dblts  %>%
-  imap(.,  ~ {
-    # create tabset for each group
-    cat('######', .y, '   \n')
-    a_gns = .x@meta.data  %>%
-      ggplot(., aes(x=scf_class_rand, y=nFeature_RNA, color = strain_gt)) +
-      geom_boxplot(aes( color = strain_gt)) +
-      geom_point(aes(group=strain_gt), size = 0.7, position = position_jitterdodge(jitter.width = 0.2)) +
-      stat_summary(
-        fun.data = stat_box_data, 
-        geom = "label_repel", 
-        vjust = -2,
-        size = 3.5,
-        label.padding = unit(0, "lines"),
-        position = position_jitterdodge(jitter.width = 0.2),
-        direction = "y",
-        show.legend = FALSE
-      )+
-      theme(axis.text=element_text(size=14),
-            axis.title=element_text(size=16,face="bold"),
-            legend.text = element_text(size=15),
-            title = element_text(size=16,face="bold"))
-    
-    print(a_gns)
-    
-    cat('\n\n<!-- -->\n\n')
-    cat('\n\n<!-- -->\n\n')
-    cat('\n')
-    cat('\n')
-  })
-
-```
 
 
 #### End of scdblfinder visualizations
@@ -821,94 +814,52 @@ all_msc_w_dblts <- list(scrublet_o, all_msc_w_dblts) %>%
 ```
 
 
+Add the doublet proportion per cluster for each of the doublet methods assessed
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(strain_gt == "Doublet") %>% row.names()))
-
-```
-
-
-#### MSC14 scrublet doublet scores
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-##dimplot
-
-# Display the combined datasets as an interactive 3D plot
-plot_ly(data = as.data.frame(all_msc_w_dblts[[4]]@reductions[["umap"]]@cell.embeddings),
-        x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,
-        color= all_msc_w_dblts[[4]]$scrub_doublet,
-        colors = c('blue', 'red'),
-        opacity = 0.8,
-        size = 1, 
-        type = 'scatter3d'
-)
-
-```
-
-
-#### Boxplots gene count vs scrublet doublet status stratified by strain_gt {.tabset}
-
-```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
-all_msc_w_dblts  %>%
-  purrr::imap(.,  ~ {
-    # create tabset for each group
-    cat('#####', .y, '   \n')
-    a_gns = .x@meta.data  %>%
-      ggplot(., aes(x=scrub_doublet, y=nFeature_RNA, color = strain_gt)) +
-      geom_boxplot(aes( color = strain_gt)) +
-      geom_point(aes(group=strain_gt), size = 0.7, position = position_jitterdodge(jitter.width = 0.2)) +
-      stat_summary(
-        fun.data = stat_box_data, 
-        geom = "label_repel", 
-        vjust = -2,
-        size = 3.5,
-        label.padding = unit(0, "lines"),
-        position = position_jitterdodge(jitter.width = 0.2),
-        direction = "y",
-        show.legend = FALSE
-      )+
-      theme(axis.text=element_text(size=14),
-            axis.title=element_text(size=16,face="bold"),
-            legend.text = element_text(size=15),
-            title = element_text(size=16,face="bold"))
+all_msc_w_dblts <- map(all_msc_w_dblts, ~{
+  obj = .x
+  map(dbt_methods, ~{
+  obj@meta.data %>%
+    rownames_to_column('bcode') %>%
+    dplyr::add_count(seurat_clusters, !!rlang::sym(.x))  %>%
+    group_by(seurat_clusters) %>%
+    mutate(freq = round(n / n(), 3), 
+           !!paste0(.x, "_dbt_nums") := case_when(!!rlang::sym(.x) == "Doublet" ~ n,
+                                                  !!rlang::sym(.x) == "Singlet" ~ n()-n),
+           !!paste0(.x, "_dbt_prop") := case_when(!!rlang::sym(.x) == "Doublet" ~ freq,
+                                                  !!rlang::sym(.x) == "Singlet" ~ 1-freq),
+           !!paste0(.x, "_dbt_ovrl_prop") := case_when(!!rlang::sym(.x) == "Doublet" ~ round(n / ncol(obj), 3),
+                                                       !!rlang::sym(.x) == "Singlet" ~ round((n()-n) / ncol(obj), 3)),
+           !!paste0(.x, "_dbt_allnums") := case_when(!!rlang::sym(.x) == "Doublet" ~ paste(n, n(), ncol(obj), sep = "_"),
+                                                     !!rlang::sym(.x) == "Singlet" ~ paste((n()-n), n(), ncol(obj), sep = "_"))
+           ) %>%
+      ungroup() %>% 
+      select('bcode', paste0(.x, "_dbt_prop"), paste0(.x, "_dbt_ovrl_prop"), paste0(.x, "_dbt_nums"), paste0(.x, "_dbt_allnums")) 
     
-    print(a_gns)
-    
-    cat('\n')
-    cat('\n')
+    }) %>%
+      purrr::reduce(., .f = full_join, by = "bcode") %>% 
+      column_to_rownames('bcode') %>%
+      AddMetaData(obj, .)
   })
 
 ```
 
 
+Check doublet cluster
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+dbt_methods_optimum <- c("scf_class_supx_rand", "scrub_doublet")
+
+```
 
 ### Doublets visualizations
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
 map(all_msc_w_dblts, ~.x@meta.data %>% ggplot(aes(x = seurat_clusters, y= sim_lab1, color = strain_gt)) + geom_boxplot() + geom_hline(yintercept = 0.85) + facet_wrap(. ~ StagePrelim, nrow = 1, scales = "free_x"))
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
-
-# map(all_msc_w_dblts, ~{
-#   .x@meta.data %>%
-#     mutate(StagePrelimAll = ifelse(is.na(StagePrelim), "Unassigned", StagePrelim)) %>%
-#     dplyr::add_count(seurat_clusters, strain_gt)  %>%
-#     group_by(seurat_clusters) %>%
-#     mutate(freq = round(n / n(), 3), 
-#                dbt_prop = case_when(strain_gt == "Doublet" ~ freq,
-#                                     strain_gt == "Singlet" ~ 1-freq)) %>% 
-#     group_by(stage_lab1) %>%
-#     mutate(lo_outlr_thresh = quantile(sim_lab1, probs = 0.25) - IQR(sim_lab1) * 1.5,
-#            lo_outlrs = sim_lab1 <= lo_outlr_thresh,
-#            hetero_dblts = case_when(stage_lab1 %in% c("Male", "Female", "Unassigned") & dbt_prop >= 0.05 & lo_outlrs == T ~ "Doublet",
-#                                     T ~ "Singlet"))  %>% 
-#     ggplot(aes(x = seurat_clusters, y= sim_lab1, color = hetero_dblts)) + 
-#     geom_boxplot() + 
-#     geom_hline(yintercept = 0.85) + 
-#     facet_wrap(. ~ StagePrelimAll, nrow = 1, scales = "free_x")
-#     })
 ```
 
 
@@ -918,21 +869,16 @@ all_msc_w_dblts <- map(all_msc_w_dblts, ~{
   .x@meta.data %>%
     rownames_to_column('bcodes') %>%
     mutate(StagePrelimAll = ifelse(is.na(StagePrelim), "Unassigned", StagePrelim)) %>%
-    dplyr::add_count(seurat_clusters, strain_gt)  %>%
-    group_by(seurat_clusters) %>%
-    mutate(freq = round(n / n(), 3), 
-               dbt_prop = case_when(strain_gt == "Doublet" ~ freq,
-                                    strain_gt == "Singlet" ~ 1-freq)) %>% 
     group_by(stage_lab1) %>%
     mutate(lo_outlr_thresh = quantile(sim_lab1, probs = 0.25) - IQR(sim_lab1) * 1.5,
            lo_outlrs = sim_lab1 <= lo_outlr_thresh,
            q10 = quantile(sim_lab1, probs = .20),
            hetero_dblts = case_when(stage_lab1 %in% c("Male", "Female", "Unassigned") & sim_lab1 <= q10 & lo_outlrs == T ~ "Doublet",
                                     T ~ "Singlet"),
-           # hetero_dblts = case_when(stage_lab1 %in% c("Male", "Female", "Unassigned") & dbt_prop >= 0.05 & lo_outlrs == T ~ "Doublet",
+           # hetero_dblts = case_when(stage_lab1 %in% c("Male", "Female", "Unassigned") & strain_gt_dbt_prop >= 0.05 & lo_outlrs == T ~ "Doublet",
            #                          T ~ "Singlet")
            )   %>%
-    dplyr::select(bcodes, StagePrelimAll, dbt_prop, lo_outlr_thresh, lo_outlrs, hetero_dblts) %>%
+    dplyr::select(bcodes, StagePrelimAll, lo_outlr_thresh, lo_outlrs, hetero_dblts) %>%
     column_to_rownames('bcodes') %>%
     AddMetaData(.x, .) 
     
@@ -941,6 +887,7 @@ all_msc_w_dblts <- map(all_msc_w_dblts, ~{
 ```
 
 
+
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
 map(all_msc_w_dblts, ~{
@@ -957,10 +904,7 @@ map(all_msc_w_dblts, ~{
 
 map(all_msc_w_dblts, ~{
   .x@meta.data %>%
-    ggplot(aes(x = seurat_clusters, y= sim_lab1, color = hetero_dblts)) + 
-    geom_boxplot() + 
-    geom_hline(yintercept = 0.85) + 
-    facet_wrap(. ~ StagePrelimAll, nrow = 1, scales = "free_x")
+    count(seurat_clusters, strain_gt_dbt_prop)
     })
 ```
 
@@ -973,15 +917,11 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(strain_gt == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
-```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(hetero_dblts == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(hetero_dblts == "Doublet") %>% row.names(), reduction = "umap_soupx"))
 
 ```
 
@@ -989,8 +929,8 @@ map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x
 ```{r}
 
 map(all_msc_w_dblts, ~.x@meta.data %>%
-      filter(dbt_prop > 0.05) %>% 
-      dplyr::count(seurat_clusters, strain_gt, StagePrelimAll,lo_outlrs,dbt_prop)  %>%
+      filter(strain_gt_dbt_prop > 0.05) %>% 
+      dplyr::count(seurat_clusters, strain_gt, StagePrelimAll,lo_outlrs,strain_gt_dbt_prop)  %>%
       group_by(seurat_clusters) %>%
       filter(strain_gt == "Doublet")
     )  
@@ -1002,7 +942,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 all_msc_w_dblts[[3]]@meta.data %>%
       filter(seurat_clusters == "5") %>% 
-      select(sim_lab1,StagePrelimAll, dbt_prop, lo_outlr_thresh, lo_outlrs, hetero_dblts)
+      select(sim_lab1,StagePrelimAll, strain_gt_dbt_prop, lo_outlr_thresh, lo_outlrs, hetero_dblts)
  
 
 ```
@@ -1018,7 +958,7 @@ all_msc_w_dblts[[3]]@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelimAll", reduction = "umap_n_soupx"))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelimAll", reduction = "umap_soupx"))
 ```
 
 
@@ -1035,99 +975,179 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_rand == "Doublet") %>% row.names()))
-```
+```{r, fig.height = 3.5, fig.width = 15}
+dbt_methods_gtyp <- c(dbt_methods, "strain_gt", "hetero_dblts")
 
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scrub_doublet == "Doublet") %>% row.names(), reduction = "umap_n_soupx"))
+scf_fn <- function(obj = all_msc_w_dblts[[1]], mks = dbt_methods_gtyp, mk_nms = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/5)) {
+  list(mks, mk_nms) %>%
+  pmap(.,~{
+    DimPlot(obj, dims = c(1,2), label = T, pt.size = 0.01, cells.highlight = obj@meta.data %>% filter(!!rlang::sym(..1) == "Doublet") %>% row.names(), sizes.highlight = 0.1) + 
+      labs(title = ..2) +
+      theme(legend.position = 'none')
+    }) %>% 
+    plot_grid(plotlist = ., nrow = nrws) 
+}
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, fig.height = 8, fig.width = 15}
+# 
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scrub_doublet == "Doublet") %>% row.names()))
+map(all_msc_w_dblts, ~scf_fn(obj = .x, nrws = ceiling(length(dbt_methods_gtyp)/5)))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+
+map(all_msc_w_dblts, ~{
+  
+  .x@meta.data %>% 
+    distinct(seurat_clusters, .keep_all = T) %>% 
+    select(contains("_dbt_prop"), contains("_dbt_allnums"), seurat_clusters) %>%
+    pivot_longer(cols = -c('strain_gt_dbt_prop', 'strain_gt_dbt_allnums', seurat_clusters), names_pattern = "(.*)_(dbt.*)", names_to = c( "dbm", ".value")) %>% 
+    ggplot(aes(y = strain_gt_dbt_prop,x = dbt_prop )) + geom_point() +facet_wrap(.~dbm) + 
+    geom_text_repel(aes(label = paste0(seurat_clusters, "(",dbt_allnums,")"))) + 
+    geom_hline(yintercept = 0.3) + 
+    geom_vline(xintercept = 0.3)
+  
+})
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+
+map(all_msc_w_dblts, ~{
+  
+  .x@meta.data %>% 
+    distinct(seurat_clusters, .keep_all = T) %>% 
+    select(contains("_dbt_prop"), contains("_dbt_nums"), seurat_clusters) %>%
+    pivot_longer(cols = -c('strain_gt_dbt_prop', 'strain_gt_dbt_nums', seurat_clusters), names_pattern = "(.*)_(dbt.*)", names_to = c( "dbm", ".value")) %>% 
+    ggplot(aes(y = strain_gt_dbt_prop,x = dbt_prop )) + geom_point() +facet_wrap(.~dbm) + 
+    geom_text_repel(aes(label = paste0(seurat_clusters, "(",dbt_nums,")"))) + 
+    geom_hline(yintercept = 0.3) + 
+    geom_vline(xintercept = 0.5)
+  
+})
+
 ```
 
 
-```{r, warning=FALSE, message=FALSE}
 
-# map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "StagePrelim"))
-```
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == "Doublet") %>% row.names()))
-```
 
 ```{r, warning=FALSE, message=FALSE}
 
 map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "seurat_clusters"))
-```
 
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(strain_gt == "Doublet") %>% row.names()))
 ```
 
 
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-#### Boxplot gene count VS stageHL coloured by doublets {.tabset}
+map(all_msc_w_dblts, ~{
+  .x@meta.data %>%
+    dplyr::count(seurat_clusters, scf_class_supx_norm)  %>%
+    group_by(seurat_clusters) %>%
+    mutate(freq = round(n / sum(n), 3), 
+               scf_dbt_prop = case_when(scf_class_supx_norm == "Doublet" ~ freq,
+                                    scf_class_supx_norm == "Singlet" ~ 1-freq)) %>% 
+    filter(scf_dbt_prop > 0.1)
+  
+    }) 
 
-```{r, results='asis', fig.width = 15, fig.height = 5}
-list(all_msc_w_dblts[1], sample_id_lst[1])  %>%
-  purrr::pmap(.,  ~ {
-    # create tabset for each group
-    cat('#####', ..2, '   \n')
-    
-    cat('nfeature \n')
-    a_gns = ..1@meta.data %>%
-      ggplot(., aes(x=StagePrelim, y=nFeature_RNA, color = scf_class_norm)) +
-      geom_boxplot(aes( color = scf_class_norm)) +
-      geom_point(aes(group=scf_class_norm), size = 0.7, position = position_jitterdodge(jitter.width = 0.07)) + 
-      # scale_color_manual(values = sp_fld_colors) +
-      # stat_summary(fun.data = stat_box_data, 
-      #              geom = "label_repel", 
-      #              vjust = -2,
-      #              size = 3.5,
-      #              label.padding = unit(0, "lines"),
-      #              position = position_jitterdodge(jitter.width = 0.2),
-      #              direction = "y",
-      #              show.legend = FALSE)+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+
+map(all_msc_w_dblts, ~{
+  .x@meta.data %>%
+    dplyr::count(seurat_clusters, strain_gt)  %>%
+    group_by(seurat_clusters) %>%
+    mutate(freq = round(n / sum(n), 3), 
+               scf_dbt_prop = case_when(strain_gt == "Doublet" ~ freq,
+                                    strain_gt == "Singlet" ~ 1-freq)) %>% 
+    filter(scf_dbt_prop > 0.1)
+  
+    }) 
+
+```
+
+
+```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
+gbox_thme <- theme(axis.text=element_text(size=14),
+            axis.title=element_text(size=16,face="bold"),
+            legend.text = element_text(size=15),
+            title = element_text(size=16,face="bold")
+            )
+
+```
+
+```{r, fig.height = 3.5, fig.width = 15}
+
+gbx_fn <- function(obj = all_msc_w_dblts[[1]], mks = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/5), lgpos = "bottom", xgrp = "StagePrelim") {
+  list(mks) %>%
+  pmap(.,~{
+    obj@meta.data %>%
+      ggplot(., aes(x= !!rlang::sym(xgrp), y=nFeature_RNA, color = !!rlang::sym(..1))) +
+      geom_boxplot(aes( color = !!rlang::sym(..1))) +
+      geom_point(aes(group=!!rlang::sym(..1)), size = 0.7, position = position_jitterdodge(jitter.width = 0.07)) + 
+      labs(title = ..1) +
       theme_classic() +
-      theme(axis.text=element_text(size=14), 
-            axis.title=element_text(size=16,face="bold"), 
-            legend.text = element_text(size=15), 
-            title = element_text(size=16,face="bold"))
+      gbox_thme +
+      theme(legend.position = lgpos,
+            legend.title.position = "top") 
+    
+    }) %>% 
+    plot_grid(plotlist = ., nrow = nrws) 
+}
+
+```
+
+```{r, fig.height = 8, fig.width = 15}
+
+map(all_msc_w_dblts, ~gbx_fn(obj = .x, mks = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/4), xgrp = "StagePrelim"))
+```
+
+
+```{r, fig.height = 8, fig.width = 15}
+# 
+
+map(all_msc_w_dblts, ~gbx_fn(obj = .x, mks = dbt_methods_gtyp[!dbt_methods_gtyp == "strain_gt"], nrws = ceiling(length(dbt_methods_gtyp)/4), xgrp = "strain_gt"))
+```
+
+
+```{r, fig.height = 13, fig.width = 18}
+# 
+
+map(all_msc_w_dblts, ~gbx_fn(obj = .x, mks = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/3), xgrp = "seurat_clusters"))
+```
+
+##### Boxplots gene count vs doublet status stratified by Strain_DN
+
+```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5, eval=FALSE}
+all_msc_w_dblts  %>%
+  imap(.,  ~ {
+    a_gns = .x@meta.data  %>%
+      ggplot(., aes(x=scf_class_rand, y=nFeature_RNA, color = strain_gt)) +
+      geom_boxplot(aes( color = strain_gt)) +
+      geom_point(aes(group=strain_gt), size = 0.7, position = position_jitterdodge(jitter.width = 0.2)) +
+      stat_summary(
+        fun.data = stat_box_data, 
+        geom = "label_repel", 
+        vjust = -2,
+        size = 3.5,
+        label.padding = unit(0, "lines"),
+        position = position_jitterdodge(jitter.width = 0.2),
+        direction = "y",
+        show.legend = FALSE
+      )+
+      gbox_thme
     
     print(a_gns)
     
-    cat('\n')
-    cat("\n")
   })
 
 ```
-
-```{r, results='asis'}
-##adding clusters that are used to display mitochondrial count
-# all_msc_w_dblts[[4]] <- AddMetaData(all_msc_w_dblts[[4]], all_msc[[4]]@meta.data[, 'old_seu_cluster', drop=F])
-```
-
 
 ```{r, results='asis'}
 ##adding clusters that are used to display mitochondrial count
@@ -1138,12 +1158,8 @@ map(all_msc_w_dblts, ElbowPlot)
 pc_list <-list(6L,4L,5L, 5L, 5L, 5L)
 res_list <- c(0.18,0.12,0.12,0.12,0.12,0.12)
 
-pc_list <- pc_list
-res_list <- pc_list
-
-## Just run for MSC14 - will need to expand in future
-# pc_list <-pc_list[4]
-# res_list <- res_list[4]
+pc_list <- list(rep(6L, length(sample_name_nms)))
+res_list <- list(rep(0.4, length(sample_name_nms)))
 
 # all_msc_nosct_corrected_dblt_db <- list(all_msc_w_dblts, pc_list, res_list) %>%
 #   pmap(.,~{RunUMAP(..1, dims = 1:..2, n.components = 3L, verbose=F, seed.use = 949) %>%
@@ -1249,53 +1265,18 @@ dbt_sens_speci %>% pivot_longer(cols = -c(donor), names_pattern = "(.*)\\.(S.*)"
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(strain_gt == "Doublet") %>% row.names()))
-
-```
 
 
 
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scrub_doublet == "TRUE") %>% row.names()))
-
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(scf_class_norm == 'Doublet') %>% row.names()))
-```
-
-
-
-```{r}
-##Seurat object
-##Add doublet assignment to counts not corrected by soupX
-
-# all_msc_w_dblts <- list(all_msc_w_dblts, all_msc_anotd) %>%
-#   pmap(~ ..1@meta.data %>% 
-#          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'scf_class_rand', 'scf_class_norm', 'seurat_clusters_dblt', 'scf_score_norm')))  %>%
-#          # dplyr::select(scrub_doublet, scf_class_rand, scf_class_norm)  %>%
-#          AddMetaData(..2, .))
-
-```
 
 #### Add doublet assignment to raw seurat object to visualize all the cells that are filter out
 ```{r}
-# all_msc_w_dblts <- all_msc_w_dblts %>% map(., ~.x@meta.data %>% mutate('QC_reason' =case_when(strain_gt == "Negative" ~ 'SC Negative', 
-#                                                                                               nFeature_RNA<300 | nCount_RNA < 700 ~ 'Few genes/transcripts', 
-#                                                                                               nCount_RNA > 40000 ~ 'High genes outlier', 
-#                                                                                               percent.mt>0.45 ~ 'High Mt %')) 
-# )
-mt_filt <- c(0.4, 0.4, 0.4, 0.4, 0.4, 0.4)
+
+mt_filt <- rep(0.4, length(all_msc_w_dblts))
 ```
 
 ## Visualize doublets and other QC classes
+
 
 
 ```{r, results='asis',  fig.width = 8, fig.height = 4}
@@ -1308,22 +1289,22 @@ trunc_axis <- ggh4x::guide_axis_truncated(
 )
 
 
-cell_qc_objs<- list(all_msc_w_dblts, gn_lc, rna_lc, rna_uc, mt_filt, gn_uc) %>%
+cell_qc_objs<- list(all_msc_w_dblts, mt_filt) %>%
   pmap(., ~{
   
   cell_qc_filt_tbl <- ..1@meta.data %>%
   mutate('QC_reason' =case_when(strain_gt == "Negative" ~ 'sc_neg', 
-                                nFeature_RNA<=..2 | nCount_RNA <= ..3 ~ 'lo_gn_cnt', 
-                                nFeature_RNA>=..6 | nCount_RNA >= ..4 ~ 'hi_gn_cnt', 
-                                percent.mt>=..5 ~ 'hi_mtp',
-                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt != 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'stg_db',
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
+                                nFeature_RNA<=gn_lci_cl | nCount_RNA <= rna_lci_cl ~ 'lo_gn_cnt', 
+                                nFeature_RNA>=gn_uci_cl | nCount_RNA >= rna_uci_cl ~ 'hi_gn_cnt', 
+                                percent.mt>=..2 ~ 'hi_mtp',
+                                strain_gt == 'Doublet' & scf_class_supx_rand == 'Doublet' & scrub_doublet == 'Doublet' ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_supx_rand == 'Doublet' & scrub_doublet == 'Singlet' ~ 'ss_db', 
+                                strain_gt == 'Doublet' & scf_class_supx_rand == 'Singlet' & scrub_doublet == 'Doublet' ~ 'ss_db', 
+                                strain_gt != 'Doublet' & scf_class_supx_rand == 'Doublet' & scrub_doublet == 'Doublet' ~ 'stg_db', 
+                                strain_gt == 'Doublet' & scf_class_supx_rand == 'Singlet' & scrub_doublet == 'Singlet' ~ 'strn_db', 
+                                strain_gt!= 'Doublet' & scf_class_supx_rand == 'Doublet' & scrub_doublet == 'Singlet' ~ 'stg_db',
+                                strain_gt!= 'Doublet' & scf_class_supx_rand == 'Singlet' & scrub_doublet == 'Doublet' ~ 'stg_db', 
+                                strain_gt!= 'Doublet' & scf_class_supx_rand == 'Singlet' & scrub_doublet == 'Singlet' ~ 'pass')) %>%
   dplyr::select(QC_reason, StagePrelim)
 
 ##tabulate cells  
@@ -1374,8 +1355,7 @@ return(list(cell_qc_filt_obj, cell_qc_plot))
 
 })
 ```
- 
- 
+
 
 ```{r, results='asis',  fig.width = 8, fig.height = 4}
 ##adding clusters that are used to display mitochondrial count
@@ -1387,36 +1367,8 @@ map(cell_qc_objs, ~.x[2])
 
 ```{r, results='asis',  fig.width = 8, fig.height = 4}
 ##adding clusters that are used to display mitochondrial count
- list(all_msc_w_dblts, gn_lc, rna_lc, rna_uc, mt_filt) %>%
-  pmap(., ~{
-  
-  cell_qc_filt_tbl <- ..1@meta.data %>%
-  mutate('QC_reason' =case_when(strain_gt == "Negative" ~ 'sc_neg', 
-                                nFeature_RNA<=..2 | nCount_RNA <= ..3 ~ 'lo_gn_cnt', 
-                                nCount_RNA >= ..4 ~ 'hi_gn_cnt', 
-                                percent.mt>=..5 ~ 'hi_mtp',
-                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'ss_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'ss_db', 
-                                strain_gt != 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt == 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'strn_db', 
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Doublet' & scrub_doublet == F ~ 'stg_db',
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == T ~ 'stg_db', 
-                                strain_gt!= 'Doublet' & scf_class_norm == 'Singlet' & scrub_doublet == F ~ 'pass')) %>%
-  dplyr::select(StagePrelim, QC_reason)
 
-##Order the QC filt reasons with the lowest prevalent to the highest prevalent 
-cell_qc_filt_tbl %>% dplyr::count(StagePrelim, QC_reason)
-
-})
-```
- 
-
-
-```{r, results='asis',  fig.width = 8, fig.height = 4}
-##adding clusters that are used to display mitochondrial count
-
-mt_plt <- function(tbl, mtf, gp_var='old_seu_cluster', gp_cols = cluster_cols){
+mt_plt <- function(tbl, mtf, gp_var='seurat_clusters_norm', gp_cols = cluster_cols){
   
   FeatureScatter(tbl[,tbl@meta.data$QC_reason %in% c('pass', 'hi_mtp')], feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 3, group.by = gp_var) +
   scale_color_manual(name= 'Cluster', values = gp_cols ) +
@@ -1443,7 +1395,7 @@ mt_plt <- function(tbl, mtf, gp_var='old_seu_cluster', gp_cols = cluster_cols){
 
 mt_pc_plot_no_col <- list(map(cell_qc_objs, ~.x[[1]]), mt_filt) %>%
   pmap(., ~{ 
-    cl_no <- length(levels(..1@meta.data$old_seu_cluster))
+    cl_no <- length(levels(..1@meta.data$seurat_clusters_norm))
     
     print(mt_plt(..1, ..2, gp_cols = rep("grey", cl_no)))
     })
@@ -1505,34 +1457,18 @@ list(map(cell_qc_objs, ~.x[[1]][,.x[[1]]@meta.data$QC_reason %in% c('pass')]), m
 ```
 
 
-#### Add doublet assignment to counts not corrected by soupX
-```{r}
-##Seurat object
-##Add doublet assignment to counts not corrected by soupX
-# 
-# all_msc_filt_w_dblts <- list(all_msc_nosct_supx_4_dblt, all_msc_filt) %>%
-#   pmap(~ ..1@meta.data %>% 
-#          dplyr::rename('seurat_clusters_dblt' = seurat_clusters) %>%
-#          dplyr::select(any_of(c('scrub_doublet', 'scf_class_rand', 'scf_class_norm', 'seurat_clusters_dblt','old_seu_cluster', 'scf_score_norm')))  %>%
-#          # dplyr::select(scrub_doublet, scf_class_rand, scf_class_norm)  %>%
-#          AddMetaData(..2, .))
-
-```
-
 #### Tabulate  doublets
 ```{r}
 ##Seurat object
 
 ##!! WILL NEED TO BE UNDONE - RETAIN MSC14 ONLY WHOSE POSITION HAS CHANGED FROM 4 TO 1
 # all_msc_filt_w_dblts[[4]] : all_msc_filt_w_dblts[[4]]
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(seurat_clusters_dblt, scf_class_rand, scf_class_norm))
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(scf_class_rand, scf_class_norm))
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm, scrub_doublet))
+map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(scf_class_rand, scf_class_norm))
+map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt, scf_class_norm, scrub_doublet))
 
-map(all_msc_filt_w_dblts, ~.x@meta.data %>% 
-  dplyr::group_by(seurat_clusters_dblt) %>% 
-  dplyr::count(seurat_clusters_dblt, scf_class_norm) %>%
-  mutate(freq = round(n / sum(n), 3))) 
+# map(all_msc_w_dblts, ~.x@meta.data %>% 
+#   dplyr::count(seurat_clusters_dblt, scf_class_norm) %>%
+#   mutate(freq = round(n / sum(n), 3))) 
 ```
 
 
@@ -1542,7 +1478,7 @@ map(all_msc_filt_w_dblts, ~.x@meta.data %>%
 ```{r}
 
 ##Remove souporcell doublet
-all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
+all_msc_filt_no_dblts <- all_msc_w_dblts %>%
   map(. %>% subset(., subset = strain_gt %in% c("Doublet"), invert = TRUE))
 
 ```
@@ -1551,13 +1487,22 @@ all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
 ```{r}
 ##Seurat object
 ##Remove cluster 7 with lots of doublets MSC14
-# subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet)
+# subset(all_msc_filt_no_dblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet)
 
 ##Remove cluster 8 with lots of doublets (0.205) MSC14 - losing 31 singlets
-# all_msc_filt_w_dblts[[4]] <- subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt != "7")
+# all_msc_filt_no_dblts[[4]] <- subset(all_msc_filt_no_dblts[[4]], subset = seurat_clusters_dblt != "7")
 
 ##Remove cluster 8 with lots of doublets (0.368) MSC14 - losing 12 singlets
-# all_msc_filt_w_dblts[[4]] <- subset(all_msc_filt_w_dblts[[4]], subset = seurat_clusters_dblt != "8")
+# all_msc_filt_no_dblts[[4]] <- subset(all_msc_filt_no_dblts[[4]], subset = seurat_clusters_dblt != "8")
+
+```
+
+##### Check doublet clusters
+```{r}
+##Seurat object
+##Remove doublets
+
+map(all_msc_filt_no_dblts, ~.x@meta.data %>% filter(scf_class_norm_dbt_prop > 0.3) %>% count(seurat_clusters, scf_class_norm_dbt_prop, scrub_doublet_dbt_prop, scf_class_norm_dbt_nums, scrub_doublet_dbt_nums))
 
 ```
 
@@ -1566,143 +1511,86 @@ all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_w_dblts, ~.@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet))
+map(all_msc_filt_no_dblts, ~.@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet))
 
 ```
+
+##### Remove remaining doublets
 
 ```{r}
 ##Seurat object
 ##Remove doublets
 
-all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
-  map(. %>% subset(., subset = scf_class_norm == "Singlet" & scrub_doublet == 'FALSE'))
-
-```
-
-
-## Visualization of QCd cells -End of QC
-
-
-```{r, fig.width = 13, fig.height = 3.5, message=FALSE, warning=FALSE}
-# k_ovlp_plot_lst <- list(soupo_kselect_list_pp[c(1,4)], names(soupo_kselect_list_pp[c(1,4)]), optimum_k_pt_msc1_13_fake[c(1,4)], all_msc_filt_w_dblts[c(1,4)]) %>%
-#   pmap(., ~{
-#     ..1 %>% 
-#       filter(bcode %in% colnames(..4)) %>% 
-#   mutate("Strain_final" = !!rlang::sym(paste0("Strain_",..2,"_", ..3)),
-#          "Strain_2nd" = !!rlang::sym(paste0("Strain_",..2,"_", ..3-1)),
-#          "Strain_3rd" = !!rlang::sym(paste0("Strain_",..2,"_", ..3-2))) %>%
-#     filter(!Strain_final %in% c('Doublet', 'Negative')) %>% 
-#     filter(!Strain_2nd %in% c('Doublet', 'Negative')) %>%
-#     filter(!Strain_3rd %in% c('Doublet', 'Negative')) %>%
-#   dplyr::count(Strain_final, Strain_2nd, Strain_3rd) %>% 
-#   group_by(Strain_3rd) %>%  
-#   mutate(st3_f = paste0(Strain_final, collapse = '_'))  %>%
-#   group_by(Strain_2nd) %>% 
-#   mutate(st2_f = paste0(Strain_final, collapse = '_')) %>% 
-#   group_by(Strain_3rd) %>%  
-#   add_count(name = 'consist_strn') %>% 
-#   ungroup() %>% 
-#   mutate_at(vars(matches("st[0-9]_f")), ~ str_split(., "_")) %>%
-#   mutate_at(vars(matches("st[0-9]_f")), ~ map(., unique)) %>%
-#   mutate_at(vars(matches("st[0-9]_f")), ~ map_chr(., paste, collapse = "_")) %>% 
-#   # filter(consist_strn>1) %>% 
-#   dplyr::rename(c('Counts' =n, 'Strain' = Strain_final))  %>%
-#   ggplot(., aes(x = Strain, y = Counts, fill = Strain)) +
-#   geom_col(position = position_dodge2()) + #width=0.4, position = position_dodge(width=0.5) 
-#   geom_text(aes(label=Counts), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F, fontface ='bold')+
-#   scale_fill_manual(values = strain_cols_n) +
-#   ggh4x::facet_nested_wrap(vars(st3_f, st2_f),  nrow = 1)+
-#   scale_y_continuous(expand = expansion(mult = c(0.01, 0.24))) +
-#   scale_x_discrete(expand = expansion(add = c(1, 1))) +
-#   theme_classic() +
-#   labs( y = 'Counts')+
-#   theme(
-#     axis.text.y  = element_text(size = 14),
-#     axis.title.y  = element_text(size = 17, face = "bold"),
-#     axis.text.x  = element_text(size = 14, face = "bold", angle = 90),
-#     # axis.title.x = element_blank(),
-#     axis.title.x = element_text(size = 17, face = "bold"),
-#     legend.text = element_text(size = 17),
-#     legend.title = element_text(size = 17, face = "bold"),
-#     legend.position="bottom",
-#     strip.text =element_text(size=16,face="bold", colour = 'black'),
-#     panel.border=element_rect(colour="black",fill='transparent')
-#   ) + 
-#   guides(fill = guide_legend(title.position = 'left', nrow = 1, name = 'Strain (K8)'))
-# 
-#   })
-
-
-```
-
-
-### Start of re-normalizing and re-clustering QCd cells for annotation with scmap
-
-```{r}
-
-all_msc_filt_w_dblts <- all_msc_filt_w_dblts %>%
-  map(. %>%
-        Seurat::NormalizeData(normalization.method = "LogNormalize", scale.factor = 10000, verbose = FALSE) %>%
-        FindVariableFeatures(selection.method = "vst", nfeatures = 700, verbose = FALSE) %>% 
-        ScaleData(., features = rownames(.), verbose = FALSE)%>% 
-        RunPCA(., features = VariableFeatures(object = .), verbose = FALSE)
-  )
-```
-
-
-#### Elbow plot for PC determination {.tabset}
-```{r, results='asis', message=FALSE, warning=FALSE}
-# cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_filt_w_dblts, sample_id_lst)  %>% 
-  purrr::pmap(.,~{
-    # create tabset for each group 
-    cat('##### ',..2,'   \n')
-    p1 <- ElbowPlot(.)
-    print(p1)
-    cat('\n')
-    cat('\n')
-    cat('\n')
-  })
-
-```
-
-
-SCT_code
-```{r, eval=F}
-##SCT
-# all_msc_filt_w_dblts_sct <- all_msc_filt_w_dblts %>%
-#                  map(. %>%
-#                        SCTransform(., method = "glmGamPoi", verbose = F) %>%
-#                        RunPCA(pbmc, verbose = FALSE) %>%
-#                        RunUMAP(pbmc, dims = 1:30, verbose = FALSE) %>%
-#                        FindNeighbors(pbmc, dims = 1:30, verbose = FALSE)%>%
-#                        FindClusters(pbmc, verbose = FALSE)
-#                )
-
-# all_msc_nosct <- all_msc_sct
-
-
+all_msc_filt_no_dblts <- all_msc_filt_no_dblts %>%
+    map(. %>% subset(., subset = scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.3))
+  # map(. %>% subset(., subset = scf_class_supx_rand == "Singlet" & scrub_doublet == 'Singlet'))
 
 ```
 
 ```{r, results='asis'}
-##adding clusters that are used to display mitochondrial count
-map(all_msc_filt_w_dblts, ElbowPlot)
+
+map(all_msc_filt_no_dblts, dim)
+
 ```
 
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+
+map(all_msc_w_dblts, ~{
+  
+  .x@meta.data %>% 
+    distinct(seurat_clusters, .keep_all = T) %>% 
+    select(contains("_dbt_prop"), contains("_dbt_nums"), seurat_clusters) %>%
+    pivot_longer(cols = -c('strain_gt_dbt_prop', 'strain_gt_dbt_nums', seurat_clusters), names_pattern = "(.*)_(dbt.*)", names_to = c( "dbm", ".value")) %>% 
+    ggplot(aes(y = strain_gt_dbt_prop,x = dbt_prop )) + geom_point() +facet_wrap(.~dbm) + 
+    geom_text_repel(aes(label = paste0(seurat_clusters, "(",dbt_nums,")"))) + 
+    geom_hline(yintercept = 0.3) + 
+    geom_vline(xintercept = 0.5)
+  
+})
+
+```
+
+## Visualization of QCd cells -End of QC
+
+### Start of re-normalizing and re-clustering QCd cells for annotation with scmap
+
+
+```{r}
+## Change the default assay
+
+for (i in names(all_msc_filt_no_dblts)) {
+  DefaultAssay(all_msc_filt_no_dblts[[i]]) <- "RNA"
+}
+
+```
+
+```{r}
+
+all_msc_filt_no_dblts <- all_msc_filt_no_dblts %>%
+  map(. %>% seurat_norm_stand()
+  )
+```
+
+
+#### Elbow plot for PC determination
+
+```{r, results='asis'}
+##adding clusters that are used to display mitochondrial count
+map(all_msc_filt_no_dblts, ElbowPlot)
+```
+
+
+
 ```{r, message=FALSE, warning=FALSE}
-pc_list <-list(5L,4L,4L, 5L, 5L, 5L)
-# res_list <- c(0.16,0.12,0.12,0.12,0.12)
-res_list <- c(0.1,0.1,0.12,0.12,0.2,0.2)
+# pc_list <-list(5L,4L,4L, 5L, 5L, 5L)
+# # res_list <- c(0.16,0.12,0.12,0.12,0.12)
+# res_list <- c(0.1,0.1,0.12,0.12,0.2,0.2)
+
+pc_list <- list(rep(6L, length(sample_name_nms)))
+res_list <- list(rep(0.4, length(sample_name_nms)))
 
 
-pc_list <-pc_list
-res_list <- res_list
-## Just run for MSC14 - will need to expand in future
-# pc_list <-pc_list[4]
-# res_list <- res_list[4]
-
-all_msc_filt_w_dblts <- list(all_msc_filt_w_dblts, pc_list, res_list) %>%
+all_msc_filt_no_dblts <- list(all_msc_filt_no_dblts, pc_list, res_list) %>%
   pmap(~RunUMAP(..1, dims = 1:..2, n.components = 3L, verbose=F, seed.use = 949) %>%
          FindNeighbors(., dims = 1:..2, verbose = FALSE) %>%
          FindClusters(., resolution = ..3, verbose=F)
@@ -1711,36 +1599,37 @@ all_msc_filt_w_dblts <- list(all_msc_filt_w_dblts, pc_list, res_list) %>%
 ```
 
 
-#### Visualize reclustered QCd cells {.tabset}
+#### Visualize reclustered QCd cells
 
 ```{r, results='asis', message=FALSE, warning=FALSE}
-# cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_filt_w_dblts, sample_id_lst)  %>% 
+list(all_msc_filt_no_dblts, sample_id_lst)  %>% 
   purrr::pmap(.,~{
-    # create tabset for each group 
-    cat('##### ',..2,'   \n')
-    p1 <- DimPlot(., reduction = "umap", label = T, pt.size = 0.5)
-    print(p1)
-    cat('\n')
-    
-    p2 <- VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = NULL,idents = NULL, pt.size = 0.01)
-    print(p2)
-    cat('\n')
-    cat('\n')
-    
+    DimPlot(., reduction = "umap", label = T, pt.size = 0.5)
+
+    VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = NULL,idents = NULL, pt.size = 0.01)
+
   })
 
 ```
 
 
+```{r, results='asis', message=FALSE, warning=FALSE}
+list(all_msc_filt_no_dblts, sample_id_lst)  %>% 
+  purrr::pmap(.,~{
+    DimPlot(., reduction = "umap", label = T, pt.size = 0.5)
+
+    VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = "StagePrelim",idents = NULL, pt.size = 0.01)
+
+  })
+
+```
+
 ```{r,  fig.width = 6, fig.height = 4, results='asis'}
 
-cln_umap_stg <- list(all_msc_filt_w_dblts, sample_id_lst)  %>%
+cln_umap_stg <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
   purrr::pmap(.,  ~ {
-    # create tabset for each group
-    cat('####', ..2, '   \n')
+
     
-    cat('nfeature \n')
     p = DimPlot(., reduction = "umap", , pt.size = 1,  label = F, repel = T, label.size = 9, group.by = "StagePrelim") +
   scale_color_manual(name= 'Stage', values = sp_fld_colors) +
       theme_void()+
@@ -1762,21 +1651,40 @@ cln_umap_stg <- list(all_msc_filt_w_dblts, sample_id_lst)  %>%
     
     print(p)
     return(p)
-    
-    cat('\n')
-    cat("\n")
+
   })
 
 ```
 
+
+### Violin plot gene expression levels
+```{r, fig.height=4.5, fig.width=6}
+cln_vln_stg <- map(all_msc_filt_no_dblts,~.x %>%
+  VlnPlot(., features = c("nFeature_RNA"), group.by = 'StagePrelim', pt.size = .001) +
+  scale_fill_manual(name= 'Stage', values = sp_fld_colors)+
+  scale_y_continuous(label=function(y) y / 1000) +
+  theme(axis.text.x = element_blank(),
+        axis.text=element_text(size=20),
+        axis.title=element_text(size=20,face="bold"),
+        axis.title.y=element_text(hjust = 0.5),
+        # legend.text = element_text(size=20),
+        # legend.title = element_text(size=20, face = 'bold'),
+        legend.position = 'none',
+        # title = element_text(size=20,face="bold"),
+        plot.title = element_blank()
+  ) +
+  labs(x='Cluster', y = "Genes expressed\n(X 10e3)", title = 'Genes per cell')
+)
+
+cln_vln_stg
+```
+
 ```{r,  fig.width = 6, fig.height = 4, results='asis'}
 
-cln_umap <- list(all_msc_filt_w_dblts, sample_id_lst)  %>%
+cln_umap <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
   purrr::pmap(.,  ~ {
-    # create tabset for each group
-    cat('####', ..2, '   \n')
+
     
-    cat('nfeature \n')
     p = DimPlot(., reduction = "umap", , pt.size = .3,  label = T, repel = T, label.size = 4 ) +
   scale_color_manual(name= 'Cluster', values = cluster_cols) +
       theme_void()+
@@ -1798,38 +1706,15 @@ cln_umap <- list(all_msc_filt_w_dblts, sample_id_lst)  %>%
     
     print(p)
     return(p)
-    
-    cat('\n')
-    cat("\n")
+
   })
 
 ```
 
-### Violin plot gene expression levels
-```{r, fig.height=4.5, fig.width=6}
-cln_vln_stg <- map(all_msc_filt_w_dblts,~.x %>%
-  VlnPlot(., features = c("nFeature_RNA"), group.by = 'StagePrelim', pt.size = .001) +
-  scale_fill_manual(name= 'Stage', values = sp_fld_colors)+
-  scale_y_continuous(label=function(y) y / 1000) +
-  theme(axis.text.x = element_blank(),
-        axis.text=element_text(size=20),
-        axis.title=element_text(size=20,face="bold"),
-        axis.title.y=element_text(hjust = 0.5),
-        # legend.text = element_text(size=20),
-        # legend.title = element_text(size=20, face = 'bold'),
-        legend.position = 'none',
-        # title = element_text(size=20,face="bold"),
-        plot.title = element_blank()
-  ) +
-  labs(x='Cluster', y = "Genes expressed\n(X 10e3)", title = 'Genes per cell')
-)
-
-cln_vln_stg
-```
 
 ### Violin plot gene expression levels
 ```{r, fig.height=4.5, fig.width=6}
-cln_vln <- map(all_msc_filt_w_dblts,~.x %>%
+cln_vln <- map(all_msc_filt_no_dblts,~.x %>%
   VlnPlot(., features = c("nFeature_RNA"), group.by = 'old_seu_cluster', pt.size = .001) +
   scale_fill_manual(name= 'Cluster', values = cluster_cols)+
   scale_y_continuous(label=function(y) y / 1000) +
@@ -1848,218 +1733,50 @@ cln_vln <- map(all_msc_filt_w_dblts,~.x %>%
 cln_vln
 ```
 
-#### Grouping by strain_gt QCd cells {.tabset}
+#### Grouping by strain_gt QCd cells
 ```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-# list(all_msc_filt_w_dblts[2:5], sample_id_lst[2:5])  %>% 
-all_msc_filt_w_dblts  %>% 
+
+# list(all_msc_filt_no_dblts[2:5], sample_id_lst[2:5])  %>% 
+all_msc_filt_no_dblts  %>% 
   purrr::imap(.,~{
-    # create tabset for each group 
-    cat('##### ',.y,'   \n')
-    p1 <- DimPlot(.x, reduction = "umap", label = T, split.by = 'strain_gt', pt.size = 1)
-    print(p1)
-    cat('\n ')
     
-    p2 <- VlnPlot(.x, features = c("nCount_RNA", "nFeature_RNA"), group.by = 'strain_gt')
-    print(p2)
-    cat('\n ')
+    DimPlot(.x, reduction = "umap", label = T, split.by = 'strain_gt', pt.size = 1)
+
     
-    p3 <- FeaturePlot(.x, reduction = "umap", label = T, split.by = 'strain_gt', features ='nCount_RNA', pt.size = 1)
-    print(p3)
-    cat('\n')
-    cat('\n')
+    VlnPlot(.x, features = c("nCount_RNA", "nFeature_RNA"), group.by = 'strain_gt')
+    
+    FeaturePlot(.x, reduction = "umap", label = T, split.by = 'strain_gt', features ='nCount_RNA', pt.size = 1)
     
   })
 
 ```
 
-#### Featureplot reclustered QCd cells {.tabset}
+#### Featureplot reclustered QCd cells
 ```{r, results='asis'}
-# cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_filt_w_dblts, sample_id_lst)  %>% 
-  purrr::pmap(.,~{
-    # create tabset for each group 
-    cat('##### ',..2,'   \n')
-    p2 <- FeaturePlot(., reduction = "umap", features ='percent.mt', pt.size = .2)
-    print(p2)
-    cat('\n')
-    cat('\n')
-    
-  })
+
+map(all_msc_filt_no_dblts, ~FeaturePlot(., reduction = "umap", features ='percent.mt', pt.size = .2))
 
 ```
 
 
 ```{r}
-saveRDS(all_msc_filt_w_dblts, 'data/processed/DB52e_star/all_msc_filt_w_dblts.RDS')
+saveRDS(all_msc_filt_no_dblts, 'data/processed/Pf/all_msc_filt_no_dblts.RDS')
 ```
 
+Copy the Qcd barcodes to farm for souporcell
+```{r, results='asis'}
 
-## figS Plot for paper 
-
-
-Read in data for log likelihood Elbow plots visualisations for all MSCs
-```{r, message=FALSE}
-## Read in log likelihoods for estimation of number of clusters from elbow plots
-sc_ll_knee_p_all = readRDS('plots/fig_QC_s1/sc_ll_knee_p_all.RDS')
-
-```
-
-Read in data for log likelihood Elbow plots visualisations for all MSCs
-```{r, message=FALSE}
-## Read in log likelihoods for estimation of number of clusters from elbow plots
-sc_ll_knee_p_lst = readRDS('plots/fig_QC_s1/sc_ll_knee_p_lst.RDS')
+imap(all_msc_filt_no_dblts, ~{
+  system(paste0('mkdir /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/'))
+  write(colnames(.x), paste0('data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))
+  system(paste0('gzip /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))
+  system(
+        paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv.gz jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/')
+      )
+})
 
 ```
 
-Put together all the necessary plots
-```{r, fig.width= 12, fig.height=15, eval=FALSE}
-##Put together the plots for annotation
-
-##Get legend for the stage info for the dot plot
-# 
-list(sc_ll_knee_p_lst, strn_knee_p, cell_qc_objs, mt_pc_plot, cln_umap, cln_vln, c(k_ovlp_bar[1], "", k_ovlp_bar[2:3],"")) %>%
-pmap(., ~{
-  plot_grid(
-  plot_grid(..1 +
-              theme(axis.title = element_text(size = '20', face = 'bold'),
-                    axis.text = element_text(size = '20'),
-                    plot.margin = margin(l=0, r= 2, unit = "cm")),
-            ..2[[1]]+
-              theme(axis.title = element_text(size = '20', face = 'bold'),
-                    axis.text = element_text(size = '20', face = 'plain')),
-            ncol = 2,
-            rel_widths = c(.48,.52),
-            labels = c('A', 'B'),
-            label_size = 24,
-            vjust= 0.3)+
-              theme(plot.margin = margin(t=0.7, b=0.2, unit = "cm")),
-  plot_grid(..3[[2]],
-            ..4+
-              theme(axis.title = element_text(size = '20', face = 'bold'),
-                    axis.text = element_text(size = '20', face = 'plain')),
-            ncol = 2,
-            rel_widths = c(.62,.38),
-            labels = c('C', 'D'),
-            label_size = 24,
-            vjust=0.3)+
-              theme(plot.margin = margin(t=0.7, b=0.2, unit = "cm")),
-  plot_grid(..5 +
-              theme(aspect.ratio = 0.7,
-                    plot.margin = margin(t=0, b=0, l=0, r= 4, unit = "cm")),
-            ..6+
-              theme(axis.title = element_text(size = '20', face = 'bold'),
-                    axis.text = element_text(size = '20', face = 'plain')),
-            ncol = 2,
-            rel_widths = c(.55,.45),
-            labels = c('E', 'F'),
-            label_size = 24,
-            vjust= 0.3)+
-              theme(plot.margin = margin(t=0.7, b=0.2, unit = "cm")),
-  ..7+
-              theme(plot.margin = margin(t=0.7, b=0.2, unit = "cm")),
-  ncol = 1,
-  rel_heights = c(.24, .27, .27),
-            labels = c(rep('', 3)),
-            label_size = 24,
-            vjust= 0.3
-)})
-```
-
-Put together all the necessary plots
-```{r, fig.width= 12, fig.height=18, eval=FALSE}
-##Put together the plots for annotation
-qc_umaps <- map(cell_qc_objs, ~.[[2]] + 
-  theme(legend.position="none"))
-##Get legend for the stage info for the dot plot
-# 
-plot_grid(plot_grid(plotlist = raw_umap[1:4], ncol = 4),
-          my21_qc_filt[[2]],
-            sc_ll_knee_p_all,
-            plot_grid(st_assgn_sanky1_14[[1]], st_assgn_sanky3_13[[1]], st_assgn_sanky3_13[[2]],st_assgn_sanky1_14[[2]] , ncol = 4, rel_widths = c(.3,.2,.2,.3)),
-            plot_grid(plotlist = qc_umaps[1:4], ncol = 4),
-            # plot_grid(plotlist = cln_umap[1:4], ncol = 4),
-            nrow = 5,
-            rel_heights = c(.175,.225,.2,.175,.175),
-            labels = c('A', 'B', 'C', 'D', 'E'),
-            label_size = 24,
-            vjust= 0.3)
-```
-
-
-
-
-
-
-```{r, fig.height = 4.5, fig.width = 12}
-# options(repr.plot.width=32, repr.plot.height=7)
-pt_th1 <- theme(axis.title = element_text(size = 16, face = "plain"), axis.text = element_text(size = 14))
-pt_th3 <- theme(axis.title = element_blank(), axis.text = element_text(size = 14))
-gn_rna_qc_pt <- map2(viol_cut_off_lst[[2]], viol_cut_off_lst[[1]], ~plot_grid(.x+pt_th1, .y+pt_th1))[[1]] 
-
-
-msc_ttl <- map(str_to_upper(sample_name_nms[1:4]), ~.x %>% ggdraw() + 
-  draw_label(.,  fontface = 'bold', size =20,  hjust =  0.5) +
-  theme(
-    # plot.margin = margin(3, 3, 3, 3)
-  )
-)
-
-gn_rna_pt <- plot_grid(
-plot_grid(plotlist = msc_ttl, nrow = 1),
-plot_grid(gn_rna_qc_pt + panel_border(),
-          plot_grid(plotlist = map2(viol_cut_off_lst[[2]], viol_cut_off_lst[[1]], ~plot_grid(.x+pt_th3, .y +pt_th3)+ panel_border())[2:4], 
-                    nrow = 1
-                    ),
-          nrow = 1,
-          rel_widths = c(.3,.7)
-),
-nrow = 2,
-rel_heights = c(.1,.9), 
-scale = 0.95
-)
-
-```
-
-
-```{r, fig.width= 12, fig.height=16}
-##Put together the plots for annotation
-qc_umaps <- map(cell_qc_objs, ~.[[2]] + 
-  theme(legend.position="none"))
-
-lg_thme <- theme(legend.position = 'bottom',
-          legend.text = element_text(size = 14),
-          legend.title = element_text(size = 14, face = 'bold'),
-          legend.justification="center"
-          # legend.margin = margin(t=-0.2, b=0, unit = 'cm')
-          # legend.background = element_rect(fill = 'grey')
-    )
-
-mt_lgnd <- cowplot::get_legend(
-  mt_pc_plot_no_col[[4]] +
-    lg_thme +
-    guides(color=guide_legend(override.aes = list(size = 4.5), title.position = "left", nrow = 1)))
-    
-qc_lgnd <- cowplot::get_legend(
-  cell_qc_objs[[1]][[2]] + 
-    lg_thme + 
-    guides(color=guide_legend(override.aes = list(size = 4.5), title.position = "top", nrow = 1)))
-
-##Get legend for the stage info for the dot plot
-# 
-plot_grid(gn_rna_pt,
-          plot_grid(plotlist = map(sc_ll_knee_p_lst[1:4], ~ .x + theme(axis.title = element_text(size = 16), axis.text = element_text(size = 14))), ncol = 4, scale = 0.95),
-            plot_grid(st_assgn_sanky1_14[[1]][[2]], st_assgn_sanky3_13[[1]][[2]], st_assgn_sanky3_13[[2]][[2]],st_assgn_sanky14_MANUSCRIPT[[1]][[2]] , ncol = 4, rel_widths = c(.3,.2,.2,.3), scale = 0.95),
-             plot_grid(plotlist = map(mt_pc_plot_no_col[1:4], ~.x + theme(legend.position = "none", axis.title = element_text(size = 16, face = "plain"), axis.text = element_text(size = 14))), ncol = 4, scale = 0.95),
-            # mt_lgnd,
-            plot_grid(plotlist = qc_umaps[1:4], ncol = 4, scale = 0.9),
-            qc_lgnd,
-            nrow = 6,
-            rel_heights = c(.2,.2,.23,.15, .18,.04),
-            labels = c('A', 'B', 'C', 'D', 'E',''),
-            label_size = 22,
-            vjust= 1)
-```
 
 Packages and environment information
 ```{r}

@@ -235,7 +235,10 @@ initialize variable for the sample names
 ##Copy souporcell files for the optimum clusters
 
 ##Sample ID
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
+## All sample ids removing "MSC38" which seems to have lots of doublets
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
 ##Samples
@@ -313,7 +316,7 @@ map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
 map(all_msc, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelim", label = T))
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
 gn_lc <- rep(600, length(sample_id_lst))
 ugn_lc <- rep(list(NULL), length(sample_id_lst))
@@ -330,13 +333,13 @@ vp_fn <- function(seu_lst = all_msc, gnc_lst = gn_lc, ugnc_lst= ugn_lc, seu_thre
 
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.01)
 
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 gn_lc <- rep(300, length(sample_id_lst))
 nf_lst <- rep("nFeature_RNA", length(sample_id_lst))
 
@@ -345,26 +348,26 @@ vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 100000, ftr = nf_lst, grp
 ```
 
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 gn_lc <- rep(300, length(sample_id_lst))
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = "StagePrelim", ptsz = 0.01)
 
 ```
 
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 gn_lc <- rep(600, length(sample_id_lst))
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 1000000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.0)
 
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 gn_lc <- rep(550, length(sample_id_lst))
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 2000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.0)
 
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 gn_lc <- rep(600, length(sample_id_lst))
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelim", ptsz = 0.01)
 
@@ -396,9 +399,9 @@ all_mdata %>%
 ```
 
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
-gn_lc <- c(260, 260, 330, 270, 250, 250, 260, 330, 270, 250, 250)
+gn_lc <- rep(300, length(sample_id_lst))
 
 vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = NULL, ptsz = 0.01)
 
@@ -408,9 +411,9 @@ vp_fn(seu_lst = all_msc, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = 
 ```{r, fig.height = 5, fig.width = 15}
 # options(repr.plot.width=32, repr.plot.height=7)
 # rna_lc <- c(530, 600, 530, 700, 600)
-rna_lc <- rep(510, length(sample_id_lst))
+rna_lc <- rep(600, length(sample_id_lst))
 # rna_uc <- c(7500, 13000, 24000, 40000, 17000)
-rna_uc <- c(7500, 13000, 23000, 37000, 17000, 17000, 13000, 23000, 37000, 17000, 17000)
+rna_uc <- rep(10000, length(sample_id_lst))
 
 vp_fn(seu_lst = all_msc, gnc_lst = rna_lc, ugnc_lst = rna_uc, seu_thresh = 10000, ftr = nc_lst, grp = NULL, ptsz = 0.01)
 
@@ -432,16 +435,16 @@ qc_cutoffs <- pmap(list(all_msc, rep('nFeature_RNA', length(sample_id_lst)), rep
 })
 ```
 
-```{r, fig.height = 5, fig.width = 15}
+```{r, fig.height = 10, fig.width = 15}
 vp_fn(seu_lst = all_msc, gnc_lst = map(qc_cutoffs, ~.x$gn_lci), ugnc_lst = map(qc_cutoffs, ~.x$gn_uci), seu_thresh = 1000000, ftr = nf_lst, grp = NULL, ptsz = 0.01)
 ```
 
 
-```{r, fig.height = 7, fig.width = 15}
+```{r, fig.height = 15, fig.width = 15}
 lc_lst <- unlist(c(map(qc_cutoffs, ~.x[c("gn_lci")]), map(qc_cutoffs, ~.x[c("rna_lci")])), recursive = T)
 uc_lst <- unlist(c(map(qc_cutoffs, ~.x[c("gn_uci")]), map(qc_cutoffs, ~.x[c("rna_uci")])), recursive = T)
 
-vp_fn(seu_lst = rep(all_msc, 2), gnc_lst = lc_lst, ugnc_lst = uc_lst, seu_thresh = 100000000, ftr = c(nf_lst, nc_lst), grp = NULL, ptsz = 0.01, nrws = 2)
+vp_fn(seu_lst = rep(all_msc, 2), gnc_lst = lc_lst, ugnc_lst = uc_lst, seu_thresh = 100000000, ftr = c(nf_lst, nc_lst), grp = NULL, ptsz = 0.01, nrws = 4)
 ```
 
 #### Violin plots
@@ -1086,6 +1089,10 @@ all_msc_anotd_ysct <- map(all_msc_anotd_ysct, ~{
 
 ```
 
+```{r}
+saveRDS(all_msc_anotd_ysct, "data/processed/Pf/all_msc_anotd_ysct.RDS")
+```
+
 ```{r, results='asis', eval=FALSE}
 # cat('## Visualize field parasites {.tabset}   \n')
 # list(all_msc_ysct, sample_id_lst)  %>%
@@ -1663,7 +1670,7 @@ all_msc_filt <- all_msc_filt %>%
 
 ```{r, warning=FALSE, message=FALSE}
 # pc_list <-list('12')
-pc_list <-list(5L,3L,4L, 5L, 5L, 5L,3L,4L, 5L, 5L, 5L)
+pc_list <-rep(5L, length(all_msc_filt))
 
 all_msc_filt <- all_msc_filt %>%
   map2(., pc_list, ~RunUMAP(.x, reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
@@ -1757,7 +1764,21 @@ We use SCT since it has increased resolution to allow for soup (SoupX) removal d
 
 
 ```{r}
+imap(all_msc_filt, ~saveRDS(.x, paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/all_msc_filt_",.y,".RDS")))
+```
+
+```{r}
+# imap(all_msc_filt, ~paste0("d",.y,".RDS"))
+# saveRDS(all_msc_anotd, "data/processed/Pf/all_msc_anotd.RDS")
+```
+
+```{r}
+# imap(all_msc_filt, ~saveRDS(paste0(.x, "data/processed/Pf/all_msc_filt_",.y,".RDS")))
+# saveRDS(all_msc_anotd, "data/processed/Pf/all_msc_anotd.RDS")
+```
+
+```{r}
 saveRDS(all_msc_filt, "data/processed/Pf/all_msc_filt.RDS")
-saveRDS(all_msc_anotd, "data/processed/Pf/all_msc_anotd.RDS")
+# saveRDS(all_msc_anotd, "data/processed/Pf/all_msc_anotd.RDS")
 ```
 
