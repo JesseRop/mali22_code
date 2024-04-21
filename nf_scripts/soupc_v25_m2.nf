@@ -11,13 +11,13 @@ params.bam = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cel
 
 // - cell barcodes
 // params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
-params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/GE_qcd_bcodes.tsv"
+params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/barcodes.tsv.gz"
 
 // - output directory
 params.o_dir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
 
 // - compute resources for first process
-ncores="10"
+ncores="12"
 mem="120 GB"
 
 // - souporcell output folder
@@ -62,7 +62,7 @@ bcodes_bam_ch = id_ch
                     .combine(bcodes_ch, by:0)
                     .map { file -> tuple(file[0], file[4], file[2], file[3]) }
 
-bcodes_bam_ch.view()
+// bcodes_bam_ch.view()
 
 // - Algnment mapper tuples including references
 hsat_tup = ['hsat', 'HISAT2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/Pf66_hisat_refs/genome_w_tran_ref/genome_tran.fasta'] // reference generated using /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/scripts/hisat2_ref_build.sh
@@ -88,7 +88,7 @@ process SOUPC1 {
     memory "${mem}"
     cpus "${ncores}"
 
-    errorStrategy 'ignore' // MSC66 giving error
+    // errorStrategy 'ignore' // MSC66 giving error
 
     tag "Souporcell k1 ${sample_nm} ${algn_nm} reads"
 
