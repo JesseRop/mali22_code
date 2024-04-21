@@ -1,3 +1,6 @@
+nf_scripts/.nextflow*
+nf_scripts/work/
+nf_scripts/nextflow.config
 .DS_Store
 backup_scripts/
 html_nbooks_share/
