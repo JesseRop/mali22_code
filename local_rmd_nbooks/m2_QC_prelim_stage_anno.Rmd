@@ -197,21 +197,20 @@ source_irods <- irods_id_sk21_mdata_cln[,c('sample_nm', 'irods_id')] %>% deframe
 ```
 
 
-```{r, eval=FALSE}
+```{r, eval=T}
 ##Copy souporcell files for the optimum clusters
 
 for (i in 1:length(sample_name)) {
 # for (i in 32:33) {
   
   ## Create new directories
-  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/Pf/outs'))
-  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/', sample_name[i]))
+  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/', sample_name[i], '/outs'))
   system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/', sample_name[i], '/bpcells'))
   
   ##Transfers
   ##souporcell genotyping files
   system(
-    paste0('rsync --delete -av --exclude="molecule_info.h5" --exclude="raw_feature_bc_matrix.h5" --exclude="*bam*" --exclude="metrics_summary.csv" jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/Pf/outs/')
+    paste0('rsync --delete -av --exclude="molecule_info.h5" --exclude="raw_feature_bc_matrix.h5" --exclude="*bam*" --exclude="metrics_summary.csv" jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/', sample_name[i], '/outs/')
     )
   
   ##metadata and seurat object files
@@ -227,14 +226,14 @@ for (i in 1:length(sample_name)) {
 
 ```{r, results='hide'}
 # list.files("data/processed/", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
-list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T) %>% 
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_')))
 ```
 
 
 ```{r}
 ##Read filtered cellranger matrices into R
-list.files("data/raw/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T)
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T)
 ```
 
 ```{r}
@@ -250,8 +249,8 @@ list.files("data/raw/", pattern = "filtered_feature_bc_matrix.h5$", full.names =
 
 ```{r, message=F, warning=F}
 ##Write BPcells matrices
-list.files("data/raw/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*'))) %>% 
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
   .[sample_name] %>%
   map(~open_matrix_10x_hdf5(path = .)) %>% 
   imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/counts_mtx'), overwrite = T))
@@ -451,19 +450,44 @@ Convert seurat object into single cell experiment filling in the slots appropria
 
 ##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
 ##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
+# 
+# sce_obj_creatn <- function(sce_obj, seu_obj){
+#   for(i in 1:length(seu_obj)) {
+#     sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
+#     
+#     logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
+#     # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
+#     rowData(sce_obj[[i]])$feature_symbol <- rownames(sce_obj[[i]])
+#     sce_obj[[i]] <- sce_obj[[i]][!duplicated(rownames(sce_obj[[i]])), ]
+#     # rowData(sce_obj[[i]])$feature_symbol <- str_replace(rownames(sce_obj[[i]]), "-", "_")
+#     # reducedDims(sce_obj[[i]]) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
+# 
+#   }
+#   
+#   return(sce_obj)
+#   
+# }
 
+
+```
+
+```{r}
+
+##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
+##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
+# all_msc_sce <- list()
 sce_obj_creatn <- function(sce_obj, seu_obj){
-  for(i in 1:length(sce_obj)) {
-    sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
+  for(i in 1:length(seu_obj)) {
+    obj1 <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
     
-    logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
-    # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
-    rowData(sce_obj[[i]])$feature_symbol <- rownames(sce_obj[[i]])
-    sce_obj[[i]] <- sce_obj[[i]][!duplicated(rownames(sce_obj[[i]])), ]
-    # rowData(sce_obj[[i]])$feature_symbol <- str_replace(rownames(sce_obj[[i]]), "-", "_")
-    # reducedDims(sce_obj[[i]]) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
-
-
+    logcounts(obj1) <- log2((SingleCellExperiment::counts(obj1) + 1))
+    # normcounts(obj1) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
+    rowData(obj1)$feature_symbol <- rownames(obj1)
+    obj1 <- obj1[!duplicated(rownames(obj1)), ]
+    # rowData(obj1)$feature_symbol <- str_replace(rownames(obj1), "-", "_")
+    # reducedDims(obj1) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
+    
+    sce_obj[[i]] <- obj1
   }
   
   return(sce_obj)
@@ -475,7 +499,7 @@ sce_obj_creatn <- function(sce_obj, seu_obj){
 
 ```{r}
 
-all_msc_sce <- sce_obj_creatn(sce_obj = all_msc_sce, seu_obj = all_msc)
+all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc)
 
 ```
 
@@ -602,7 +626,7 @@ all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name
   ..1@meta.data %>%
   mutate(across(Stage_MSC, as.character)) %>%
   # mutate(Stage_MSC = Stage_MSC) %>%
-  mutate(StagePrelim = case_when(
+  mutate(StagePrelim_lf = case_when(
     is.na(Stage_MSC) & sim_lab1 > 0.35 & str_detect(stage_lab1, ..3) & str_detect(stage_lab2, ..3) & str_detect(stage_lab3, ..3) ~ stage_lab1,
     is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Male|male') & str_detect(stage_lab2, 'Male|male') & str_detect(stage_lab3, 'Male|male') ~ stage_lab1,
     is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Female|female') & str_detect(stage_lab2, 'Female|female') & str_detect(stage_lab3, 'Female|female') ~ stage_lab1,
@@ -610,12 +634,14 @@ all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name
     # across(StagePrelim, str_to_sentence)
   )%>%
   mutate(StagePrelim = case_when(
-    str_detect(StagePrelim, "late|early|gametocyte") ~ str_to_sentence(StagePrelim),
-    is.na(StagePrelim) ~ "Field unlabelled",
-    TRUE ~ StagePrelim)#,
+    str_detect(StagePrelim_lf, "gametocyte (developing)|schizont") ~ "Field unlabelled",
+    str_detect(StagePrelim_lf, "late|early") ~ str_to_sentence(StagePrelim_lf),
+    str_detect(StagePrelim_lf, "gametocyte") ~ str_to_sentence(str_remove_all(StagePrelim_lf, "gametocyte \\(|\\)")),
+    is.na(StagePrelim_lf) ~ "Field unlabelled",
+    TRUE ~ StagePrelim_lf)#,
     # across(StagePrelim, str_to_sentence)
   ) %>%
-  dplyr::select(StagePrelim) %>%
+  dplyr::select(StagePrelim, StagePrelim_lf) %>%
   # mutate(across(starts_with('Stage_V'), ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
   AddMetaData(.x, .)
 })
