@@ -284,7 +284,7 @@ TURN CHUNKS FOR PROCESSING OF RAW CELLRANGER OUTPUTS TO FALSE -
 
 ```{r, message=F, warning=F}
 ##Read filtered cellranger matrices into R 4,6,10,12,15
-all_msc <- readRDS("data/processed/all_msc_anotd_preQC.RDS") %>% .[sample_id_lst]
+all_msc <- readRDS("data/processed/Pf/all_msc_anotd_preQC.RDS") %>% .[sample_id_lst]
 ```
 
 
@@ -873,7 +873,7 @@ We did souporcell assuming a range of 3 strains (6,7 and 8)
 ```{r}
 algn_nm <- "minmap"
 ##Read in strain information
-soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
+soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS")# %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
 
 ##Creating Binary variable for Doublet/Singlet for doublet finder in the samples with more than 2 strains
 # soupo_kselect_list_pp[2:10] <- soupo_kselect_list_pp[2:10] %>%
