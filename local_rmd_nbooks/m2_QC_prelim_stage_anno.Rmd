@@ -44,6 +44,7 @@ suppressPackageStartupMessages({
   library(scmap)
   library(ggsankey)
   library(findPC)
+  library(BPCells)
   
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
@@ -70,7 +71,7 @@ knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents
 ##Strain cluster colours
 stg_lvls = c("Early ring", "Late ring", "Early trophozoite","Late trophozoite" , "Early schizont", "Late schizont",  "Gametocyte (developing)", "Female (HE)", "Female", "Female (LE)",  "Gametocyte (female)", "Male (HE)", "Male", "Male (LE)", "Gametocyte (male)", "Asexual", "Unassigned", "Failed QC", "Not assigned")
 
-stg_refnd_lvls = c("Early ring", "Late ring", "Early trophozoite", "Late trophozoite", "Early schizont", "Late schizont", "Gametocyte (committed)", "Gametocyte (developing)", "Gametocyte (branching)", "Female (HE)", "Female", "Female (LE)", "Gametocyte (female)", "Gametocyte (early female)", "Gametocyte (late female)", "Gametocyte (male)", "Male (HE)", "Male", "Male (LE)", "Gametocyte (early male)", "Gametocyte (late male)", "Asexual", "Unassigned", "Failed qc", "Not assigned", "Atlas")
+stg_refnd_lvls = c("Early ring", "Late ring", "Early trophozoite", "Late trophozoite", "Early schizont", "Late schizont", "Gametocyte (committed)", "Gametocyte (developing)", "Gametocyte (branching)", "Female (HE)", "Female", "Female (LE)", "Gametocyte (female)", "Gametocyte (early female)", "Gametocyte (late female)", "Gametocyte (male)", "Male (HE)", "Male", "Male (LE)", "Gametocyte (early male)", "Gametocyte (late male)", "Asexual", "early trophozoite", "late ring", "late trophozoite", "early schizont", "early ring", "late schizont", "gametocyte (developing)", "gametocyte (female)", "gametocyte (male)", "Unassigned", "Failed qc", "Not assigned", "Atlas")
 
 stg_refnd_lvls2 = c('Early ring','Late ring','Early trophozoite','Late trophozoite','Early schizont','Late schizont', "Gametocyte (committed)","Gametocyte (developing)","Gametocyte (branching)", "Female (HE)", "Female", "Female (LE)", "Gametocyte (early female)","Gametocyte (late female)", "Male (HE)", "Male", "Male (LE)", "Gametocyte (early male)","Gametocyte (late male)", "Asexual", "Unassigned", "Failed QC", "Not assigned") #%>% str_to_sentence(.)
 
@@ -101,13 +102,13 @@ sp_colors <- c('Early ring'='#D1EC9F',
 
 sp_fld_colors <- c('Late ring'= '#78C679',#met.brewer('Java')[2],
                    'Early trophozoite'='#FEEEAA',#met.brewer('Java')[3],
-                   'Female (LE)'= met.brewer('Ingres')[5],
+                   'Female LE'= met.brewer('Ingres')[5],
                    'Female'= '#551A8B', #met.brewer('Ingres')[7],
                    # 'Female (HE)'= '#551A8B', #met.brewer('Ingres')[7],
                    # 'Male (LE)'=met.brewer('Nizami')[6],
                    # 'Male (HE)'=met.brewer('Nizami')[8],
                    # 'Gametocyte (male)'=met.brewer('Austria')[5],
-                   'Male (LE)'=met.brewer('Ingres')[7],#'#a2e19e',
+                   'Male LE'=met.brewer('Ingres')[7],#'#a2e19e',
                    'Male'= 'mediumpurple',#'#039911',
                    ## 'Male (HE)'= 'mediumpurple',#'#039911',
                    'Gametocyte (male)'='#3DED97',
@@ -125,7 +126,8 @@ sp_fld_colors <- c('Late ring'= '#78C679',#met.brewer('Java')[2],
                    'early female' = '#749E89',
                    'late female'= '#4E6D58',
                     "Asexual" = "#FBC81D",
-                   NULL = 'lightgrey'
+                   NULL = 'lightgrey',
+                   'Field unlabelled'='#D2C1DC'
 )
 
 cluster_cols <- brewer.pal(7, name = 'Set2') %>% set_names(as.character(c(0:6)))
@@ -173,7 +175,7 @@ write_csv(irods_id_sk21_mdata_cln, "data/raw/irods_id_sk21_mdata_cln.csv")
 
 ```{r}
 system(
-    paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv')
+    paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv')
     )
 ```
   
@@ -195,25 +197,25 @@ source_irods <- irods_id_sk21_mdata_cln[,c('sample_nm', 'irods_id')] %>% deframe
 ```
 
 
-```{r, eval=FALSE}
+```{r, eval=T}
 ##Copy souporcell files for the optimum clusters
 
 for (i in 1:length(sample_name)) {
 # for (i in 32:33) {
   
   ## Create new directories
-  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/Pf/outs'))
-  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/processed/', sample_name[i]))
+  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/', sample_name[i], '/outs'))
+  system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/', sample_name[i], '/bpcells'))
   
   ##Transfers
   ##souporcell genotyping files
   system(
-    paste0('rsync --delete -av --exclude="*h5" --exclude="*bam*" --exclude="metrics_summary.csv" jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/Pf/outs/')
+    paste0('rsync --delete -av --exclude="molecule_info.h5" --exclude="raw_feature_bc_matrix.h5" --exclude="*bam*" --exclude="metrics_summary.csv" jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/', sample_name[i], '/outs/')
     )
   
   ##metadata and seurat object files
   # system(
-  #   paste0('rsync -av --include="msc_filt_w_dblts_scmap_metadata.RDS" --include="msc_filt_w_dblts_scmap.RDS" --exclude="*" jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/Pf/', source_irods[i], '/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/')
+  #   paste0('rsync -av --include="msc_filt_w_dblts_scmap_metadata.RDS" --include="msc_filt_w_dblts_scmap.RDS" --exclude="*" jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/Pf/', source_irods[i], '/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/', sample_name[i], '/')
   # )
   
 }
@@ -221,25 +223,86 @@ for (i in 1:length(sample_name)) {
 
 ```
 
+
 ```{r, results='hide'}
 # list.files("data/processed/", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
-list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_')))
 ```
 
 
-```{r, message=F, warning=F}
+```{r}
 ##Read filtered cellranger matrices into R
-all_msc <- list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
-  set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_'))) %>% 
-  # str_sort(., numeric = T) %>%
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T)
+```
+
+```{r}
+##Read filtered cellranger matrices into R
+# all_msc <- list.files("data/raw/", pattern = "filtered_feature_bc_matrix_h5", full.names = T, recursive = T, include.dirs = T)%>% 
+#   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_'))) %>% 
+#   # str_sort(., numeric = T) %>%
+#   .[sample_name] %>%
+#   map(~Read10X(.,gene.column = 1)) %>% 
+#   imap(., ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) 
+```
+
+
+```{r, message=F, warning=F}
+##Write BPcells matrices
+list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
   .[sample_name] %>%
-  map(~Read10X(.,gene.column = 1)) %>% 
-  imap(., ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) 
+  map(~open_matrix_10x_hdf5(path = .)) %>% 
+  imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/counts_mtx'), overwrite = T))
+```
+
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_msc <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
+  .[sample_name] %>%
+  map(~open_matrix_dir(dir = .)) %>% 
+  imap(., ~CreateSeuratObject(counts = .x, project = paste0(.y, ".mrna"))) 
 ```
 
 
 
+```{r, message=F, warning=F}
+# file.dir <- "/brahms/hartmana/vignette_data/h5ad_files/"
+# files.set <- c("ahern_pbmc.h5ad", "jin_pbmc.h5ad", "yoshida_pbmc.h5ad")
+# 
+# # Loop through h5ad files and output BPCells matrices on-disk
+# data.list <- c()
+# metadata.list <- c()
+# 
+# for (i in 1:length(files.set)) {
+#   path <- paste0(file.dir, files.set[i])
+#   data <- open_matrix_anndata_hdf5(path)
+#    write_matrix_dir(
+#      mat = data,
+#      dir = paste0(gsub(".h5ad", "", path), "_BP")
+#    )
+#   # Load in BP matrices
+#   mat <- open_matrix_dir(dir = paste0(gsub(".h5ad", "", path), "_BP"))
+#   mat <- Azimuth:::ConvertEnsembleToSymbol(mat = mat, species = "human")
+#   # Get metadata
+#   metadata.list[[i]] <- LoadH5ADobs(path = path)
+#   data.list[[i]] <- mat
+# }
+# # Name layers
+# names(data.list) <- c("ahern", "jin", "yoshida")
+# 
+# # Add Metadata
+# for (i in 1:length(metadata.list)) {
+#   metadata.list[[i]]$publication <- names(data.list)[i]
+# }
+# metadata.list <- lapply(metadata.list, function(x) {
+#   x <- x[, c("publication", "sex", "cell_type", "donor_id", "disease")]
+#   return(x)
+# })
+# metadata <- Reduce(rbind, metadata.list)
+```
 
 Check clustering of cells before filtering out by mt.percent
 ```{r, warning=FALSE, message=FALSE}
@@ -256,9 +319,9 @@ map(all_msc, ElbowPlot)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-sdev<-prcomp(t(data),scale. = T)$sdev[1:30]
-sdev <- sort(sdev, decreasing = TRUE)
-npc <- findPC(sdev = sdev)
+# sdev<-prcomp(t(data),scale. = T)$sdev[1:30]
+# sdev <- sort(sdev, decreasing = TRUE)
+# npc <- findPC(sdev = sdev)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -298,7 +361,7 @@ map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
 ### Preprocessing references
 
 #### msc_combi reference dataset
-```{r}
+```{r, eval=FALSE}
 ##Read MCA V3 blood stage reference dataset
 # msc_combi <- readRDS("../sc_velo/data/raw/RoadtoUMAP/pseudotime/raw_combined_cut_0.4.RDS")
 # msc_combi <- readRDS("../Mali/data/raw/mca_v3_ref/raw_combined_cut_0.4_nodoublets_stagenew.RDS")
@@ -309,7 +372,7 @@ DefaultAssay(msc_combi) <- "RNA"
 msc_combi@meta.data$stageHL_ref_asx <- ifelse(msc_combi@meta.data$stageHL_ref %in% c("Early trophozoite", "Late ring"), "Asexual", msc_combi@meta.data$stageHL_ref)
 ```
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
 ##Convert to reference to sce
 msc_combi.sce <- as.SingleCellExperiment(msc_combi)
 
@@ -327,13 +390,59 @@ msc_combi.sce <- indexCell(msc_combi.sce)
 ```
 
 
+```{r, eval=T}
+## transfer integrated object from sunil farm to local
+system('rsync -av jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.seur.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/')
+system('rsync -av jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.sce.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/')
+
+```
+
+#### full msc_atlas reference dataset
+```{r}
+##Read MCA V3 + field blood stage reference dataset
+v3labmscs.ref.sce <- readRDS("../Mali2/data/raw/Pf/v3labmscs.ref.sce.RDS")
+
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+##Collapse asexual stages into 1 "Asexual"
+v3labmscs.ref.sce@colData[,c("stageHL_ref", "stageHL_ref_asx")] <- colData(v3labmscs.ref.sce) %>% 
+  data.frame() %>% 
+  mutate(stageHL_ref = case_when(str_detect(orig.ident, "msc") & stageLR == "late ring" ~ "Late ring", 
+                                 str_detect(orig.ident, "msc") & stageLR == "early trophozoite" ~ "Early trophozoite", 
+                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (female) LE" ~ "Female LE", 
+                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (female)" ~ "Female", 
+                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (male) LE" ~ "Male LE", 
+                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (male)" ~ "Male", T ~ stageLR)) %>% 
+  mutate(stageHL_ref_asx = case_when(stageHL_ref %in% c("Early trophozoite", "Late ring") ~ "Asexual", T ~ stageHL_ref)) %>%
+  select(stageHL_ref, stageHL_ref_asx)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+scater::plotReducedDim(v3labmscs.ref.sce, dimred = "PCA", colour_by = "stageHL_ref_asx", ncomponents = c(2,3))
+```
+
+```{r, message=FALSE, warning=FALSE}
+##scmap feature selection
+v3labmscs.ref.sce <- selectFeatures(v3labmscs.ref.sce, suppress_plot = T)
+
+##Cell indexing
+set.seed(155)
+v3labmscs.ref.sce <- indexCell(v3labmscs.ref.sce)
+```
+
+
 ### Preprocessing MSC query datasets
 
 ```{r}
 
 #Convert to SCE and subset
-all_msc_sce <- all_msc %>%
-  map(. %>% as.SingleCellExperiment(.))
+# all_msc_sce <- all_msc %>%
+#   map(. %>% as.SingleCellExperiment(.))
 ```
 
 Convert seurat object into single cell experiment filling in the slots appropriately
@@ -341,21 +450,48 @@ Convert seurat object into single cell experiment filling in the slots appropria
 
 ##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
 ##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
+# 
+# sce_obj_creatn <- function(sce_obj, seu_obj){
+#   for(i in 1:length(seu_obj)) {
+#     sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
+#     
+#     logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
+#     # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
+#     rowData(sce_obj[[i]])$feature_symbol <- rownames(sce_obj[[i]])
+#     sce_obj[[i]] <- sce_obj[[i]][!duplicated(rownames(sce_obj[[i]])), ]
+#     # rowData(sce_obj[[i]])$feature_symbol <- str_replace(rownames(sce_obj[[i]]), "-", "_")
+#     # reducedDims(sce_obj[[i]]) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
+# 
+#   }
+#   
+#   return(sce_obj)
+#   
+# }
 
+
+```
+
+```{r}
+
+##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
+##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
+# all_msc_sce <- list()
 sce_obj_creatn <- function(sce_obj, seu_obj){
-  for(i in 1:length(sce_obj)) {
-    sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as.matrix(seu_obj[[i]]@assays$RNA@counts)), colData = seu_obj[[i]]@meta.data)
+  for(i in 1:length(seu_obj)) {
+    obj1 <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
     
-    logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
-    # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
-    rowData(sce_obj[[i]])$feature_symbol <- rownames(sce_obj[[i]])
-    sce_obj[[i]] <- sce_obj[[i]][!duplicated(rownames(sce_obj[[i]])), ]
-    # rowData(sce_obj[[i]])$feature_symbol <- str_replace(rownames(sce_obj[[i]]), "-", "_")
-    # reducedDims(sce_obj[[i]]) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
-
-
+    logcounts(obj1) <- log2((SingleCellExperiment::counts(obj1) + 1))
+    # normcounts(obj1) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
+    rowData(obj1)$feature_symbol <- rownames(obj1)
+    obj1 <- obj1[!duplicated(rownames(obj1)), ]
+    # rowData(obj1)$feature_symbol <- str_replace(rownames(obj1), "-", "_")
+    # reducedDims(obj1) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
+    
+    sce_obj[[i]] <- obj1
   }
+  
   return(sce_obj)
+  
 }
 
 
@@ -363,7 +499,7 @@ sce_obj_creatn <- function(sce_obj, seu_obj){
 
 ```{r}
 
-all_msc_sce <- sce_obj_creatn(sce_obj = all_msc_sce, seu_obj = all_msc)
+all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc)
 
 ```
 
@@ -373,10 +509,16 @@ transferring labels from  reference datasets
 ##Projection
 all_msc_jc <- all_msc_sce %>%
   map(. %>% scmapCell(.,list(
-    Stage_MSC = metadata(msc_combi.sce)$scmap_cell_index
+    # Stage_MSC = metadata(msc_combi.sce)$scmap_cell_index
+    Stage_MSC = metadata(v3labmscs.ref.sce)$scmap_cell_index
   )
   )
   )
+```
+
+```{r}
+##Projection
+rm(all_msc_sce)
 ```
 
 Assigning stage labels only when the top 3 most closest reference cells to a query cell all have a similar stage label and a cosine similarity greater than 0.4
@@ -384,7 +526,8 @@ Assigning stage labels only when the top 3 most closest reference cells to a que
 ##Assigning stage labels using thresholds
 all_msc_lbls <- all_msc_jc %>%
   map(. %>% scmapCell2Cluster(.,list(
-    as.character(SummarizedExperiment::colData(msc_combi.sce)$stageHL_ref)
+    # as.character(SummarizedExperiment::colData(msc_combi.sce)$stageHL_ref)
+    as.character(SummarizedExperiment::colData(v3labmscs.ref.sce)$stageHL_ref)
   ),w = 3, threshold = 0.5)
   )
 ```
@@ -408,7 +551,8 @@ sc_topv3_cells_sims_all <- list(all_msc_jc) %>%
                     rename_all(., ~str_replace(., 'X', 'msc_ref_cells')) %>% 
                     rownames_to_column('bcode'),
                   by = 'bcode') %>% 
-        mutate(across(starts_with('msc_ref_cells'), ~colnames(msc_combi.sce)[.]))
+        # mutate(across(starts_with('msc_ref_cells'), ~colnames(msc_combi.sce)[.]))
+        mutate(across(starts_with('msc_ref_cells'), ~colnames(v3labmscs.ref.sce)[.]))
     })
 
 # saveRDS(sc_topv3_cells_sims_all, 'data/processed/DB52e_star/sc_topv3_cells_sims_all.RDS')
@@ -430,7 +574,8 @@ sc_topv3_cells_sims_all <- list(all_msc_jc) %>%
 Adding annotations to MSC query datasets
 ```{r}
 ## Adding annotations to query cells
-stg_anots <- msc_combi@meta.data[,c('stageHL_ref'), drop=F]
+# stg_anots <- msc_combi@meta.data[,c('stageHL_ref'), drop=F]
+stg_anots <- v3labmscs.ref.sce@colData[,c('stageHL_ref'), drop=F] %>% data.frame()
 
 ## scmap merge the top labels and similarity scores
 top_stg_sim <- map(sc_topv3_cells_sims_all,
@@ -477,18 +622,26 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(Stage_MSC, stage_lab1))
 ```{r}
 ##Modify the stage labels for MSC14
 # all_msc_anotd_preQC[[4]] <- all_msc_anotd_preQC[[4]]@meta.data %>%
-all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name)), c(rep('Late ring|Early trophozoite', length(sample_name)))), ~{
+all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name)), c(rep('Late ring|Early trophozoite|late ring|early trophozoite', length(sample_name)))), ~{
   ..1@meta.data %>%
   mutate(across(Stage_MSC, as.character)) %>%
   # mutate(Stage_MSC = Stage_MSC) %>%
-  mutate(StagePrelim = case_when(
+  mutate(StagePrelim_lf = case_when(
     is.na(Stage_MSC) & sim_lab1 > 0.35 & str_detect(stage_lab1, ..3) & str_detect(stage_lab2, ..3) & str_detect(stage_lab3, ..3) ~ stage_lab1,
-    is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Male') & str_detect(stage_lab2, 'Male') & str_detect(stage_lab3, 'Male') ~ stage_lab1,
-    is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Female') & str_detect(stage_lab2, 'Female') & str_detect(stage_lab3, 'Female') ~ stage_lab1,
+    is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Male|male') & str_detect(stage_lab2, 'Male|male') & str_detect(stage_lab3, 'Male|male') ~ stage_lab1,
+    is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Female|female') & str_detect(stage_lab2, 'Female|female') & str_detect(stage_lab3, 'Female|female') ~ stage_lab1,
     TRUE ~ Stage_MSC)#,
     # across(StagePrelim, str_to_sentence)
+  )%>%
+  mutate(StagePrelim = case_when(
+    str_detect(StagePrelim_lf, "gametocyte (developing)|schizont") ~ "Field unlabelled",
+    str_detect(StagePrelim_lf, "late|early") ~ str_to_sentence(StagePrelim_lf),
+    str_detect(StagePrelim_lf, "gametocyte") ~ str_to_sentence(str_remove_all(StagePrelim_lf, "gametocyte \\(|\\)")),
+    is.na(StagePrelim_lf) ~ "Field unlabelled",
+    TRUE ~ StagePrelim_lf)#,
+    # across(StagePrelim, str_to_sentence)
   ) %>%
-  dplyr::select(StagePrelim) %>%
+  dplyr::select(StagePrelim, StagePrelim_lf) %>%
   # mutate(across(starts_with('Stage_V'), ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
   AddMetaData(.x, .)
 })
@@ -498,7 +651,8 @@ all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(Stage_MSC, StagePrelim, stage_lab1))
+# map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(Stage_MSC, StagePrelim, stage_lab1))
+map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(StagePrelim))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -531,14 +685,16 @@ print(cell_qc_plot)
 
 Umap with stage labels in legend
 
-```{r, fig.width = 7, fig.height = 5}
+```{r, fig.width = 7, fig.height = 5, eval=T}
 trunc_axis <- ggh4x::guide_axis_truncated(
   trunc_lower = unit(0, "npc"),
   trunc_upper = unit(2.2, "cm")
 )
 
 # Assign the female High_low stage of the projected cell to the nearest cell in the reference dataset
-msc_qcd_anotd_mali_mapped14HL = rep(list(rep("Not assigned", ncol(msc_combi.sce))), length(all_msc_jc))
+# msc_qcd_anotd_mali_mapped14HL = rep(list(rep("Not assigned", ncol(msc_combi.sce))), length(all_msc_jc))
+msc_qcd_anotd_mali_mapped14HL = rep(list(rep("Not assigned", ncol(v3labmscs.ref.sce))), length(all_msc_jc))
+
 
 for (i in 1:length(msc_qcd_anotd_mali_mapped14HL)){
   msc_qcd_anotd_mali_mapped14HL[[i]][all_msc_jc[[i]]$Stage_MSC$cells[1,]] <- all_msc_anotd_preQC[[i]]$StagePrelim
@@ -547,7 +703,9 @@ for (i in 1:length(msc_qcd_anotd_mali_mapped14HL)){
 
 for (i in 1:length(all_msc_anotd_preQC)){
   msc_qcd_anotd_mali_mapped14HL[[i]][all_msc_jc[[i]]$Stage_MSC$cells[1,]] <- all_msc_anotd_preQC[[i]]$StagePrelim
-  msc_combi@meta.data[, paste0("stage_", names(all_msc_anotd_preQC[i]))] <-  droplevels(factor(msc_qcd_anotd_mali_mapped14HL[[i]], levels = stg_refnd_lvls))
+  # msc_combi@meta.data[, paste0("stage_", names(all_msc_anotd_preQC[i]))] <-  droplevels(factor(msc_qcd_anotd_mali_mapped14HL[[i]], levels = stg_refnd_lvls))
+  v3labmscs.ref.sce@colData[, paste0("stage_", names(all_msc_anotd_preQC[i]))] <-  droplevels(factor(msc_qcd_anotd_mali_mapped14HL[[i]], levels = stg_refnd_lvls))
+
 }
 
 labs_order <- c('Late ring', 'Early trophozoite','Female (HE)',  'Male (HE)', 'Female (LE)', 'Male (LE)','Gametocyte (developing)', 'Gametocyte (male)','Gametocyte (female)',  'Atlas')
@@ -565,15 +723,24 @@ umap_theme <- theme(legend.position = 'right',
 
 
 # Idents(msc_combi) <- 'MSC14_V3'
-m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~DimPlot(msc_combi, reduction = "umap",  group.by = paste0("stage_",.x), pt.size = 1, dims = c(2,3), 
-        order = labs_order) +
-  scale_color_manual(breaks=labs_order, values = sp_fld_colors[labs_order], labels = str_wrap(labs_order, 10))+ umap_theme+
+# m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~DimPlot(msc_combi, reduction = "umap",  group.by = paste0("stage_",.x), pt.size = 1, dims = c(2,3), 
+#         order = labs_order) +
+m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~{
+  cbind(reducedDims(v3labmscs.ref.sce)$UMAP, colData(v3labmscs.ref.sce)[, c("stageHL_ref", paste0("stage_",.x)), drop=F]) %>% 
+    data.frame() %>% 
+    mutate(od_stg = factor(!!rlang::sym(paste0("stage_",.x)), levels = rev(stg_refnd_lvls))) %>%
+    arrange(od_stg) %>%
+    ggplot(aes(y = UMAP_2, x=UMAP_3, color = od_stg)) +
+  geom_point() +
+  # scale_color_manual(breaks=labs_order, values = sp_fld_colors, labels = str_wrap(labs_order, 10))+
+  scale_color_manual(values = sp_fld_colors)+
+    umap_theme+
   guides(color = guide_legend(title = 'Stage',override.aes = list(size = 4), ncol = 1, byrow = TRUE),
          x= trunc_axis,
          y= trunc_axis)+
   scale_x_continuous(breaks = NULL) +
   scale_y_continuous(breaks = NULL)
-)
+})
 
 ##Save image for manuscript fig 4
 # saveRDS(m14_scmap_mca_umap, 'plots/fig4/m14_scmap_mca_umap')
@@ -584,7 +751,7 @@ m14_scmap_mca_umap
 ```
 
 Umap with stage labels inside
-```{r, fig.width = 7, fig.height = 5}
+```{r, fig.width = 7, fig.height = 5, eval=F}
 
 m14_scmap_mca_umap_labs_in <- map(names(all_msc_anotd_preQC), ~DimPlot(msc_combi, reduction = "umap",  group.by = paste0("stage_",.x), pt.size = 1, dims = c(2,3), label = T, order = labs_order, repel = T, label.size = 5) +
   scale_color_manual(values = sp_fld_colors)+ 
@@ -618,13 +785,13 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(StagePrelim, Stage_MSC,
 
 
 ```{r, warning=FALSE, message=FALSE}
-saveRDS(all_msc_anotd_preQC, "data/processed/all_msc_anotd_preQC.RDS")
+saveRDS(all_msc_anotd_preQC, "data/processed/Pf/all_msc_anotd_preQC.RDS")
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/all_msc_anotd_preQC_mdata.RDS")
+map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/Pf/all_msc_anotd_preQC_mdata.RDS")
 
 ```
 
