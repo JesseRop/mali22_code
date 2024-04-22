@@ -45,6 +45,7 @@ suppressPackageStartupMessages({
   library(scmap)
   library(ggsankey)
   library(caret)
+  library(BPCells)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
