@@ -319,9 +319,9 @@ map(all_msc, ElbowPlot)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-sdev<-prcomp(t(data),scale. = T)$sdev[1:30]
-sdev <- sort(sdev, decreasing = TRUE)
-npc <- findPC(sdev = sdev)
+# sdev<-prcomp(t(data),scale. = T)$sdev[1:30]
+# sdev <- sort(sdev, decreasing = TRUE)
+# npc <- findPC(sdev = sdev)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -395,8 +395,8 @@ msc_combi.sce <- indexCell(msc_combi.sce)
 ```{r}
 
 #Convert to SCE and subset
-all_msc_sce <- all_msc %>%
-  map(. %>% as.SingleCellExperiment(.))
+# all_msc_sce <- all_msc %>%
+#   map(. %>% as.SingleCellExperiment(.))
 ```
 
 Convert seurat object into single cell experiment filling in the slots appropriately
@@ -407,7 +407,7 @@ Convert seurat object into single cell experiment filling in the slots appropria
 
 sce_obj_creatn <- function(sce_obj, seu_obj){
   for(i in 1:length(sce_obj)) {
-    sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as.matrix(seu_obj[[i]]@assays$RNA@counts)), colData = seu_obj[[i]]@meta.data)
+    sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
     
     logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
     # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
@@ -440,6 +440,11 @@ all_msc_jc <- all_msc_sce %>%
   )
   )
   )
+```
+
+```{r}
+##Projection
+rm(all_msc_sce)
 ```
 
 Assigning stage labels only when the top 3 most closest reference cells to a query cell all have a similar stage label and a cosine similarity greater than 0.4
@@ -681,13 +686,13 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(StagePrelim, Stage_MSC,
 
 
 ```{r, warning=FALSE, message=FALSE}
-saveRDS(all_msc_anotd_preQC, "data/processed/all_msc_anotd_preQC.RDS")
+saveRDS(all_msc_anotd_preQC, "data/processed/Pf/all_msc_anotd_preQC.RDS")
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/all_msc_anotd_preQC_mdata.RDS")
+map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/Pf/all_msc_anotd_preQC_mdata.RDS")
 
 ```
 
