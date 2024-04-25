@@ -14,7 +14,7 @@ output:
 suppressPackageStartupMessages({
   library(Seurat)
   library(sctransform)
-  library(rgl)
+  # library(rgl)
   library(patchwork)
   # library(DoubletFinder)
   library(ggrepel)
@@ -42,9 +42,12 @@ suppressPackageStartupMessages({
   library(ggh4x)
   library(SingleCellExperiment)
   library(scmap)
-  library(ggsankey)
-  library(findPC)
+  # library(ggsankey)
+  # library(findPC)
   library(BPCells)
+  library(furrr)
+  library(future.batchtools)
+  library(parallel)
   
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
@@ -59,7 +62,8 @@ suppressPackageStartupMessages({
 
 ```{r, setup}
 
-knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
+# knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
 
@@ -160,7 +164,7 @@ seurat_norm_stand = function(Seurat_object, nHVG = 500){
 initialize variable for the sample names
 
 ```{r}
-irods_id_sk21_mdata_cln <- read_csv("data/raw/irods_id_sk21_mdata.csv") %>%
+irods_id_sk21_mdata_cln <- read_csv("data/raw/irods_id_sk21_mdata_cln.csv") %>%
   mutate(sample_nm = str_remove_all(sample_name, "_JC")) %>%
   arrange(sample_nm)
 
@@ -170,10 +174,11 @@ smpl_nms <-irods_id_sk21_mdata_cln$sample_nm
 
 ```{r}
 ## Save for farm
-write_csv(irods_id_sk21_mdata_cln, "data/raw/irods_id_sk21_mdata_cln.csv") 
+write_csv(irods_id_sk21_mdata_cln, "data/raw/Pf/irods_id_sk21_mdata_cln.csv") 
 ```
 
-```{r}
+NB-LOCAL_CODE
+```{r, eval=FALSE}
 system(
     paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv')
     )
@@ -196,8 +201,9 @@ source_irods <- irods_id_sk21_mdata_cln[,c('sample_nm', 'irods_id')] %>% deframe
 
 ```
 
+NB-LOCAL_CODE
 
-```{r, eval=T}
+```{r, eval=F}
 ##Copy souporcell files for the optimum clusters
 
 for (i in 1:length(sample_name)) {
@@ -223,8 +229,29 @@ for (i in 1:length(sample_name)) {
 
 ```
 
+NB-FARM_CODE
+```{r, eval=T}
+##Copy souporcell files for the optimum clusters
 
-```{r, results='hide'}
+for (i in 1:length(sample_name)) {
+# for (i in 32:33) {
+  
+  ## Create new directories
+  system(paste0('mkdir -p data/raw/Pf/', sample_name[i], '/outs'))
+  system(paste0('mkdir -p data/processed/Pf/', sample_name[i], '/bpcells'))
+  
+  ##Transfers
+  ##souporcell genotyping files
+  system(
+    paste0('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/filtered_feature_bc_matrix.h5 data/raw/Pf/', sample_name[i], '/outs/')
+    )
+  
+}
+
+
+```
+
+```{r, results='hide', eval=FALSE}
 # list.files("data/processed/", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
 list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_')))
@@ -267,6 +294,54 @@ all_msc <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T
 ```
 
 
+```{r, message=F, warning=F}
+all_msc2 <- all_msc[1:2]
+all_msc2[[1]][["RNA"]]$counts <- as(object = all_msc2[[1]][["RNA"]]$counts, Class = "dgCMatrix")
+all_msc2[[2]][["RNA"]]$counts <- as(object = all_msc2[[2]][["RNA"]]$counts, Class = "dgCMatrix")
+```
+
+
+```{r, message=F, warning=F}
+# all_msc2 <- all_msc[1:2]
+all_msc2m <- all_msc[1:2] %>%
+  map(., ~{
+    .x[["RNA"]]$counts <- as(object = .x[["RNA"]]$counts, Class = "dgCMatrix")
+    return(.x)
+    })
+
+```
+
+
+Check clustering of cells before filtering out by mt.percent
+```{r, warning=FALSE, message=FALSE}
+##Seurat standard transformation
+# plan(cluster, workers = availableWorkers())
+# all_msc_tr <- mclapply(all_msc2, ~seurat_norm_stand(.x))
+start.time <- Sys.time()
+all_msc_tr <- mclapply(all_msc2m, function(x) {
+  seurat_norm_stand(x)
+})
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+# plan(sequential)
+```
+
+
+Check clustering of cells before filtering out by mt.percent
+```{r, warning=FALSE, message=FALSE}
+##Seurat standard transformation
+# plan(cluster, workers = availableWorkers())
+# all_msc_tr <- mclapply(all_msc2, ~seurat_norm_stand(.x))
+start.time <- Sys.time()
+all_msc_tr <- mclapply(all_msc[1:2], function(x) {
+  seurat_norm_stand(x)
+})
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+# plan(sequential)
+```
 
 ```{r, message=F, warning=F}
 # file.dir <- "/brahms/hartmana/vignette_data/h5ad_files/"
@@ -304,13 +379,179 @@ all_msc <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T
 # metadata <- Reduce(rbind, metadata.list)
 ```
 
+```{r, warning=FALSE, message=FALSE}
+# # map(all_msc, ElbowPlot)
+# plan(batchtools_lsf(template = ".batchtools.lsf.tmpl", resources = list(queue = "normal", memory = "70000")))
+# 
+# # This does run in parallel!
+# sta=Sys.time()
+# future_map(c("hello", "world","hello", "world","hello"), ~.x)
+# sto=Sys.time()
+# sto-sta
+# plan(sequential)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# # map(all_msc, ElbowPlot)
+# plan(cluster, workers = availableWorkers())
+# 
+# # This does run in parallel!
+# sta=Sys.time()
+# future_map(c("hello", "world","hello", "world","hello"), ~.x)
+# sto=Sys.time()
+# sto-sta
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# # map(all_msc, ElbowPlot)
+# plan(sequential)
+# 
+# # This does run in parallel!
+# sta=Sys.time()
+# future_map(c("hello", "world","hello", "world","hello"), ~.x)
+# sto=Sys.time()
+# sto-sta
+```
+
+NB-FARM_CODE
+```{r, eval=T}
+plan(sequential)
+start.time <- Sys.time()
+nothingness <- future_map(c(2, 2, 2, 2, 2), ~Sys.sleep(.x))
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+```{r, eval=T}
+plan(multisession, worker)
+start.time <- Sys.time()
+nothingness <- future_map(c(2, 2, 2, 2, 2), ~Sys.sleep(.x))
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+```{r, eval=T}
+# plan(batchtools_lsf,resources = list(nodes = "1:ppn=12", vmem = "5gb"))
+# plan(batchtools_lsf, resources = list(u = 'jr35', q = 'normal', n= 6, M= 50000, R= "span[hosts=1] select[mem>50000] rusage[mem=50000]", output = "data/"))
+plan(batchtools_lsf, 
+     resources = list(queue="normal",
+                      walltime=60,#minutes
+                      memory=8192,
+                      ncpus=2)
+)
+
+x %<-% { Sys.sleep(5); 3.14 }
+y %<-% { Sys.sleep(5); 2.71 }
+
+x + y
+
+```
+
+
+```{r, eval=T}
+batchtools::makeClusterFunctionsLSF(
+  template = "~/.batchtools.lsf.tmpl",
+  scheduler.latency = 1,
+  fs.latency = 65
+)
+
+reg = batchtools::makeRegistry(file.dir = NA, seed = 1)
+reg$cluster.functions = batchtools::makeClusterFunctionsLSF(
+  template = "~/.batchtools.lsf.tmpl",
+  scheduler.latency = 1,
+  fs.latency = 65
+)
+cluster.functions = batchtools::makeClusterFunctionsInteractive()
+```
+
+
+
+```{r, eval=T}
+piApprox = function(n) {
+  nums = matrix(runif(2 * n), ncol = 2)
+  d = sqrt(nums[, 1]^2 + nums[, 2]^2)
+  4 * mean(d <= 1)
+}
+set.seed(42)
+piApprox(1000)
+```
+
+
+```{r, eval=T}
+batchMap(fun = piApprox, n = rep(1e5, 10))
+```
+
+
+```{r, eval=T}
+names(getJobTable())
+```
+
+
+```{r, eval=T}
+submitJobs(resources = list(walltime = 3600, memory = 1024))
+```
+
+
+```{r, eval=T}
+getStatus()
+```
+
+
+NB-FARM_CODE
+```{r, eval=T}
+# plan(batchtools_lsf,resources = list(nodes = "1:ppn=12", vmem = "5gb"))
+# plan(batchtools_lsf, resources = list(u = 'jr35', q = 'normal', n= 6, M= 50000, R= "span[hosts=1] select[mem>50000] rusage[mem=50000]", output = "data/"))
+plan(batchtools_lsf, 
+     resources = list(queue="normal",
+                      walltime=60,#minutes
+                      memory=8192,
+                      ncpus=2)
+)
+
+start.time <- Sys.time()
+all_msc_tr_md <- all_msc[1:5] %>%
+  map(., ~.x@meta.data)
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+#### full msc_atlas reference dataset
+```{r}
+plan(multisession, workers = 2)
+start.time <- Sys.time()
+all_msc_tr_md <- all_msc[1:2] %>%
+  future_map(., ~seurat_norm_stand(.x))
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+
+```
+
 Check clustering of cells before filtering out by mt.percent
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat standard transformation
+# plan(cluster, workers = availableWorkers())
+all_msc_tr_md <- all_msc[1:5] %>%
+  map(., ~.x@meta.data)
+
+# plan(sequential)
+```
+
+Check clustering of cells before filtering out by mt.percent
+```{r, warning=FALSE, message=FALSE}
+##Seurat standard transformation
+# plan(cluster, workers = availableWorkers())
 all_msc <- all_msc %>%
   map(., ~seurat_norm_stand(.x))
 
-
+# plan(sequential)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -389,19 +630,27 @@ set.seed(155)
 msc_combi.sce <- indexCell(msc_combi.sce)
 ```
 
-
-```{r, eval=T}
+NB-LOCAL_CODE
+```{r, eval=F}
 ## transfer integrated object from sunil farm to local
 system('rsync -av jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.seur.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/')
 system('rsync -av jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.sce.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/Pf/')
 
 ```
 
+NB-FARM_CODE
+```{r, eval=T}
+## transfer integrated object from sunil farm to local
+# system('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.seur.RDS data/raw/Pf/')
+system('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.sce.RDS data/raw/Pf/')
+
+```
+
 #### full msc_atlas reference dataset
 ```{r}
 ##Read MCA V3 + field blood stage reference dataset
-v3labmscs.ref.sce <- readRDS("../Mali2/data/raw/Pf/v3labmscs.ref.sce.RDS")
-
+# v3labmscs.ref.sce <- readRDS("../Mali2/data/raw/Pf/v3labmscs.ref.sce.RDS")
+v3labmscs.ref.sce <- readRDS("data/raw/Pf/v3labmscs.ref.sce.RDS")
 ```
 
 
