@@ -286,8 +286,8 @@ list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T,
 
 Save paths to raw MSC files in list - also needed for soupX below
 ```{r}
-all_msc_raw_paths <- list.files("data/raw/", pattern = "raw_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
-  set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_'))) %>%
+all_msc_raw_paths <- list.files("data/raw/Pf/", pattern = "raw_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
+  set_names(nm = (str_remove_all(.,'data/raw/Pf//|/.*') %>% str_replace(., '/', '_'))) %>%
   .[sample_id_lst]
 ```
 
@@ -359,14 +359,14 @@ get_SoupX <- function(data, path, seu_fun = seurat_norm_stand){
   data <- CreateSeuratObject(adjusted)
   # data <- seurat_SCT(data)
   data <- seu_fun(data)
-  return(data)
+  return(list(data, sc))
 }
 ```
 
 
 Run soupX
 
-```{r ,include=FALSE, message=FALSE, warning=FALSE}
+```{r }
 # path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
 
 # all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
