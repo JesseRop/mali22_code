@@ -286,7 +286,7 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_bp <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
   .[sample_name] %>%
   map(~open_matrix_dir(dir = .)) %>% 
@@ -294,16 +294,9 @@ all_msc <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T
 ```
 
 
-```{r, message=F, warning=F}
-all_msc2 <- all_msc[1:2]
-all_msc2[[1]][["RNA"]]$counts <- as(object = all_msc2[[1]][["RNA"]]$counts, Class = "dgCMatrix")
-all_msc2[[2]][["RNA"]]$counts <- as(object = all_msc2[[2]][["RNA"]]$counts, Class = "dgCMatrix")
-```
-
-
-```{r, message=F, warning=F}
-# all_msc2 <- all_msc[1:2]
-all_msc2m <- all_msc[1:2] %>%
+```{r, message=F, warning=F, eval=F}
+# Convert to dense object for quicker parallelization
+all_msc <- all_msc_bp %>%
   map(., ~{
     .x[["RNA"]]$counts <- as(object = .x[["RNA"]]$counts, Class = "dgCMatrix")
     return(.x)
@@ -311,251 +304,50 @@ all_msc2m <- all_msc[1:2] %>%
 
 ```
 
+FARM CODE
+```{r, eval=F}
+##write out for normalization processing in farm
 
-Check clustering of cells before filtering out by mt.percent
-```{r, warning=FALSE, message=FALSE}
-##Seurat standard transformation
-# plan(cluster, workers = availableWorkers())
-# all_msc_tr <- mclapply(all_msc2, ~seurat_norm_stand(.x))
-start.time <- Sys.time()
-all_msc_tr <- mclapply(all_msc2m, function(x) {
-  seurat_norm_stand(x)
-})
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# plan(sequential)
-```
-
-
-Check clustering of cells before filtering out by mt.percent
-```{r, warning=FALSE, message=FALSE}
-##Seurat standard transformation
-# plan(cluster, workers = availableWorkers())
-# all_msc_tr <- mclapply(all_msc2, ~seurat_norm_stand(.x))
-start.time <- Sys.time()
-all_msc_tr <- mclapply(all_msc[1:2], function(x) {
-  seurat_norm_stand(x)
-})
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# plan(sequential)
-```
-
-```{r, message=F, warning=F}
-# file.dir <- "/brahms/hartmana/vignette_data/h5ad_files/"
-# files.set <- c("ahern_pbmc.h5ad", "jin_pbmc.h5ad", "yoshida_pbmc.h5ad")
-# 
-# # Loop through h5ad files and output BPCells matrices on-disk
-# data.list <- c()
-# metadata.list <- c()
-# 
-# for (i in 1:length(files.set)) {
-#   path <- paste0(file.dir, files.set[i])
-#   data <- open_matrix_anndata_hdf5(path)
-#    write_matrix_dir(
-#      mat = data,
-#      dir = paste0(gsub(".h5ad", "", path), "_BP")
-#    )
-#   # Load in BP matrices
-#   mat <- open_matrix_dir(dir = paste0(gsub(".h5ad", "", path), "_BP"))
-#   mat <- Azimuth:::ConvertEnsembleToSymbol(mat = mat, species = "human")
-#   # Get metadata
-#   metadata.list[[i]] <- LoadH5ADobs(path = path)
-#   data.list[[i]] <- mat
-# }
-# # Name layers
-# names(data.list) <- c("ahern", "jin", "yoshida")
-# 
-# # Add Metadata
-# for (i in 1:length(metadata.list)) {
-#   metadata.list[[i]]$publication <- names(data.list)[i]
-# }
-# metadata.list <- lapply(metadata.list, function(x) {
-#   x <- x[, c("publication", "sex", "cell_type", "donor_id", "disease")]
-#   return(x)
-# })
-# metadata <- Reduce(rbind, metadata.list)
-```
-
-```{r, warning=FALSE, message=FALSE}
-# # map(all_msc, ElbowPlot)
-# plan(batchtools_lsf(template = ".batchtools.lsf.tmpl", resources = list(queue = "normal", memory = "70000")))
-# 
-# # This does run in parallel!
-# sta=Sys.time()
-# future_map(c("hello", "world","hello", "world","hello"), ~.x)
-# sto=Sys.time()
-# sto-sta
-# plan(sequential)
-```
-
-```{r, warning=FALSE, message=FALSE}
-# # map(all_msc, ElbowPlot)
-# plan(cluster, workers = availableWorkers())
-# 
-# # This does run in parallel!
-# sta=Sys.time()
-# future_map(c("hello", "world","hello", "world","hello"), ~.x)
-# sto=Sys.time()
-# sto-sta
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-# # map(all_msc, ElbowPlot)
-# plan(sequential)
-# 
-# # This does run in parallel!
-# sta=Sys.time()
-# future_map(c("hello", "world","hello", "world","hello"), ~.x)
-# sto=Sys.time()
-# sto-sta
-```
-
-NB-FARM_CODE
-```{r, eval=T}
-plan(sequential)
-start.time <- Sys.time()
-nothingness <- future_map(c(2, 2, 2, 2, 2), ~Sys.sleep(.x))
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-```
-
-```{r, eval=T}
-plan(multisession, worker)
-start.time <- Sys.time()
-nothingness <- future_map(c(2, 2, 2, 2, 2), ~Sys.sleep(.x))
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-```
-
-```{r, eval=T}
-# plan(batchtools_lsf,resources = list(nodes = "1:ppn=12", vmem = "5gb"))
-# plan(batchtools_lsf, resources = list(u = 'jr35', q = 'normal', n= 6, M= 50000, R= "span[hosts=1] select[mem>50000] rusage[mem=50000]", output = "data/"))
-plan(batchtools_lsf, 
-     resources = list(queue="normal",
-                      walltime=60,#minutes
-                      memory=8192,
-                      ncpus=2)
-)
-
-x %<-% { Sys.sleep(5); 3.14 }
-y %<-% { Sys.sleep(5); 2.71 }
-
-x + y
-
-```
-
-
-```{r, eval=T}
-batchtools::makeClusterFunctionsLSF(
-  template = "~/.batchtools.lsf.tmpl",
-  scheduler.latency = 1,
-  fs.latency = 65
-)
-
-reg = batchtools::makeRegistry(file.dir = NA, seed = 1)
-reg$cluster.functions = batchtools::makeClusterFunctionsLSF(
-  template = "~/.batchtools.lsf.tmpl",
-  scheduler.latency = 1,
-  fs.latency = 65
-)
-cluster.functions = batchtools::makeClusterFunctionsInteractive()
-```
-
-
-
-```{r, eval=T}
-piApprox = function(n) {
-  nums = matrix(runif(2 * n), ncol = 2)
-  d = sqrt(nums[, 1]^2 + nums[, 2]^2)
-  4 * mean(d <= 1)
+for (i in 1:length(sample_name)) {
+# for (i in 32:33) {
+  
+  ## Create new directories
+  system(paste0('mkdir -p data/processed/Pf/', sample_name[i], '/seu_obj'))
+  
+  ##Transfers
+  ##souporcell genotyping files
+  saveRDS(all_msc[[sample_name[i]]],
+    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/', sample_name[i],'_seu.RDS')
+    )
+  
 }
-set.seed(42)
-piApprox(1000)
-```
-
-
-```{r, eval=T}
-batchMap(fun = piApprox, n = rep(1e5, 10))
-```
-
-
-```{r, eval=T}
-names(getJobTable())
-```
-
-
-```{r, eval=T}
-submitJobs(resources = list(walltime = 3600, memory = 1024))
-```
-
-
-```{r, eval=T}
-getStatus()
-```
-
-
-NB-FARM_CODE
-```{r, eval=T}
-# plan(batchtools_lsf,resources = list(nodes = "1:ppn=12", vmem = "5gb"))
-# plan(batchtools_lsf, resources = list(u = 'jr35', q = 'normal', n= 6, M= 50000, R= "span[hosts=1] select[mem>50000] rusage[mem=50000]", output = "data/"))
-plan(batchtools_lsf, 
-     resources = list(queue="normal",
-                      walltime=60,#minutes
-                      memory=8192,
-                      ncpus=2)
-)
-
-start.time <- Sys.time()
-all_msc_tr_md <- all_msc[1:5] %>%
-  map(., ~.x@meta.data)
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-```
-
-#### full msc_atlas reference dataset
-```{r}
-plan(multisession, workers = 2)
-start.time <- Sys.time()
-all_msc_tr_md <- all_msc[1:2] %>%
-  future_map(., ~seurat_norm_stand(.x))
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
 
 
 ```
+
+Read in seurat objects processed in farm
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_msc <- list.files("data/processed/", pattern = "seu_stdnorm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(readRDS)
+```
+
 
 Check clustering of cells before filtering out by mt.percent
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat standard transformation
-# plan(cluster, workers = availableWorkers())
-all_msc_tr_md <- all_msc[1:5] %>%
-  map(., ~.x@meta.data)
 
-# plan(sequential)
+# all_msc <- mclapply(all_msc, function(x) {
+#   seurat_norm_stand(x)
+# })
+
 ```
 
-Check clustering of cells before filtering out by mt.percent
-```{r, warning=FALSE, message=FALSE}
-##Seurat standard transformation
-# plan(cluster, workers = availableWorkers())
-all_msc <- all_msc %>%
-  map(., ~seurat_norm_stand(.x))
-
-# plan(sequential)
-```
 
 ```{r, warning=FALSE, message=FALSE}
-map(all_msc, ElbowPlot)
+# map(all_msc, ElbowPlot)
 
 ```
 
@@ -565,32 +357,39 @@ map(all_msc, ElbowPlot)
 # npc <- findPC(sdev = sdev)
 ```
 
+
+
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat UMAP
-pc_list <-list(6L,6L,6L, 7L, 7L, 6L)
-pc_list <-list(rep(6L,length(sample_name)))
+# pc_list <-list(6L,6L,6L, 7L, 7L, 6L)
+# pc_list <-list(rep(6L,length(sample_name)))
+# 
+# 
+# all_msc <- mcmapply(function(x, y) {
+#   RunUMAP(x, dims = 1:y, n.components = 3L, verbose=F, seed.use = 949) |>
+#          FindNeighbors(reduction = "pca", dims = 1:y, verbose = FALSE)
+# },
+# all_msc, pc_list)
 
-
-all_msc <- all_msc %>%
-  map2(., pc_list, ~RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 949) %>%
-         FindNeighbors(reduction = "pca", dims = 1:.y, verbose = FALSE) 
-       )
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat UMAP
-res_list <-list(rep(0.04, length(sample_name)))
+# res_list <-list(rep(0.04, length(sample_name)))
+# 
+# all_msc <- mcmapply(function(x, y) {
+#   FindClusters(x, resolution = y, verbose = FALSE, k.param = 30)
+# },
+# all_msc, res_list)
 
+```
 
-all_msc <- all_msc %>%
-  map2(., res_list, ~FindClusters(.x, resolution = .y, verbose = FALSE, k.param = 30))
-
-# old_seurat_clusters <-  all_msc %>% map(., ~.x@meta.data %>% dplyr::select(seurat_clusters) %>% rename('old_seu_cluster' = seurat_clusters))
-
+```{r, warning=FALSE, message=FALSE}
 map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
 ```
+
 
 ```{r, warning=FALSE, message=FALSE}
 
@@ -642,7 +441,7 @@ NB-FARM_CODE
 ```{r, eval=T}
 ## transfer integrated object from sunil farm to local
 # system('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.seur.RDS data/raw/Pf/')
-system('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.sce.RDS data/raw/Pf/')
+# system('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/for_scmap/v3labmscs.ref.sce.RDS data/raw/Pf/')
 
 ```
 
@@ -675,7 +474,13 @@ v3labmscs.ref.sce@colData[,c("stageHL_ref", "stageHL_ref_asx")] <- colData(v3lab
 scater::plotReducedDim(v3labmscs.ref.sce, dimred = "PCA", colour_by = "stageHL_ref_asx", ncomponents = c(2,3))
 ```
 
+
 ```{r, message=FALSE, warning=FALSE}
+saveRDS(v3labmscs.ref.sce, "data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS")
+```
+
+LOCAL CODE
+```{r, message=FALSE, warning=FALSE, eval=F}
 ##scmap feature selection
 v3labmscs.ref.sce <- selectFeatures(v3labmscs.ref.sce, suppress_plot = T)
 
@@ -695,32 +500,9 @@ v3labmscs.ref.sce <- indexCell(v3labmscs.ref.sce)
 ```
 
 Convert seurat object into single cell experiment filling in the slots appropriately
-```{r}
 
-##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
-##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
-# 
-# sce_obj_creatn <- function(sce_obj, seu_obj){
-#   for(i in 1:length(seu_obj)) {
-#     sce_obj[[i]] <- SingleCellExperiment(assays = list(counts = as(object = seu_obj[[i]][["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj[[i]]@meta.data)
-#     
-#     logcounts(sce_obj[[i]]) <- log2((SingleCellExperiment::counts(sce_obj[[i]]) + 1))
-#     # normcounts(sce_obj[[i]]) <- as.matrix(seu_obj[[i]]@assays$RNA@data)
-#     rowData(sce_obj[[i]])$feature_symbol <- rownames(sce_obj[[i]])
-#     sce_obj[[i]] <- sce_obj[[i]][!duplicated(rownames(sce_obj[[i]])), ]
-#     # rowData(sce_obj[[i]])$feature_symbol <- str_replace(rownames(sce_obj[[i]]), "-", "_")
-#     # reducedDims(sce_obj[[i]]) <- SimpleList(PCA = seu_obj[[i]]@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj[[i]]@reductions[["umap"]]@cell.embeddings)
-# 
-#   }
-#   
-#   return(sce_obj)
-#   
-# }
-
-
-```
-
-```{r}
+LOCAL CODE
+```{r, eval=FALSE}
 
 ##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
 ##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
@@ -746,45 +528,54 @@ sce_obj_creatn <- function(sce_obj, seu_obj){
 
 ```
 
-```{r}
+LOCAL CODE
+```{r, eval=FALSE}
 
-all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc)
+# all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc)
+all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc) %>% set_names(names(all_msc))
+
 
 ```
 
 ### Stage label assignment (projection)
 transferring labels from  reference datasets
-```{r}
-##Projection
-all_msc_jc <- all_msc_sce %>%
-  map(. %>% scmapCell(.,list(
-    # Stage_MSC = metadata(msc_combi.sce)$scmap_cell_index
+LOCAL CODE
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+##Seurat standard transformation
+
+all_msc_jc <- lapply(all_msc_sce[1:2], function(x) {
+  scmapCell(x, list(
     Stage_MSC = metadata(v3labmscs.ref.sce)$scmap_cell_index
   )
   )
-  )
+})
+
 ```
 
-```{r}
+LOCAL CODE
+```{r, eval=FALSE}
 ##Projection
 rm(all_msc_sce)
 ```
 
 Assigning stage labels only when the top 3 most closest reference cells to a query cell all have a similar stage label and a cosine similarity greater than 0.4
-```{r}
-##Assigning stage labels using thresholds
-all_msc_lbls <- all_msc_jc %>%
-  map(. %>% scmapCell2Cluster(.,list(
+LOCAL CODE
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+##Seurat standard transformation
+
+all_msc_lbls <- lapply(all_msc_jc, function(x) {
+  scmapCell2Cluster(x,list(
     # as.character(SummarizedExperiment::colData(msc_combi.sce)$stageHL_ref)
     as.character(SummarizedExperiment::colData(v3labmscs.ref.sce)$stageHL_ref)
-  ),w = 3, threshold = 0.5)
-  )
+  ), w = 3, threshold = 0.5)
+})
+
 ```
 
 Obtaining the reference cell that is closest to each query cell in neighbourhood space regardless of cosine similarity. For those where the top 10 most closest cells constitute several stages, we also obtain the second most similar stage.
 
-
-```{r, eval=T}
+LOCAL CODE
+```{r, eval=F}
 ##Get the top V3 cell and top 3 similarity scores that is most similar to each MSC14 cell 
 sc_topv3_cells_sims_all <- list(all_msc_jc) %>%
     pmap(~{
@@ -821,6 +612,7 @@ sc_topv3_cells_sims_all <- list(all_msc_jc) %>%
 
 
 Adding annotations to MSC query datasets
+LOCAL CODE
 ```{r}
 ## Adding annotations to query cells
 # stg_anots <- msc_combi@meta.data[,c('stageHL_ref'), drop=F]
@@ -849,6 +641,29 @@ all_msc_anotd_preQC <- list(all_msc_lbls, all_msc_jc, all_msc, top_stg_sim) %>%
 
 ```
 
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_msc_anots <- list.files("data/processed/", pattern = "msc_anots.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>% 
+  .[!is.na(.)] %>%
+  map(readRDS)
+```
+
+```{r}
+## Adding annotations to query cells
+all_msc_anotd_preQC <- list(all_msc_anots, all_msc) %>%
+  pmap(~ ..1 %>%
+         column_to_rownames("cell_bc") %>%
+         mutate(across(Stage_MSC, ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
+         AddMetaData(..2, .) 
+       )
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+rm(all_msc)
+```
 
 ```{r, warning=FALSE, message=FALSE}
 
@@ -934,7 +749,7 @@ print(cell_qc_plot)
 
 Umap with stage labels in legend
 
-```{r, fig.width = 7, fig.height = 5, eval=T}
+```{r, fig.width = 7, fig.height = 5, eval=F}
 trunc_axis <- ggh4x::guide_axis_truncated(
   trunc_lower = unit(0, "npc"),
   trunc_upper = unit(2.2, "cm")
@@ -975,11 +790,11 @@ umap_theme <- theme(legend.position = 'right',
 # m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~DimPlot(msc_combi, reduction = "umap",  group.by = paste0("stage_",.x), pt.size = 1, dims = c(2,3), 
 #         order = labs_order) +
 m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~{
-  cbind(reducedDims(v3labmscs.ref.sce)$UMAP, colData(v3labmscs.ref.sce)[, c("stageHL_ref", paste0("stage_",.x)), drop=F]) %>% 
+  cbind(reducedDims(v3labmscs.ref.sce)$PCA, colData(v3labmscs.ref.sce)[, c("stageHL_ref", paste0("stage_",.x)), drop=F]) %>% 
     data.frame() %>% 
     mutate(od_stg = factor(!!rlang::sym(paste0("stage_",.x)), levels = rev(stg_refnd_lvls))) %>%
     arrange(od_stg) %>%
-    ggplot(aes(y = UMAP_2, x=UMAP_3, color = od_stg)) +
+    ggplot(aes(y = PC2, x=PC3, color = od_stg)) +
   geom_point() +
   # scale_color_manual(breaks=labs_order, values = sp_fld_colors, labels = str_wrap(labs_order, 10))+
   scale_color_manual(values = sp_fld_colors)+
