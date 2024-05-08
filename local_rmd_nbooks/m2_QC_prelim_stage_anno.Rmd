@@ -230,7 +230,7 @@ for (i in 1:length(sample_name)) {
 ```
 
 NB-FARM_CODE
-```{r, eval=T}
+```{r, eval=F}
 ##Copy souporcell files for the optimum clusters
 
 for (i in 1:length(sample_name)) {
@@ -274,7 +274,7 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 ```
 
 
-```{r, message=F, warning=F}
+```{r, message=F, warning=F, eval=F}
 ##Write BPcells matrices
 list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
@@ -284,7 +284,7 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 ```
 
 
-```{r, message=F, warning=F}
+```{r, message=F, warning=F, eval=F}
 ##Read BPcells matrices
 all_msc_bp <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
@@ -304,92 +304,58 @@ all_msc <- all_msc_bp %>%
 
 ```
 
-FARM CODE
+
 ```{r, eval=F}
 ##write out for normalization processing in farm
 
 for (i in 1:length(sample_name)) {
-# for (i in 32:33) {
   
   ## Create new directories
   system(paste0('mkdir -p data/processed/Pf/', sample_name[i], '/seu_obj'))
-  
-  ##Transfers
-  ##souporcell genotyping files
-  saveRDS(all_msc[[sample_name[i]]],
-    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/', sample_name[i],'_seu.RDS')
-    )
   
 }
 
 
 ```
 
+FARM CODE
+```{r, eval=F}
+## write out seurat object files for normalization processing in farm
+imap(all_msc, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu.RDS")))
+```
+
+```{r, eval=F}
+## write out seurat bpcells object files for normalization processing in farm
+imap(all_msc_bp, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu.RDS")))
+```
+
+
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc <- list.files("data/processed/", pattern = "seu_stdnorm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc <- list.files("data/processed/", pattern = "^seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  # .[sample_name] %>%
   map(readRDS)
 ```
 
 
 Check clustering of cells before filtering out by mt.percent
 ```{r, warning=FALSE, message=FALSE}
-##Seurat standard transformation
-
-# all_msc <- mclapply(all_msc, function(x) {
-#   seurat_norm_stand(x)
-# })
+## done in farm
+## nextflow run submsn_seu_norm.nf -resume
 
 ```
 
 
-```{r, warning=FALSE, message=FALSE}
-# map(all_msc, ElbowPlot)
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-# sdev<-prcomp(t(data),scale. = T)$sdev[1:30]
-# sdev <- sort(sdev, decreasing = TRUE)
-# npc <- findPC(sdev = sdev)
-```
-
-
-
-```{r, warning=FALSE, message=FALSE}
-##Seurat UMAP
-# pc_list <-list(6L,6L,6L, 7L, 7L, 6L)
-# pc_list <-list(rep(6L,length(sample_name)))
-# 
-# 
-# all_msc <- mcmapply(function(x, y) {
-#   RunUMAP(x, dims = 1:y, n.components = 3L, verbose=F, seed.use = 949) |>
-#          FindNeighbors(reduction = "pca", dims = 1:y, verbose = FALSE)
-# },
-# all_msc, pc_list)
-
-
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-##Seurat UMAP
-# res_list <-list(rep(0.04, length(sample_name)))
-# 
-# all_msc <- mcmapply(function(x, y) {
-#   FindClusters(x, resolution = y, verbose = FALSE, k.param = 30)
-# },
-# all_msc, res_list)
-
-```
 
 ```{r, warning=FALSE, message=FALSE}
 map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
 ```
 
+```{r, warning=FALSE, message=FALSE}
+map(all_msc, ~DimPlot(.x, dims = c(1,2), label = T))
+```
 
 ```{r, warning=FALSE, message=FALSE}
 
@@ -525,7 +491,6 @@ sce_obj_creatn <- function(sce_obj, seu_obj){
   
 }
 
-
 ```
 
 LOCAL CODE
@@ -533,7 +498,6 @@ LOCAL CODE
 
 # all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc)
 all_msc_sce <- sce_obj_creatn(sce_obj = list(), seu_obj = all_msc) %>% set_names(names(all_msc))
-
 
 ```
 
