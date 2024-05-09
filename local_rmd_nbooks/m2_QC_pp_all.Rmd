@@ -159,20 +159,6 @@ all_msc_anotd_preQC <- all_msc_anotd_preQC %>% .[sample_id_lst]
 map(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = T))
 ```
 
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-##Seurat UMAP
-# res_list <-list(rep(0.4, length(sample_name)))
-# 
-# # all_msc_anotd_preQC <- all_msc_anotd_preQC %>%
-# #   map2(., res_list, ~FindClusters(.x, resolution = .y, verbose = FALSE, k.param = 30))
-# 
-# all_msc_anotd_preQC <- mcmapply(function(x, y) {
-#   FindClusters(.x, resolution = .y, verbose = FALSE, k.param = 30)
-# },
-# all_msc_anotd_preQC, res_list)
-
-
-```
 
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat UMAP
@@ -683,20 +669,6 @@ all_msc_anotd_preQC <-  map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::select
 ```
 
 
-
-
-```{r, warning=FALSE, message=FALSE}
-## Add annotation
-# all_msc_anotd_mdata
-# all_msc_anotd_preQC <- list(all_msc_anotd_preQC, all_msc_anotd_mdata) %>%
-#   pmap(~ ..2 %>%
-#          dplyr::select(Stage_V3, StagePrelimC)  %>%
-#          AddMetaData(..1, .) 
-#        )
-# map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/DB52e_star/all_msc_anotd_mdata.RDS")
-
-```
-
 #### Declare variables after strain analysis
 ```{r, eval=FALSE}
 
@@ -844,33 +816,6 @@ for (i in names(all_msc_anotd_preQC)) {
   all_msc_anotd_preQC[[i]]@reductions[["umap_norm"]] <- all_msc_anotd_preQC[[i]]@reductions$umap
   all_msc_anotd_preQC[[i]]@meta.data[, "seurat_clusters_norm"] <- all_msc_anotd_preQC[[i]]@meta.data$seurat_clusters
 }
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-
-# all_msc_anotd_ysct <- imap(all_msc_anotd_preQC, ~{
-#   print(paste0("SCT starting ", .y))
-#   
-#   obj <- .x %>%
-#     seurat_SCT() %>%
-#     RunUMAP(reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
-#     FindNeighbors(reduction = "pca", dims = 1:30, verbose = FALSE) 
-#   
-#   print(paste0("done ", .y))
-#   return(obj)
-# })
-
-# all_msc_anotd_ysct <- mcmapply(function(x, y) {
-#   obj <- x %>%
-#     seurat_SCT() %>%
-#     RunUMAP(reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
-#     FindNeighbors(reduction = "pca", dims = 1:30, verbose = FALSE)
-#   
-#     print(paste0("done ", .y))
-#     return(obj)
-# },
-# all_msc_anotd_preQC, names(all_msc_anotd_preQC))
-
 ```
 
 
@@ -1418,7 +1363,7 @@ rm(all_msc_anotd_ysct)
 ```
 
 Remove those categorised as negative by Souporcell
-## !!!!!!NB -CONSIDER FORE REMOVAL LATER
+## !!!!!!NB -CONSIDER FOR REMOVAL LATER
 ```{r}
 ## ## !!!!!!NB -CONSIDER FORE REMOVAL LATER
 # all_msc_filt <- all_msc_filt %>%
@@ -1442,66 +1387,6 @@ Remove those categorised as negative by Souporcell
 #       
 #   })
 
-```
-
-```{r}
-# all_msc_filt <- all_msc_anotd_preQC
-```
-  
-```{r, warning=FALSE, message=FALSE}
-## !!! ONLY KEEP MSC14 IN THE LIST - WILL NEED TO BE UNDONE IN FUTURE
-
-# pc_list <-list(10L,10L,10L, 12L, 10L)
-# pc_list <-pc_list
-# all_msc_anotd_preQC <- all_msc_anotd_preQC[4] %>%
-# all_msc_filt <- all_msc_filt %>%
-#   map(., ~seurat_norm_stand(.x))
-
-
-```
-
-
-Check clustering of cells before filtering out by mt.percent
-
-```{r}
-# pc_list <-list('10','10','10', '10', '10')
-# pc_list <- pc_list
-# all_msc_nosct_pre_mt <- all_msc_filt %>%
-#                 map(., ~seurat_norm_stand(.x))
-
-```
-
-```{r}
-# pc_list <-list('12')
-# all_msc_nosct_pre_mt <- all_msc_filt %>%
-#                 map2(., pc_list, ~RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 949) %>%
-#         FindNeighbors(reduction = "pca", dims = 1:.y, verbose = FALSE) %>%
-#         FindClusters(resolution = 0.15, verbose = FALSE))
-# 
-# old_seurat_clusters <- all_msc_nosct_pre_mt[[1]]@meta.data %>% dplyr::select(seurat_clusters) %>% rename('old_seu_cluster' = seurat_clusters)
-# DimPlot(all_msc_nosct_pre_mt[[1]], dims = c(1,2))
-```
-
-
-
-Filter out cells with high mitochondrial count c(5,1.2,0.9,0.45,2)
-This is the chunk that is set to not evaluate (eval=F) so as to get the object saved as 'msc_qcd_anotd_no_mt_fltr' in msc_annotation notebook line 1202
-
-
-```{r}
-## !!! ONLY KEEP MSC14 IN THE LIST - WILL NEED TO BE UNDONE IN FUTURE
-
-# all_msc_filt <- all_msc_filt[1]
-# pc_list <- pc_list[1]
-# mt_filt <- mt_filt[1]
-# sample_id_lst <- sample_id_lst[1]
-# soupo_kselect_list_pp <- soupo_kselect_list_pp[1]
-
-# all_msc_filt <- all_msc_filt[4]
-# pc_list <- pc_list[4]
-# mt_filt <- mt_filt[4]
-# sample_id_lst <- sample_id_lst[4]
-# soupo_kselect_list_pp <- soupo_kselect_list_pp[4]
 ```
 
 
@@ -1536,31 +1421,6 @@ list(all_msc_filt, mt_filt, sample_id_lst)  %>%
 
   })
 
-```
-
-```{r, warning=FALSE, message=FALSE}
-# pc_list <-list('12')
-pc_list <-rep(5L, length(all_msc_filt))
-
-# all_msc_filt <- all_msc_filt %>%
-#   map2(., pc_list, ~RunUMAP(.x, reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
-#     FindNeighbors(reduction = "pca", dims = 1:30, verbose = FALSE) #%>%
-#     #      RunUMAP(.x, dims = 1:.y, n.components = 3L, verbose=F, seed.use = 949) %>%
-#     #      FindNeighbors(reduction = "pca", dims = 1:.y, verbose = FALSE) %>%
-#     #      FindClusters(resolution = 0.25, verbose = FALSE)
-#     )
-
-
-# all_msc_filt <- mcmapply(function(x, y) {
-#   RunUMAP(x, reduction = "pca", dims = 1:.y, verbose = FALSE, seed.use = 372)%>%
-#     FindNeighbors(reduction = "pca", dims = 1:.y, verbose = FALSE)
-# },
-# all_msc_filt, pc_list)
-
-
-# old_seurat_clusters <-  all_msc_filt %>% map(., ~.x@meta.data %>% dplyr::select(seurat_clusters) %>% rename('old_seu_cluster' = seurat_clusters))
-
-# map(all_msc_filt, ~DimPlot(.x, dims = c(1,2), label = T))
 ```
 
 
@@ -1626,58 +1486,6 @@ Has removing cells with low transcript and gene count also removed cells with hi
 ```
 
 ## Seurat pre-processing after first pass QC
-
-### SCT
-We use SCT since it has increased resolution to allow for soup (SoupX) removal doublets (doublet finder and scrublet) removal however standard seurat pipeline is used for the rest of pipeline
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-
-# all_msc_ysct <- map(all_msc_filt, ~{
-#   .x %>%
-#     seurat_SCT() %>%
-#     RunUMAP(reduction = "pca", dims = 1:30, verbose = FALSE, seed.use = 372)%>%
-#     FindNeighbors(reduction = "pca", dims = 1:30, verbose = FALSE) %>%
-#     FindClusters(resolution = 0.3, verbose = FALSE)
-# })
-
-```
-
-```{r, results='asis', eval=FALSE}
-# cat('## Visualize field parasites {.tabset}   \n')
-# list(all_msc_ysct, sample_id_lst)  %>% 
-#   purrr::pmap(.,~{
-#     # create tabset for each group 
-#     cat('###### ',..2,'   \n')
-#     DimPlot(., group.by = 'strain_gt', label = T) %>% print()
-#     DimPlot(., group.by = 'seurat_clusters', label = T) %>% print()
-#     DimPlot(., cells.highlight = .@meta.data %>% filter(strain_gt=='Doublet') %>% row.names(), sizes.highlight = 1) %>% print()
-#     # FeaturePlot(., features = 'percent.mt') %>% print()
-#     # print(p2)
-#     cat('\n ')
-#     cat("\n")
-#   })
-
-```
-
-### Seurat standard normalization - no SCT
-```{r}
-# all_msc_nosct <- all_msc_filt %>%
-#   map(. %>%
-#         seurat_norm_stand(.)
-#   )
-
-```
-
-
-```{r}
-# imap(all_msc_filt, ~paste0("d",.y,".RDS"))
-# saveRDS(all_msc_anotd_preQC, "data/processed/Pf/all_msc_anotd_preQC.RDS")
-```
-
-```{r}
-# imap(all_msc_filt, ~saveRDS(paste0(.x, "data/processed/Pf/all_msc_filt_",.y,".RDS")))
-# saveRDS(all_msc_anotd_preQC, "data/processed/Pf/all_msc_anotd_preQC.RDS")
-```
 
 ```{r}
 saveRDS(all_msc_filt, "data/processed/Pf/all_msc_filt.RDS")
