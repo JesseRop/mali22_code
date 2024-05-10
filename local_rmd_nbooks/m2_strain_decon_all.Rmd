@@ -251,6 +251,12 @@ map2(sample_name_nms_al, rep(algn_nms, each= length(sample_name_nms)), ~system(p
 
 ```
 
+NB - LOCAL CODE
+```{r, message=FALSE, eval=T}
+## copy from farm
+system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/Pf/all_msc_anotd_preQC_mdata.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/'))
+
+```
 
 ```{r, message=FALSE}
 ## Read in log likelihoods for estimation of number of clusters from elbow plots
@@ -498,14 +504,14 @@ imap(hsat_mnmp_comp, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_lab
 ```
 
 
-```{r , fig.width = 10, fig.height = 5}
+```{r , fig.width = 10, fig.height = 5, eval = F}
 ## Heatmap function for plotting pheatmap for number of cells assigned labels
 imap(hsat_lr_ref_comp, possibly(~phmap_lab_transfr(.x, col_labs= `lr_ref`, row_labs=`hsat`, row_labs_c ='lr_ref', col_labs_c= 'hsat', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
 ```
 
 
-```{r , fig.width = 10, fig.height = 5}
+```{r , fig.width = 10, fig.height = 5, eval = F}
 ## Heatmap function for plotting pheatmap for number of cells assigned labels from Clara's and Roser's datasets
 imap(mnmp_lr_ref_comp, possibly(~phmap_lab_transfr(.x, col_labs= `lr_ref`, row_labs=`minmap`, row_labs_c ='lr_ref', col_labs_c= 'minmap', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
@@ -801,7 +807,7 @@ snk_pt_fn(..1, strns_2_plt = c(..2[1], ..4[2:3]), labls = paste0("K=", ..3[1:3])
 
 ```
 
-```{r, fig.width=6, fig.height=4}
+```{r, fig.width=6, fig.height=4, eval=FALSE}
 
 # don_k_names <- imap(opt_clusters_nms, ~paste0('Strain_',.y, '_', .x))
 # don_hmonizd_k_names <- imap(opt_clusters_nms, ~paste0('Strain_hmo_',str_remove(.y, "SC"), '_', .x))
@@ -825,22 +831,6 @@ snk_pt_fn(..1, strns_2_plt = c(..2[1], ..4[2], ..4[3], ..4[4], ..4[5]), labls = 
     
  })
 
-```
-
-
-
-
-```{r}
-snk_plts[str_detect(names(snk_plts), "minmap")]
-```
-
-```{r}
-snk_plts[str_detect(names(snk_plts), "hsat")]
-```
-
-
-```{r}
-snk_plts[str_detect(names(snk_plts), "lr_ref")]
 ```
 
 
@@ -916,6 +906,37 @@ strn_hm_tbl_fn <- function(soupo_seu_kmerge_f, don_k_names_aln_f, don_hmonizd_k_
 strn_harmnzd_tbls <- strn_hm_tbl_fn(soupo_seu_kmerge_f = soupo_seu_kmerge, don_k_names_aln_f =don_k_names_aln, don_hmonizd_k_names_aln_f = don_hmonizd_k_names_aln)
 ```
 
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts <- list(strn_harmnzd_tbls, don_k_names_aln, opt_clusters_nms_aln, don_hmonizd_k_names_aln) %>%
+  pmap(~{  
+    
+snk_pt_fn(..1, strns_2_plt = c(..2[1], ..4[2:length(..4)]), labls = paste0("K=", ..3[1:5]), bp_face = c("plain"))
+    
+ })
+
+```
+
+
+```{r, eval=T}
+snk_plts[str_detect(names(snk_plts), "minmap")]
+```
+
+```{r, eval=FALSE}
+snk_plts[str_detect(names(snk_plts), "hsat")]
+```
+
+
+```{r, eval=FALSE}
+snk_plts[str_detect(names(snk_plts), "lr_ref")]
+```
+
+
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts
+
+```
 
 
 ```{r}
@@ -941,7 +962,7 @@ optimum_k_aln = rep(optimum_k, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 ```{r, fig.width=6, fig.height=4}
 ## Rename the initial k colnames which is unchanged when harmonizing strain annotation for Sankey plot and factorized newly generated strain harmonized vectors
 # strn_harmnzd_tbls_5 <- list(strn_harmnzd_tbls_5, map(don_k_names, ~.x[1]), map(don_hmonizd_k_names, ~.x[1])) %>%
-strn_harmnzd_tbls_5 <- list(strn_harmnzd_tbls_5, map(don_k_names_aln, ~.x[1]), map(don_hmonizd_k_names_aln, ~.x[1])) %>%
+strn_harmnzd_tbls <- list(strn_harmnzd_tbls, map(don_k_names_aln, ~.x[1]), map(don_hmonizd_k_names_aln, ~.x[1])) %>%
   pmap(~{
     ..1 %>% 
       mutate(!! ..3:= !!rlang::sym(..2)) %>%
@@ -954,7 +975,7 @@ strn_harmnzd_tbls_5 <- list(strn_harmnzd_tbls_5, map(don_k_names_aln, ~.x[1]), m
 ```{r, fig.width=6, fig.height=4}
 ## !! NOTE - VERY IMPORTANT to verify that the strain renaming to harmonize names for sankey plot function has been done correctly
 # strn_harmnzd_assesmnt <- list(strn_harmnzd_tbls_5, don_k_names, don_hmonizd_k_names) %>%
-strn_harmnzd_assesmnt <- list(strn_harmnzd_tbls_5, don_k_names_aln, don_hmonizd_k_names_aln) %>%
+strn_harmnzd_assesmnt <- list(strn_harmnzd_tbls, don_k_names_aln, don_hmonizd_k_names_aln) %>%
   pmap(~{
     tbl <- ..1
     nms <- ..2
@@ -1052,9 +1073,9 @@ opt_narrow_clusters_nms_aln <- rep(opt_narrow_clusters_nms, length(algn_nms)) %>
 
 
 # strn_c_mdata <- list(strn_harmnzd_tbls_5, names(strn_harmnzd_tbls_5), opt_clusters_nms[names(strn_harmnzd_tbls_5)] %>% map(.,max), optimum_k, imap(opt_narrow_clusters_nms, ~paste0(.y, '_', .x))) %>%
-strn_c_mdata <- list(strn_harmnzd_tbls_5, 
-                     names(strn_harmnzd_tbls_5), 
-                     opt_clusters_nms_aln[names(strn_harmnzd_tbls_5)] %>% map(.,max), 
+strn_c_mdata <- list(strn_harmnzd_tbls, 
+                     names(strn_harmnzd_tbls), 
+                     opt_clusters_nms_aln[names(strn_harmnzd_tbls)] %>% map(.,max), 
                      optimum_k_aln, 
                      imap(opt_narrow_clusters_nms_aln, ~paste0(.y, '_', .x))) %>%
   pmap(~{
@@ -1091,7 +1112,7 @@ map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst)
 )
 ```
 
-```{r, fig.width=16, fig.height=8} 
+```{r, fig.width=16, fig.height=8, eval=FALSE} 
 # optimum_k = c(8,6,6,7,7,9,3,8,3,3,3) %>% set_names(sample_name_nms)
 
 optimum_kv2 <- optimum_k-1
@@ -1121,7 +1142,7 @@ sc_ll_knee_p_all
 # saveRDS(sc_ll_knee_p_all, "plots/fig_QC_s1/sc_ll_knee_p_all.RDS")
 ```
 
-```{r, fig.width=7.5, fig.height= 5.5}
+```{r, fig.width=7.5, fig.height= 5.5, eval=FALSE}
   
 sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
   pmap(., ~{
@@ -1522,11 +1543,16 @@ map(strn_c_mdata,
 
 ```
 
+```{r}
+  system(
+        paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/strn_c_new_mdata_m22.RDS jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/')
+      )
+```
 
 Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk genotyping
 
 
-```{r, eval=T}
+```{r, eval=F}
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
 
