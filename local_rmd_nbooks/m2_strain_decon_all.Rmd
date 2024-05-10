@@ -29,7 +29,7 @@ suppressPackageStartupMessages({
   library(RColorBrewer)
   library(MetBrewer)
   library(ComplexHeatmap)
-  library(SeqArray)
+  # library(SeqArray)
   library(ggrepel)
   library(ggvenn)
   library(magick)
@@ -181,7 +181,7 @@ map2(sample_name_nms_al, rep(algn_nms, each= length(sample_name_nms)), ~system(p
 ```
 
 NB - LOCAL CODE
-```{r, message=FALSE, eval=T}
+```{r, message=FALSE, eval=F}
 ## copy from farm
 system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/Pf/all_msc_anotd_preQC_mdata.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/'))
 
@@ -286,7 +286,7 @@ Transfer clusters.tsv files with assignment of cells to strains and PCA plots me
 
 
 Read all the souporcell files for all the iterations. May be excessive but since we have the memory and cpu and we may need to use the files downstream then why not.
-```{r, results='hide'}
+```{r, results='hide', eval=FALSE}
 # list.files("data/processed/Pf/", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
 list.files("data/processed/Pf", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)%>% set_names(nm = (str_remove_all(.,'data/processed/Pf/|soupc/|k|/clusters.tsv') %>% str_replace_all(., '/', '_'))) 
 ```
@@ -317,7 +317,7 @@ soupc_all_al <- list.files("data/processed/Pf", pattern = "clusters.tsv", full.n
 
 ```
 
-```{r, eval=T}
+```{r, eval=FALSE}
 list.files("data/processed/Pf", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,'data/processed/Pf/|soupc/|k|/clusters.tsv'))%>% str_replace_all(., '/', '_'))
 
 
