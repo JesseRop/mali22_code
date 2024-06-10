@@ -122,13 +122,16 @@ NB-FARM_CODE
 for (i in 1:length(sample_name)) {
   
   ## Create new directories
-  system(paste0('mkdir -p data/raw/Pf/', sample_name[i], '/outs'))
+  system(paste0('mkdir -p data/raw/Pf/', sample_name[i], '/outs/filtered_feature_bc_matrix'))
   system(paste0('mkdir -p data/processed/Pf/', sample_name[i], '/bpcells'))
   
   ##Transfers
   ##souporcell genotyping files
   system(
     paste0('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/filtered_feature_bc_matrix.h5 data/raw/Pf/', sample_name[i], '/outs/')
+  )
+  system(
+    paste0('cp /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/', source_irods[i], '/outs/filtered_feature_bc_matrix/barcodes.tsv.gz data/raw/Pf/', sample_name[i], '/outs/filtered_feature_bc_matrix/')
   )
   
 }
@@ -198,6 +201,11 @@ imap(all_msc, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu.RDS")))
 imap(all_msc_bp, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu.RDS")))
 ```
 
+!!!NB - FARM CODE - DONT DELETE
+```{r, eval=F}
+## Run SCT on farm like below
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --o_file_name "seu_norm.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1
+```
 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
@@ -209,18 +217,10 @@ all_msc <- list.files("data/processed/", pattern = "^seu_norm.RDS$", full.names 
 ```
 
 
-Check clustering of cells before filtering out by mt.percent
-```{r, warning=FALSE, message=FALSE}
-## done in farm
-## nextflow run submsn_seu_norm.nf -resume
-
-```
-
-
-
 ```{r, warning=FALSE, message=FALSE}
 imap(all_msc, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
 ```
+
 
 ## scmap annotation
 
@@ -293,8 +293,14 @@ scater::plotReducedDim(v3labmscs.ref.sce, dimred = "PCA", colour_by = "stageHL_r
 ```
 
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, eval = F}
 saveRDS(v3labmscs.ref.sce, "data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS")
+```
+
+```{r, eval=T}
+jkjkj()
+## Run scmap on farm like below
+# nextflow run submsn_scmap.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/scmap.R" --sce_ref "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm.RDS" --w 3 --cos_sim 0.5 --o_file "prelim_anotd.RDS"
 ```
 
 
@@ -339,7 +345,7 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(Stage_MSC, stage_lab1))
 ```{r}
 ##Modify the stage labels for MSC14
 # all_msc_anotd_preQC[[4]] <- all_msc_anotd_preQC[[4]]@meta.data %>%
-all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name)), c(rep('Late ring|Early trophozoite|late ring|early trophozoite|developing', length(sample_name)))), ~{
+all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name)), c(rep('ring|trophozoite|developing', length(sample_name)))), ~{
   ..1@meta.data %>%
     mutate(across(Stage_MSC, as.character)) %>%
     # mutate(Stage_MSC = Stage_MSC) %>%
@@ -351,14 +357,21 @@ all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name
       # across(StagePrelim, str_to_sentence)
     )%>%
     mutate(StagePrelim = case_when(
-      str_detect(StagePrelim_lf, "gametocyte (developing)|schizont") ~ "Unassigned",
+      str_detect(StagePrelim_lf, "developing") ~ "Early trophozoite", ## !!NB - label developing gams as early trophs the closest stage
+      str_detect(StagePrelim_lf, "schizont") & str_detect(stage_lab2, "ring|trophozoite")  & str_detect(stage_lab3, "ring|trophozoite") ~ str_to_sentence(stage_lab2),
       str_detect(StagePrelim_lf, "late|early") ~ str_to_sentence(StagePrelim_lf),
       str_detect(StagePrelim_lf, "gametocyte") ~ str_to_sentence(str_remove_all(StagePrelim_lf, "gametocyte \\(|\\)")),
       is.na(StagePrelim_lf) ~ "Unassigned",
       TRUE ~ StagePrelim_lf)#,
       # across(StagePrelim, str_to_sentence)
     ) %>%
-    dplyr::select(StagePrelim, StagePrelim_lf) %>%
+    mutate(StagePrelimC = case_when(
+      str_detect(StagePrelim, "ring|trophozoite|developing|schizont") ~ "Asexual",
+      TRUE ~ StagePrelim)#,
+      # across(StagePrelim, str_to_sentence)
+    ) %>%
+    mutate(across(c(StagePrelim, StagePrelimC), ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
+    dplyr::select(StagePrelim, StagePrelim_lf, StagePrelimC) %>%
     # mutate(across(starts_with('Stage_V'), ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
     AddMetaData(.x, .)
 })
@@ -369,7 +382,7 @@ all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name
 ```{r, warning=FALSE, message=FALSE}
 
 # map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(Stage_MSC, StagePrelim, stage_lab1))
-map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(StagePrelim))
+map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(StagePrelim, StagePrelimC))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -450,7 +463,7 @@ umap_theme <- theme(legend.position = 'right',
 m14_scmap_mca_umap <- map(names(all_msc_anotd_preQC), ~{
   cbind(reducedDims(v3labmscs.ref.sce)$PCA, colData(v3labmscs.ref.sce)[, c("stageHL_ref", paste0("stage_",.x)), drop=F]) %>% 
     data.frame() %>% 
-    mutate(od_stg = factor(!!rlang::sym(paste0("stage_",.x)), levels = rev(stg_refnd_lvls))) %>%
+    mutate(od_stg = droplevels(factor(!!rlang::sym(paste0("stage_",.x)), levels = rev(stg_refnd_lvls)))) %>%
     arrange(od_stg) %>%
     ggplot(aes(y = PC2, x=PC3, color = od_stg)) +
     geom_point() +
@@ -521,4 +534,53 @@ map(all_msc_anotd_preQC, ~..1@meta.data) %>% saveRDS(., "data/processed/Pf/all_m
 
 map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(StagePrelim))
 
+```
+
+
+
+```{r, fig.width = 12, fig.height = 4}
+
+##Plotting top two scmap stages among the top 10 with their similarities for MSC14
+# 
+# stage_fct_labs <- msc_qcd_anotd[[1]]@meta.data  %>% dplyr::group_by(stageHL, seurat_clusters) %>% dplyr::group_keys() %>% dplyr::mutate(across(c(stageHL, seurat_clusters), as.character), across(seurat_clusters, ~paste0("Cluster ",., ':\n',stageHL))) %>% deframe()
+# 
+# scm_barpt <- msc_qcd_anotd[[1]]@meta.data %>% 
+#   dplyr::select(matches('s.*lab.'), stageHL) %>% 
+#   rownames_to_column('cell_bc')%>%
+#   pivot_longer(-c('cell_bc', 'stageHL'),
+#                names_to = c( ".value", "Label"),
+#                names_pattern = "(s.*)_(l.*)")%>% 
+#   filter(!is.na(sim)) %>%
+#   mutate(across(sim, as.numeric)) %>% 
+#   mutate(across(Label, ~str_replace(., 'lab','Label '))) %>%
+#   mutate(across(stage, ~droplevels(factor(., stg_refnd_lvls)))) %>%
+#   ggplot(., aes(y = sim, x = stage, color = Label)) +
+#   geom_boxplot(aes(fill = Label))+
+#   scale_fill_manual(values =  c('Label 1' = '#007FFF', 'Label 2' = '#FFFF9F'), name = "Label",
+#                     guide = guide_legend(direction = "horizontal", title.position = "top", ncol = 2)
+#   )+
+#   scale_color_manual(values =  c('Label 1' = 'black', 'Label 2' = 'black'), name = "Label")+ 
+#   geom_point(aes(group=Label), size = 0.5, position = position_jitterdodge(jitter.width = 0.2))+
+#   new_scale_fill()+
+#   geom_tile(data = data.frame(x = c( 'Late ring', 'Early trophozoite', 'Gametocyte (developing)', 'Gametocyte (female)', 'Gametocyte (male)')), inherit.aes = F, aes(x = x, y = 0.37, fill = x, height = 0.03)) +
+#   scale_fill_manual(values =  sp_fld_colors, name = "MCA stage",
+#                     guide = guide_legend(direction = "horizontal", title.position = "top", ncol = 3)
+#                     # guide = 'none'
+#   )+
+#   scale_y_continuous(expand = expansion(mult = c(0.01, 0.05))) +
+#   facet_grid(.~stageHL, labeller = labeller(stageHL = stage_fct_labs)) +
+#   geom_hline(yintercept = 0.4)+
+#   labs(y = 'scmap \nsimilarity scores', x = 'MCA stage') +
+#   theme_classic() +
+#   theme(axis.text.x = element_blank(),
+#         axis.title=element_text(size=16,face="plain"), 
+#         axis.text = element_text(size=15), 
+#         axis.ticks.x = element_blank(),
+#         strip.text =element_text(size=16,face="plain", colour = 'black'),
+#         panel.border=element_rect(colour="black",fill='transparent'),
+#         legend.title = element_text(size=16,face="bold"),
+#         legend.text = element_text(size=15),
+#         legend.position = 'bottom')
+# 
+# scm_barpt
 ```
