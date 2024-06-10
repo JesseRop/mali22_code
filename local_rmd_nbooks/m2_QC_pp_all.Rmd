@@ -98,7 +98,7 @@ initialize variable for the sample names
 ##Sample ID
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
 ## All sample ids removing "MSC38" which seems to have lots of doublets
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
 
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
@@ -452,7 +452,7 @@ all_msc_anotd_preQC <- list(all_msc_anotd_preQC, mt_avg_exp) %>%
 
 # mt_filt <-list(rep(0.4, length(sample_name)))
 # mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38"=0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
-mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
+mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38" = 0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
 ```
 
 
@@ -616,7 +616,6 @@ my21_qc_vln_fn(clust_var = "StagePrelimC", clust_cols = sp_fld_colors, ci_sufx =
 
 
 ```{r, fig.height = 8, fig.width = 12}
-
 
 my21_qc_vln_fn(clust_var = "seurat_clusters", clust_cols = cluster_cols, ci_sufx = "_seu")  
 
@@ -794,6 +793,7 @@ imap(all_msc_anotd_preQC, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/
 
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=F}
+gogo()
 ## Run SCT on farm like below
 # nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm_anotd.RDS" --o_file_name "seu_sctnorm_anotd.RDS" --umap_name "UMAP_SCT" --hvg 500 --cluster_resoln 0.1 --resume
 ```
@@ -1378,7 +1378,7 @@ imap(all_msc_filt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/filt_se
 ```
 
 !!!NB - FARM CODE - DONT DELETE
-```{r, eval=F}
+```{r, eval=T}
 gogo()
 ## Run SNORM on farm like below
 # nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct.RDS" --o_file_name "filt_seu_norm.RDS" --umap_name "UMAP_F_NORM" --hvg 500 --cluster_resoln 0.1 --resume
