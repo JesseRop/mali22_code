@@ -4,6 +4,146 @@ output: html_document
 date: "2024-03-12"
 ---
 
+
+```{r, message=FALSE}
+suppressPackageStartupMessages({
+  # library(Seurat)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  library(pheatmap)
+  # library(rmarkdown)
+  # library('vcfR')
+  library(conflicted)
+  # library(RColorBrewer)
+  # library(MetBrewer)
+  library(ComplexHeatmap)
+  # library(SeqArray)
+  # library(ggrepel)
+  # library(ggvenn)
+  # library(magick)
+  # library(svglite)
+  # library(plotly)
+  # library(ggsankey)
+  # library(gganimate)
+  # library(av)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("count", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("saveRDS", "base")
+})
+
+```
+
+
+# MSC parasites strain deconvolution and VCF visualization 
+
+## Variable declarations
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+```
+
+```{r}
+sample_set = 'Mali2'
+algn_nm = 'minmap'
+
+# soup_dir = "soupc"
+# sv_dir = "pbulk_gtypes_preQC"
+
+soup_dir = "soupc_GE_postQC"
+sv_dir = "pbulk_gtypes_clean"
+
+strain_levels_univrs <- c(paste0("SC", 1:20), "Doublet", "Negative")
+```
+
+```{r setup}
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
+```
+
+
+## Declare variables
+
+```{r}
+##Copy souporcell files for the optimum clusters
+
+##Sample ID
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
+## All sample ids removing "MSC38" which seems to have lots of doublets
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
+# algn_nms = c('minmap', 'hsat', 'lr_ref')
+algn_nms = c('minmap', 'hsat')
+
+sample_name_nms_al <- rep(sample_name_nms, length(algn_nms))
+algn_nms_al <- rep(algn_nms, each= length(sample_name_nms))
+
+sm_aln_nms_al <- paste(rep(sample_name_nms, length(algn_nms)), rep(algn_nms, each= length(sample_name_nms)), sep ='_')
+
+## optimum QCd ks
+opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11), "MSC38" = c(2:6), "MSC40" = c(6:10), "MSC50_MACS" = c(2:6), "MSC53" = c(1:3), "MSC57" = c(1:3), "MSC24" = c(1:3), "MSC37" = c(5:9), "MSC39" = c(3:7), "MSC45" = c(1:3), "MSC50_SLO" = c(2:6), "MSC54" = c(1:3), "MSC67" = c(1:3), "MSC68" = c(2:6), "MSC70" = c(1:3))
+
+
+# optimum_k <- c("MSC24" = 1, "MSC33" = 8, "MSC37" = 5, "MSC38" = 4, "MSC39" = 4, "MSC40" = 8, "MSC45" = 1, "MSC48" = 4, 
+# "MSC49" = 6, "MSC50_MACS" = 1, "MSC50_SLO" = 1, "MSC53" = 1, "MSC54" = 1, "MSC55" = 7, "MSC57" = 1, 
+# "MSC60" = 7, "MSC66" = 8, "MSC67" = 1, "MSC68" = 3, "MSC70" = 1)
+
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+
+# opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9))
+# opt_clusters_nms <- list("MSC33" = c(3:9),"MSC48" = c(2:3),"MSC49" = c(2:6),"MSC55" = c(4:10),"MSC60" = c(2:7), "MSC66")
+
+opt_clusters_len <- map(opt_clusters_nms, length)
+
+## number of optimum clusters to investigate per sample factoring the 2 alignments
+opt_clusters_nms_aln <- rep(opt_clusters_nms, length(algn_nms)) %>% set_names(sm_aln_nms_al)
+opt_clusters_len_aln <- map(opt_clusters_nms_aln, length)
+
+##Sample IDs
+# source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215", "5736STDY13437393") %>% set_names(sample_name_nms)
+# source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215") %>% set_names(sample_name_nms)
+
+# source_irods <- map2(source_irods_nms, opt_clusters_len[names(source_irods_nms)], ~rep(.x, each = .y))
+
+# source_irods <- unlist(flatten(source_irods))
+
+##Samples
+sample_name <- map2(sample_name_nms, opt_clusters_len[sample_name_nms], ~rep(.x, each = .y))
+
+opt_clusters <- unlist(flatten(opt_clusters_nms[sample_name_nms]))
+
+sample_name <- unlist(flatten(sample_name))
+
+## sorted donor_opt_cluster names
+sorted_names <- paste0(sample_name, "_", opt_clusters)
+
+## sorted factoring alignment
+sorted_names_al <-paste0(sample_name, "_",rep(algn_nms,each=length(sample_name)),"_", opt_clusters)
+
+
+iter = opt_clusters_len
+
+
+```
+
+
+
 Section to write the genotypes from the QCd cells into a files
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
