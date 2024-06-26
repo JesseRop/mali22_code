@@ -102,6 +102,10 @@ system(paste0("rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users
 
 ```
 
+
+```{r}
+all_msc_w_strns_don <- readRDS("data/processed/Pf/all_msc_w_strns_don.RDS")
+```
 initialize variable for the sample names
 
 ```{r}
