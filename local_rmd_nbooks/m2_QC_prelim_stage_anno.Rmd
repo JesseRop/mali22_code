@@ -97,6 +97,65 @@ smpl_nms <-irods_id_sk21_mdata_cln$sample_nm
 #c("MSC24", "MSC33", "MSC37", "MSC38", "MSC39", "MSC40", "MSC45", "MSC48", "MSC49", "MSC50_MACS", "MSC50_SLO", "MSC53", "MSC54", "MSC55", "MSC57", "MSC60", "MSC66", "MSC67", "MSC68", "MSC70")
 ```
 
+
+```{r}
+mrc_sk21_summary <- read_csv("data/raw/MRC_Sample_Analysis_Summary_Summary.csv", skip = 1) 
+```
+
+
+```{r}
+mrc_sk21_summary %>% filter(str_detect(mixed_infection, "pf") & str_detect(shortids, "SetB|SetC") )
+```
+
+```{r}
+## Getting only the jumpcode run where a sample was ran twice (non-jumpcode and jumpcode)
+pf_22_jcode <- mrc_sk21_summary %>% 
+  filter(str_detect(mixed_infection, "pf") & str_detect(shortids, "SetB|SetC") ) %>%
+  mutate(sample_nm = str_remove_all(Sample_Name, "_JC")) %>%
+  group_by(sample_nm) %>%
+  add_count(name = "runs") %>%
+  filter(runs == 1 | runs == 2 & str_detect(Sample_Name, "JC")) 
+
+```
+
+
+```{r}
+## Getting  pf solo infections
+pf_solo_mdata <- pf_22_jcode %>% 
+  filter(str_detect(mixed_infection2, "solo")) %>%
+  group_by(sample_nm) %>%
+  add_count(name = "runs") %>%
+  filter(pf > 200) %>%
+  filter(!(Sample_Name %in% c("MSC65", "MSC69-71"))) %>%
+  filter(runs == 1 | runs ==2 & str_detect(Sample_Name, "JC")) 
+```
+
+```{r}
+pf_solo_mdata
+```
+
+
+```{r}
+## Getting both pf solo infections and those mixed with other species
+pf_solo_mixed_mdata <- pf_22_jcode %>% 
+  group_by(sample_nm) %>%
+  add_count(name = "runs") %>%
+  filter(pf > 200) %>%
+  filter(!(Sample_Name %in% c("MSC65", "MSC69-71"))) %>%
+  filter(runs == 1 | runs ==2 & str_detect(Sample_Name, "JC")) %>%
+  rename('irods_id' = Sanger_SampleID)
+```
+
+```{r}
+pf_solo_mixed_mdata
+```
+
+
+Copy the irods metadata file from local into farm
+```{r, eval=T}
+write_csv(pf_solo_mixed, "data/raw/pf_solo_mixed.csv")
+```
+
 ## Genotype clustering for MSC
 
 Read in clusters.tsv files with assignment of cells to strains and PCA plots metrics
@@ -104,13 +163,13 @@ Read in clusters.tsv files with assignment of cells to strains and PCA plots met
 Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
 
 ```{r}
-##Copy souporcell files for the optimum clusters
 
 ##Sample ID
-sample_name <- irods_id_sk21_mdata_cln$sample_nm
+sample_name <- pf_solo_mixed$sample_nm
+smpl_nms <-pf_solo_mixed$sample_nm
 
 ##Sample IDs
-source_irods <- irods_id_sk21_mdata_cln[,c('sample_nm', 'irods_id')] %>% deframe
+source_irods <- pf_solo_mixed[,c('sample_nm', 'irods_id')] %>% deframe
 
 ```
 
