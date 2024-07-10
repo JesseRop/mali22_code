@@ -166,7 +166,7 @@ source_irods <- pf_solo_mixed[,c('sample_nm', 'irods_id')] %>% deframe
 
 
 NB-FARM_CODE
-```{r, eval=F}
+```{r, eval=T}
 ##Copy h5 files from cellranger and making relevant directories
 
 for (i in 1:length(sample_name)) {
@@ -196,7 +196,7 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 ```
 
 
-```{r, message=F, warning=F, eval=F}
+```{r, message=F, warning=F, eval=T}
 ##Write BPcells matrices
 list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
@@ -206,7 +206,7 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 ```
 
 
-```{r, message=F, warning=F, eval=F}
+```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
 all_msc_bp <- list.files("data/processed/", pattern = "counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
@@ -218,16 +218,16 @@ all_msc_bp <- list.files("data/processed/", pattern = "counts_mtx$", full.names 
 
 ```{r, message=F, warning=F, eval=F}
 # Convert to dense object - might be necessary in future instances
-all_msc <- all_msc_bp %>%
-  map(., ~{
-    .x[["RNA"]]$counts <- as(object = .x[["RNA"]]$counts, Class = "dgCMatrix")
-    return(.x)
-  })
+# all_msc <- all_msc_bp %>%
+#   map(., ~{
+#     .x[["RNA"]]$counts <- as(object = .x[["RNA"]]$counts, Class = "dgCMatrix")
+#     return(.x)
+#   })
 
 ```
 
 
-```{r, eval=F}
+```{r, eval=T}
 ##write out for normalization processing in farm
 
 for (i in 1:length(sample_name)) {
@@ -243,7 +243,7 @@ for (i in 1:length(sample_name)) {
 FARM CODE
 ```{r, eval=F}
 ## write out seurat object files for normalization processing in farm
-imap(all_msc, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu.RDS")))
+# imap(all_msc, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu.RDS")))
 ```
 
 ```{r, eval=F}
@@ -252,8 +252,9 @@ imap(all_msc_bp, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu.R
 ```
 
 !!!NB - FARM CODE - DONT DELETE
-```{r, eval=F}
-## Run SCT on farm like below
+```{r, eval=T}
+gogo()
+## Run standard normalisation on farm like below
 # nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --o_file_name "seu_norm.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1
 ```
 
