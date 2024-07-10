@@ -66,15 +66,6 @@ suppressPackageStartupMessages({
 knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
-
-Copy the irods metadata file from local into farm
-```{r, eval=FALSE}
-system(
-  paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv jr35@farm22:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv')
-)
-```
-
-
 ### Common functions
 
 #### Source commong functions, varriables and tables
