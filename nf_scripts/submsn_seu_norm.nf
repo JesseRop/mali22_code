@@ -15,10 +15,14 @@ params.o_file_name = "seu_norm.RDS"
 params.umap_name = "UMAP_"
 params.hvg = 500
 params.cluster_resoln = 0.4
+params.cl_nm = "NULL"
+params.umap_redctn_nm = "umap"
+params.redctn = "pca"
+params.integrtd = "no"
 
 // - compute resources for first process
-ncores="4"
-mem="100 GB"
+ncores="5"
+mem="50 GB"
 
 
 // - Standard scripts for running souporcell
@@ -44,9 +48,9 @@ process SEU_NORMALIZATION {
     memory "${mem}"
     cpus "${ncores}"
 
-    // errorStrategy 'ignore' // MSC66 giving error
+    // errorStrategy 'retry' // MSC66 giving error
 
-    tag "doublet finder on ${sample_nm} reads"
+    tag "seurat normalization and umap on ${sample_nm} reads"
 
     // publishDir params.outdir_index_temp, mode: "copy"
     publishDir "${out_p}/", mode: 'copy', overwrite: true
@@ -59,9 +63,9 @@ process SEU_NORMALIZATION {
 
 	script:
 	"""
-    module load HGI/softpack/groups/team222/Pf_scRNAseq/11
+    module load HGI/softpack/groups/team222/Pf_scRNAseq/12
 
-    Rscript ${params.scrpt} ${seu} ${params.hvg} ${params.o_file_name} ${params.umap_name} ${params.cluster_resoln}
+    Rscript ${params.scrpt} ${seu} ${params.hvg} ${params.o_file_name} ${params.umap_name} ${params.cluster_resoln} ${params.cl_nm} ${params.umap_redctn_nm} ${params.redctn} ${params.integrtd}
 
     
 	"""			
