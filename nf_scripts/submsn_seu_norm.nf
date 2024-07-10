@@ -21,7 +21,7 @@ params.redctn = "pca"
 params.integrtd = "no"
 
 // - compute resources for first process
-ncores="5"
+ncores="2"
 mem="50 GB"
 
 
