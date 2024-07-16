@@ -896,18 +896,18 @@ v3_m2_asex_harmony_sce_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/use
 ##This command gives error below when running the entire notebook or this whole chunk so run the command independently - coulb be and issue with rmd
 ##Error in x$.self$finalize() : attempt to apply non-function - need blank line after
 
-sce_obj_creatn <- function( seu_obj, umap = "umap"){
-
-    sce_obj <- SingleCellExperiment(assays = list(counts = as(seu_obj[["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj@meta.data)
-    
-    logcounts(sce_obj) <- log2((counts(sce_obj) + 1))
-    normcounts(sce_obj) <- as(seu_obj[["RNA"]]$data, Class = "dgCMatrix")
-    rowData(sce_obj)$feature_symbol <- str_replace(rownames(sce_obj), "-", "_")
-    reducedDims(sce_obj) <- SimpleList(PCA = seu_obj@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj@reductions[[umap]]@cell.embeddings)
-    
-    return(sce_obj)
-
-}
+# sce_obj_creatn <- function( seu_obj, umap = "umap"){
+# 
+#     sce_obj <- SingleCellExperiment(assays = list(counts = as(seu_obj[["RNA"]]$counts, Class = "dgCMatrix")), colData = seu_obj@meta.data)
+#     
+#     logcounts(sce_obj) <- log2((counts(sce_obj) + 1))
+#     normcounts(sce_obj) <- as(seu_obj[["RNA"]]$data, Class = "dgCMatrix")
+#     rowData(sce_obj)$feature_symbol <- str_replace(rownames(sce_obj), "-", "_")
+#     reducedDims(sce_obj) <- SimpleList(PCA = seu_obj@reductions[["pca"]]@cell.embeddings, UMAP = seu_obj@reductions[[umap]]@cell.embeddings)
+#     
+#     return(sce_obj)
+# 
+# }
 
 ```
 
