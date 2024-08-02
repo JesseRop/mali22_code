@@ -1,6 +1,6 @@
 ---
 title: "Pm strain deconvolution for pre and post QC each donor singly"
-date: '2022-07-11'
+date: '2024-07-31'
 author: 'Jesse Rop'
 output:
   html_document:
@@ -46,9 +46,9 @@ suppressPackageStartupMessages({
 })
 ```
 
-# MSC parasites strain deconvolution and VCF visualization 
+# MSC Pm parasites strain deconvolution, genotyping and relatedness 
 
-## Variable declarations
+## Variable declarations and setup
 
 ```{r setup}
 knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/'))
@@ -62,36 +62,24 @@ source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/
 sample_name_nms
 ```
 
-#### Source commong functions, varriables and tables
-```{r}
+
+```{r, results='hide'}
 ## Get the necessary variables for common housekeeping
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
 ```
-
+## READING IN GENOTYPES AND VARTRIX 
 ################### READING IN GENOTYPES AND VARTRIX ###########################
 
 VCF to GDS conversion
-```{r, warning=FALSE, message=FALSE, eval=T}
+```{r, warning=FALSE, message=FALSE, eval=T, results='hide'}
 ##Read in the genotypes and annotate
 
 gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
   sm <- ..1
   gp <- ..2
-  map(grps, ~seqVCF2GDS(paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
+  map(grps, ~seqVCF2GDS(paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA", verbose=F)
 )
-})
-
-```
-
-```{r, warning=FALSE, message=FALSE, eval=T}
-##Read in the genotypes and annotate
-
-pmap(list(sample_name_k, optimum_k), ~{
-  sm <- ..1
-  gp <- ..2
-  map(grps, ~paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
-
 })
 
 ```
@@ -215,6 +203,7 @@ ss_afm_vtx_mtx <-pmap(list(sample_name_k, optimum_k), ~{
 
 ################### END - READING IN GENOTYPES AND VARTRIX #####################
 
+## CLEANING AND PREPROCESSING GENOTYPES
 ################### CLEANING AND PREPROCESSING GENOTYPES #######################
 
 Combine vartix snp count per cell with freebayes calls
@@ -262,7 +251,7 @@ ss_po_pf7qc <- map(ss_afm_fb_vtx_p1bi, ~.x %>%
 )
 ```
 
-
+### Visualize ratio of high VS low quality (based on freebayes) of SNPs {.tabset} 
 
 ```{r, fig.height=4, fig.width=15}
 ##Function for cleaner plot of SNPs falling in the different filter categories for each stage +/ strain cluster
@@ -311,15 +300,23 @@ annot_snp_qc %>%
 
 
 ```{r}
-##!!!CHEATING - SORT OUT
 ss_afm_broadqc_plt <- map(ss_po_pf7qc, ~cln_plt_snp_filt_categ_pf7qc(annot_snp_qc = .x, filt_c = 'filt_reason1', xlb = 'Strain', qc_cols = broadqc_cols,  qc_lvls = broadqc_lvls, filt_rm=''))
 
-ss_afm_broadqc_plt
+# ss_afm_broadqc_plt
 
 ```
 
+```{r, results='asis'}
 
-##Assess filtered SNPs
+cat('\n')
+  ss_afm_broadqc_plt %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,'   \n')
+        print(.x)
+        cat('\n \n')
+      })
+```
+
 
 ```{r}
 ##!!!! NOTE :Adding S to [G|D] [G|D|S] so as to detect the SC labeles in the k6 raw
@@ -355,7 +352,7 @@ snps_qc_filts <- function(m14_gt){
 
 ```{r}
 ss_po_qc <- map(ss_po_pf7qc, ~snps_qc_filts(m14_gt=.x))
-ss_po_qc[[1]] %>% str()
+# ss_po_qc[[1]] %>% str()
 ```
 
 
@@ -363,7 +360,6 @@ ss_po_qc[[1]] %>% str()
 # saveRDS(ss_afm_pf7M_qc, paste0("data/processed/",species, "/ss_afm_pf7M_qc.RDS"))
 ```
 
-###########################
 
 
 ```{r, eval=FALSE}
@@ -375,6 +371,7 @@ imap(ss_afm_pf7M_qc, ~write_csv(.x, paste0('data/processed/',species,'/', str_re
 
 ```
 
+### Visualize different filter categories of PASS SNPs (based on allele counts) {.tabset} 
 
 ```{r, fig.height=4, fig.width=20}
 ##Function to plot snps per the number of SNPs falling in the different filter categories for each stage + strain cluster
@@ -398,11 +395,12 @@ plt_snp_filt_categ <- function(annot_snp_qc, xlb = 'Strain'){
 ```
 
 
-```{r, fig.height=4, fig.width=20}
+```{r, fig.height=4, fig.width=20, results='hide'}
 ##Function to plot snps per the number of SNPs falling in the different filter categories for each stage + strain cluster
 map(ss_po_qc, ~plt_snp_filt_categ(annot_snp_qc = .x))
 
 ```
+
 
 
 ```{r, fig.height=4, fig.width=15}
@@ -453,8 +451,19 @@ annot_snp_qc %>%
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
 ##!!!CHEATING - SORT OUT
 ss_afm_k6r_qc_plt <- imap(ss_po_qc, ~cln_plt_snp_filt_categ(annot_snp_qc = .x, ttl = .y))
-ss_afm_k6r_qc_plt
+# ss_afm_k6r_qc_plt
 
+```
+
+```{r, results='asis'}
+
+cat('\n')
+ss_afm_k6r_qc_plt %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,'   \n')
+        print(.x)
+        cat('\n \n')
+      })
 ```
 
 
@@ -477,7 +486,7 @@ snp_filt_bias_viz <- function(annot_snp_qc, filt_cat){
 ```
 
 
-```{r, fig.height=5, fig.width=14}
+```{r, fig.height=5, fig.width=14, results='hide'}
 ##Visualize and count the different classes of SNPs removed in QC
 for (fc in c('Non distinct', 'Noisy', 'Alt inverted', 'Ref inverted')){
   map(ss_po_qc, ~snp_filt_bias_viz(annot_snp_qc = .x, filt_cat = fc))
@@ -517,15 +526,7 @@ ss_afm_pf7M_qc_infomtv <- map(ss_po_qc, ~snp_rm_dblt_infomtv(annot_snp_qc = .x, 
 pf_chr_size = read_delim(chrm_sz, col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,chrm_prfx)) 
 ```
 
-
-IBS megacells from Mi
-
-#------------------------ 2. compute IBS for megaCells -----------------------------------------#####
-
-#------------------------------------ #
-# Compute ibs for pseudo 'mega' cells #
-#------------------------------------ #
-
+IBS computation as advised by Mi
 
 ```{r}
 
@@ -549,6 +550,7 @@ saveRDS(ss_afm_pf7M_cln_gt, paste0("data/processed/",species, "/ss_afm_pf7M_cln_
 
 ################### END - CLEANING AND PREPROCESSING GENOTYPES #################
 
+## VISUALIZATIONS & STRAIN VALIDATION
 ################### VISUALIZATIONS & STRAIN VALIDATION #########################
 
 ```{r, fig.height=3.8, fig.width=4.2}
@@ -1010,6 +1012,7 @@ saveRDS(strn_c_tbl_min, paste0("data/processed/",species, "/strn_c_tbl_min_qcd.R
 
 ################### END CHROMOSOME PAINTING & STRAIN VALIDATION ################
 
+## BETWEEN DONOR IBS
 ################### BETWEEN DONOR IBS###########################################
 
 
