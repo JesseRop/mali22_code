@@ -2,13 +2,15 @@
 
 // - Directory to store output - need to differentiate between preQC genotyping so as to verify souporcell assignments and postQC genotyping so as to perform relatedness analysis etc
 // params.sv_dir = "pbulk_gtypes_preQC"
-params.sv_dir = "pbulk_gtypes_post_GE_QC"
+// params.sv_dir = "pbulk_gtypes_GE_postQC"
+params.sv_dir = "pbulk_gtypes_postQC_cln"
 
 // - 2022 cellranger output
-params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/hs*/parent/possorted_genome_bam.bam" 
+params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/*/parent/possorted_genome_bam.bam" 
 
 // - cell barcodes
-params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/bcodes/hs*/stage_afm_strain_k[0-9]*/*.tsv"
+// params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC50_SLO/${params.sv_dir}/bcodes/*/stage_afm_strain_k[0-9]*/*.tsv"
+params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/bcodes/minmap/*/*.tsv"
 
 // - output directory
 params.odir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
@@ -27,7 +29,7 @@ params.ref  = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_ce
 // - Create channels
 bam_ch = Channel
 				.fromPath(params.bam)
-				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file, file+'.bai') }
+				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file.getParent().toString().split('\\/')[15], file, file+'.bai') }
 
 // bam_ch.view()
 
@@ -37,14 +39,14 @@ bcodes_ch = Channel
 
 // bcodes_ch.view()
 
-bcodes_bam_ch = bcodes_ch.combine(bam_ch, by: 0)
+bcodes_bam_ch = bcodes_ch.combine(bam_ch, by: [0,1])
 // bcodes_bam_ch.view()
 
 // - Processes
 // - Subset minimap bam file from souporcell based on the barcodes in each pseudobulk group using subset bam from 10X
 
 process SUBSET {
-    memory '100 GB'
+    memory '60 GB'
     cpus '5'
 
     tag "Subset ${strn_stg}  reads"
@@ -66,7 +68,7 @@ process SUBSET {
 
 // Tag each subsetted bam file using the pseudobulk group ID in preparation for freebayes genotyping
 process TAGBAM {
-    memory '50 GB'
+    memory '40 GB'
     cpus '3'
 
     errorStrategy 'ignore' // Some error coming up "terminated for an unknown reason -- Likely it has been terminated by the external system"
@@ -83,7 +85,7 @@ process TAGBAM {
     
     script:
     """
-    module load common-apps/samtools/1.17
+    module load samtools/1.20--h50ea8bc_0
 
     samtools addreplacerg -r ID:${strn_stg} -r SM:${strn_stg} $bam -o ${strn_stg}_sset_sorted_rg.bam
     samtools index ${strn_stg}_sset_sorted_rg.bam
@@ -107,8 +109,10 @@ bcf_spec=Channel.value("view --max-alleles 2")
 // Run FreeBayes with the specified parameters using ploidy of 1 and other parameters specified above
 
 process FREEBAYES {
-    memory '140 GB'
-    cpus '30'
+    memory '100 GB'
+    cpus '8'
+
+    errorStrategy 'ignore'
 
     tag "Freebayes variant calling on ${grp} ${sample_nm}"
 
@@ -124,8 +128,9 @@ process FREEBAYES {
 
     script:
     """
-    module load common-apps/bcftools/1.17 
-    module load freebayes/1.3.6--h346b5cb_1
+    module load samtools/1.20--h50ea8bc_0
+    module load HGI/softpack/groups/team222/SNP_analysis/1
+    module load bcftools/1.20--h8b25389_0
 
     freebayes -f $params.ref $fb_s --ploidy $params.ploidy $bam > fb_multiallelic.vcf 
     bcftools $bcf_s fb_multiallelic.vcf -o fb_biallelic.vcf
@@ -133,8 +138,8 @@ process FREEBAYES {
 }
 
 process VARTRIX_UMI {
-    memory '120 GB'
-    cpus '20'
+    memory '100 GB'
+    cpus '8'
     
     errorStrategy 'ignore'
 
@@ -190,7 +195,7 @@ workflow {
                         .map { file -> tuple(file[0], file[1], file[2], file[5], file[6]) }
                         .groupTuple(by: [0, 1, 2])
     
-    // tagbam_ch_all.view()
+    tagbam_ch_all.view()
 
     fb_vcf_ch = FREEBAYES(tagbam_ch_all,  fb_spec, bcf_spec)
 
