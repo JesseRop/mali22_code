@@ -21,7 +21,7 @@ suppressPackageStartupMessages({
   library(tibble)
   library(ggplot2)
   library(tidyr)
-  # library(cowplot)
+  library(cowplot)
   library(pheatmap)
   # library(rmarkdown)
   # library('vcfR')
@@ -63,7 +63,7 @@ sample_name_nms
 ```
 
 
-```{r, results='hide'}
+```{r, warning=FALSE,  message=FALSE}
 ## Get the necessary variables for common housekeeping
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
@@ -129,7 +129,7 @@ gds_rd <- function(sample_id, grp, opt_k){
 ```
 
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, results='hide'}
 ##Read in the genotypes and annotate
 # gt_ss_afm_p1_bi <- gds_rd(sample_id = "MSC48_5736STDY13782212", grp = "stage_afm_strain_k6_minimp")
 
@@ -189,8 +189,8 @@ sf <- list.files(paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step,
 ```
 
 
-```{r}
-##Read in the genotypes and annotate
+```{r, warning=FALSE, message=FALSE, results='hide'}
+##Read in the vartrix
 # NOTE - if we get error then check the header of the raw .mtx and .ref files from vartrix for consistency in number of records "number of rows of matrices must match (see arg 15)"
 
 ss_afm_vtx_mtx <-pmap(list(sample_name_k, optimum_k), ~{
@@ -236,7 +236,7 @@ fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None") {
 }
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, results='hide'}
 ss_afm_fb_vtx_p1bi <- pmap(list(unlist(gt_ss_afm_p1_bi, recursive = F), unlist(ss_afm_vtx_mtx, recursive = F)), ~fb_vt_bind(fb_gtype = ..1, vtx_mtx = ..2))
 ```
 
@@ -395,7 +395,7 @@ plt_snp_filt_categ <- function(annot_snp_qc, xlb = 'Strain'){
 ```
 
 
-```{r, fig.height=4, fig.width=20, results='hide'}
+```{r, fig.height=4, fig.width=20, fig.show='hide', results='hide', warning=FALSE, message=FALSE}
 ##Function to plot snps per the number of SNPs falling in the different filter categories for each stage + strain cluster
 map(ss_po_qc, ~plt_snp_filt_categ(annot_snp_qc = .x))
 
@@ -447,7 +447,7 @@ annot_snp_qc %>%
 }
 ```
 
-```{r, fig.height=6, fig.width=30}
+```{r}
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
 ##!!!CHEATING - SORT OUT
 ss_afm_k6r_qc_plt <- imap(ss_po_qc, ~cln_plt_snp_filt_categ(annot_snp_qc = .x, ttl = .y))
@@ -455,7 +455,7 @@ ss_afm_k6r_qc_plt <- imap(ss_po_qc, ~cln_plt_snp_filt_categ(annot_snp_qc = .x, t
 
 ```
 
-```{r, results='asis'}
+```{r, results='asis', fig.height=6, fig.width=20}
 
 cat('\n')
 ss_afm_k6r_qc_plt %>% 
@@ -486,7 +486,7 @@ snp_filt_bias_viz <- function(annot_snp_qc, filt_cat){
 ```
 
 
-```{r, fig.height=5, fig.width=14, results='hide'}
+```{r, results='hide'}
 ##Visualize and count the different classes of SNPs removed in QC
 for (fc in c('Non distinct', 'Noisy', 'Alt inverted', 'Ref inverted')){
   map(ss_po_qc, ~snp_filt_bias_viz(annot_snp_qc = .x, filt_cat = fc))
@@ -514,14 +514,14 @@ return(list(annot_snp_qc_nd, annot_snp_qc_infomtv))
 }
 ```
 
-```{r, fig.height=5, fig.width=14}
+```{r, results='hide'}
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
 
 ss_afm_pf7M_qc_infomtv <- map(ss_po_qc, ~snp_rm_dblt_infomtv(annot_snp_qc = .x, clst2rmv = "None"))
 ```
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## Get genome size like this cut -f1,2 fasta.fai > genome.size
 pf_chr_size = read_delim(chrm_sz, col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,chrm_prfx)) 
 ```
@@ -553,6 +553,7 @@ saveRDS(ss_afm_pf7M_cln_gt, paste0("data/processed/",species, "/ss_afm_pf7M_cln_
 ## VISUALIZATIONS & STRAIN VALIDATION
 ################### VISUALIZATIONS & STRAIN VALIDATION #########################
 
+### Heatmap of IBS metrics between pairwise strain comparisons {.tabset} 
 ```{r, fig.height=3.8, fig.width=4.2}
 ##Heatmap function
 
@@ -573,9 +574,9 @@ gtypes_chr_cln_ibs_mtx <- function(gtypes_chr_pos){
   
   gds = snpgdsOpen(gdsFile)
   
-  gdsSub = snpgdsLDpruning(gds, ld.threshold = 0.2)
+  gdsSub = snpgdsLDpruning(gds, ld.threshold = 0.2, verbose = F)
   
-  ibs = snpgdsIBS(gds, num.thread = 4)
+  ibs = snpgdsIBS(gds, num.thread = 4, verbose = F)
   
   rownames(ibs$ibs) = colnames(ibs$ibs) = colnames(gtMat)
     
@@ -626,22 +627,31 @@ gtypes_ibs_heatmap_one_don <- function(mtx, dendog = F){
                       grid.rect(x[l], y[l], width = width, height = height, gp = gpar(col = "#a4c2f4", lwd = 2, fill = "transparent"))
 })
   
-  print(hm)
-  print(hm2)
+  return(list(hm, hm2))
+  # print(hm2)
   # print(hm3)
 }
 ```
 
-```{r, fig.height=4.1, fig.width=4.5}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 
 ss_afm_ibs_mtx<- map(ss_afm_pf7M_cln_gt, ~gtypes_chr_cln_ibs_mtx(gtypes_chr_pos=.x))
-ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, ~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = F))
-```
-
-```{r, fig.height=5.1, fig.width=5.5}
-
+# ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, ~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = F))
 ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, ~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = T))
+
 ```
+
+```{r, results='asis'}
+
+cat('\n')
+  ss_afm_ibs_hmap %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,'   \n')
+        print(.x)
+        cat('\n \n')
+      })
+```
+
 
 ```{r}
 ##Function to creat pairwise comparison groups which are the used for plotting chromosome paints
@@ -703,16 +713,16 @@ b_strn_c_wndw_fn <- function(strn_c_tbl, wndw = 100000) {
 ```
 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 ##stage strain pairwise comparison chromosome binning of SNPs and creation of windows for plotting
 ss_afm_wndws <- map(ss_afm_pf7M_afm_comps, ~b_strn_c_wndw_fn(strn_c_tbl = .x))
 
 ```
 
-
+### Visualize identical and different SNPs between any pairwise strain comparisons {.tabset} 
 
 ```{r}
-## Function for chromosome painting
+## Function for ploting and counting identical and different SNPs between any pairwise strain comparisons
 
 p_chart_shared_snps <- function(gtypes_comps_tbl = b_strn, ttl, lg = "right") {
 
@@ -746,8 +756,7 @@ p_chart_shared_snps <- function(gtypes_comps_tbl = b_strn, ttl, lg = "right") {
 
 ```
 
-Pie of snps compared
-```{r, warning=FALSE}
+```{r, warning=FALSE, message=FALSE}
 # strain stage (afm) chromosome painting
 pp_plts <- imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x, ttl=.y, lg = "none"), 'No overlapping SNPs between the 2 groups'))
 
@@ -756,7 +765,20 @@ pp_plts <- imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x
 
 ```{r, warning=FALSE, fig.width=8, fig.height=8}
 # strain stage (afm) chromosome painting
-pp_plts
+# pp_plts
+```
+
+
+
+```{r, results='asis', fig.width=8, fig.height=8}
+
+cat('\n')
+pp_plts %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,'   \n')
+        print(.x)
+        cat('\n \n')
+      })
 ```
 
 Notes on Confirmed K
@@ -771,7 +793,7 @@ MSC66 = k8 : Neg==SC5
 MSC68 = k4 : Neg==SC2
 
 
-##Simpler chromosome plots(no continous gradient) for SS_AG and S
+### Visualize simpler chromosome plots(no continous gradient)  {.tabset} 
 
 ```{r}
 ## Function for chromosome painting
@@ -823,20 +845,38 @@ ss_afm_chromp <- map(ss_afm_wndws, ~{
 })
 
 ```
-CONFIRMATION OF STRAINS
-33=8, 
+
+
 ```{r, warning=F}
 # strain stage (afm) chromosome painting
 names(ss_afm_chromp)
 
 ```
 
+```{r, results='asis', warning=FALSE, message=FALSE}
+
+cat('\n')
+ss_afm_chromp %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,' {.tabset} \n \n')
+        plt <- .x
+          purrr::iwalk(plt,~{
+            cat('##### ',.y,'   \n \n')
+            print(.x)
+            cat('\n \n')
+          })
+        cat('\n \n')
+      })
+```
+
+
 ```{r, warning=F}
-# strain stage (afm) chromosome painting
-ss_afm_chromp[str_detect(names(ss_afm_chromp), "MSC47.strain.k6")]
+# ss_afm_chromp[str_detect(names(ss_afm_chromp), "MSC47.strain.k6")]
 
 ```
 
+
+### Visualize smoother chromosome plots (with continous gradient)  {.tabset} 
 
 ```{r, eval=T}
 ## Function for chromosome painting
@@ -907,7 +947,6 @@ chrom_paintr_smth_gradient <- function(gtypes_comps_tbl = b_strn, ttl, expn=1000
 ```
 
 
-strains split by stage Without colour gradients
 ```{r, warning=FALSE, eval=T}
 # strain stage (afm) chromosome painting
 ss_afm_chromp_smth <- map(ss_afm_wndws, ~{
@@ -920,32 +959,55 @@ ss_afm_chromp_smth <- map(ss_afm_wndws, ~{
 
 
 ```{r, warning=FALSE, eval=T}
+## Save for trial notebook
+saveRDS(ss_afm_chromp_smth, paste0("data/processed/",species, "/ss_afm_chromp_smth.RDS"))
+```
+
+```{r, results='asis', warning=FALSE, message=FALSE}
+
+cat('\n')
+ss_afm_chromp_smth %>% 
+      purrr::iwalk(.,~{
+        cat('#### ',.y,' {.tabset} \n \n')
+        plt <- .x
+          purrr::iwalk(plt,~{
+            cat('##### ',.y,'   \n \n')
+            print(.x)
+            cat('\n \n')
+          })
+        cat('\n \n')
+      })
+```
+
+
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ss_afm_chromp_smth["MSC47.strain.k6"]
 ```
 
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ss_afm_chromp_smth["MSC35.strain.k3"]
 ```
 
 
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ## Check those thought to be k=1
 ss_afm_chromp_smth["MSC27.strain.k2"]
 ```
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ## Check those thought to be k=1
 ss_afm_chromp_smth["MSC42.strain.k2"]
 ```
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ## Check those thought to be k=1
 ss_afm_chromp_smth["MSC35.strain.k3"]
 ```
 
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=T,  fig.show='hide'}
 ss_afm_chromp_smth["MSC44.strain.k3"]
 ```
 
 
+### Manually checking the accuracy of K and assigning most accurate K estimate 
 Notes on Confirmed K - Manually assign negative for which we assessed to the relevant Ks
 
 MSC27	2 (Neg == SC1) :not very clear going with 2 for now.
@@ -957,7 +1019,7 @@ MSC36	2
 MSC16	2
 MSC15	3
 
-```{r, warning=FALSE, eval=F}
+```{r, warning=FALSE, eval=T}
 ## Write out the strain assignments
 ## Get optimum strain K based on assesment above
 optimum_k_qcd <- c("MSC27" = 2, "MSC35" = 3, "MSC42" = 1, "MSC44" = 3, "MSC47" = 6, "MSC36" = 2, "MSC16" = 2, "MSC15" = 3) %>% .[sample_name_nms]
@@ -1191,7 +1253,7 @@ sibd_pht
 
 
 
-```{r, fig.height=18, fig.width=18}
+```{r, fig.height=18, fig.width=18, results='hide'}
 
 hms<- pmap(list(gt_all_ibs_mtx, list( clustr_numbers_s), c("strain_n" )), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
 
@@ -1202,7 +1264,7 @@ hms<- pmap(list(gt_all_ibs_mtx, list( clustr_numbers_s), c("strain_n" )), ~ibs_d
 
 Write out strain_qcd + stage_ag for pseudobulk genotyping
 
-```{r, warning=FALSE, eval=T}
+```{r, warning=FALSE, eval=F}
 ## Get donors with more than 1 strain
 optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
 # optimum_k_polyk <- optimum_k_polyk[!names(optimum_k_polyk) %in% c("MSC37", "MSC38")]
