@@ -3,31 +3,45 @@
 // NOTE - This script only runs the entire souporcell pipeline for the first K and then uses the bam, vcf and vartrix filed generated from this for other Ks to save on resources. 
 // The shortcut gives identical results to those from running the pipeline from scratch as verified by output from the K=5 rerun using soupc_v25_m2_k5_verif.nf script
 
-// - sample id decode file
-params.id_decode = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv" 
+// - sample id decode file. second file includes mixed infections
+// params.id_decode = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/irods_id_sk21_mdata_cln.csv"
+params.id_decode = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv"  
 
-// - 2022 cellranger output
-params.bam = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" 
+// - 2022 cellranger output - for all infections
+// params.bam = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" 
 
-// - cell barcodes
-// params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
-params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/barcodes.tsv.gz"
+// // - 2022 cellranger output - for mixed infections
+params.bam = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY134373{63,72,89}/outs/possorted_genome_bam.bam" 
+
+
+// - Cellranger filtered cell barcodes - for first pass souporcell
+params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf/MSC*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+
+// - NB!!! -DO NOT DELETE
+// - Clean cell barcodes - use this for the second pass - limiting souporcell only to the QCd (outlier low/high count and doublets removed) barcodes
+// params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/barcodes.tsv.gz"
 
 // - output directory
 params.o_dir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
 
 // - compute resources for first process
-ncores="12"
+ncores="15"
 mem="120 GB"
 
-// - souporcell output folder
-params.soup_dir = "soupc_GE_postQC"
+// - Cellranger filtered cell barcodes for first pass souporcell
+// souporcell output folder
+params.soup_dir = "soupc"
+
+// - Clean cell barcodes - use this for the second pass
+// souporcell output folder
+// params.soup_dir = "soupc_GE_postQC"
 
 // - Standard scripts for running souporcell
 params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh"
 
 // - Reference fasta
-// params.ref  = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/hisat_refs/Pfalciparum.genome.fasta"
+params.ref_file  = "PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
+params.hsat_ref_file  = "Pf66"
 
 // - Create channels 
 id_ch = Channel
@@ -51,6 +65,7 @@ bcodes_ch = Channel
 
 // bcodes_ch.view()
 
+// Old channel script for when the barcodes file was being obtained from sk21's directory 
 // bcodes_bam_ch = bcodes_ch
 //                     .combine(bam_ch, by:0)
 //                     .combine(id_ch, by:0)
@@ -65,9 +80,9 @@ bcodes_bam_ch = id_ch
 // bcodes_bam_ch.view()
 
 // - Algnment mapper tuples including references
-hsat_tup = ['hsat', 'HISAT2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/Pf66_hisat_refs/genome_w_tran_ref/genome_tran.fasta'] // reference generated using /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/scripts/hisat2_ref_build.sh
-minmap_tup = ['minmap', 'minimap2', '/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta']
-// lr_tup = ['lr_ref', 'minimap2', '/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/sk21_long_read_ref/Ref_pxPlaFalc47_hum_on_PfDB66_no_contigs_no_mit.fa']
+hsat_tup = ["hsat", "HISAT2", "/lustre/scratch126/tol/teams/lawniczak/users/jr35/genomes_gtfs_indexs/${params.hsat_ref_file}_hisat_refs/genome_w_tran_ref/genome_tran.fasta"] // reference generated using /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/scripts/hisat2_ref_build.sh
+minmap_tup = ["minmap", "minimap2", "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/${params.ref_file}"]
+// lr_tup = ["lr_ref", "minimap2", "/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/sk21_long_read_ref/Ref_pxPlaFalc47_hum_on_PfDB66_no_contigs_no_mit.fa"]
 
 
 // algn_ch = Channel.from([hsat_tup, minmap_tup, lr_tup])
@@ -193,3 +208,4 @@ workflow {
     LL_KNEE_PLOT(soupc2plus_ll_ch)
 
 }
+
