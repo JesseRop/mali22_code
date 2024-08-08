@@ -144,7 +144,13 @@ pf_solo_mixed_mdata
 
 Copy the irods metadata file from local into farm
 ```{r, eval=T}
-write_csv(pf_solo_mixed, "data/raw/pf_solo_mixed.csv")
+write_csv(pf_solo_mixed_mdata, "data/raw/pf_solo_mixed_mdata.csv")
+```
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- pf_solo_mixed_mdata %>% select(sample_nm, irods_id, mixed_infection2)
+
+write_csv(pf_solo_mixed_mdata_decode, "data/raw/pf_solo_mixed_mdata_decode.csv")
 ```
 
 ## Genotype clustering for MSC
@@ -156,14 +162,13 @@ Transfer clusters.tsv files with assignment of cells to strains and PCA plots me
 ```{r}
 
 ##Sample ID
-sample_name <- pf_solo_mixed$sample_nm
-smpl_nms <-pf_solo_mixed$sample_nm
+sample_name <- str_sort(pf_solo_mixed_mdata$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata$sample_nm)
 
 ##Sample IDs
-source_irods <- pf_solo_mixed[,c('sample_nm', 'irods_id')] %>% deframe
+source_irods <- pf_solo_mixed_mdata[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
 
 ```
-
 
 NB-FARM_CODE
 ```{r, eval=T}
@@ -216,6 +221,38 @@ all_msc_bp <- list.files("data/processed/", pattern = "counts_mtx$", full.names 
 ```
 
 
+```{r}
+## Mixed species barcodes from sunil
+sk21_mixed_sp_decode <- readRDS("data/processed/Part1_sp_barcodes_PfPmPoc.RDS")
+```
+
+
+```{r}
+## Get the donor and irods ID for mixed infections
+mxd_source_irods <- pf_solo_mixed_mdata[pf_solo_mixed_mdata$mixed_infection2 == "mixed",][,c("sample_nm", "irods_id")] %>% deframe()
+
+```
+
+
+```{r}
+## Write Pf barcodes for mixed species donor for souporcell
+imap(mxd_source_irods, ~{
+    system(paste0("mkdir -p data/raw/Pf_mxd/", .y, "/outs/sk21_bcodes_pp"))
+    write(sk21_mixed_sp_decode$sp_barcodes[[.x]]$pf_filt, paste0("data/raw/Pf_mxd/", .y, "/outs/sk21_bcodes_pp/barcodes.tsv"))
+    system(paste0("gzip -f data/raw/Pf_mxd/", .y, "/outs/sk21_bcodes_pp/barcodes.tsv"))
+  })
+
+```
+
+Remove non-Pf from the mixed infections
+```{r, message=F, warning=F, eval=T}
+## Subset 
+for(i in 1:length(mxd_source_irods)) {
+    all_msc_bp[names(mxd_source_irods)[i]] <- subset(all_msc_bp[[names(mxd_source_irods)[i]]], cells = sk21_mixed_sp_decode$sp_barcodes[[mxd_source_irods[i]]]$pf_filt)
+  }
+
+```
+
 ```{r, message=F, warning=F, eval=F}
 # Convert to dense object - might be necessary in future instances
 # all_msc <- all_msc_bp %>%
@@ -246,16 +283,19 @@ FARM CODE
 # imap(all_msc, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu.RDS")))
 ```
 
-```{r, eval=F}
+```{r, eval=T}
 ## write out seurat bpcells object files for normalization processing in farm
 imap(all_msc_bp, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu.RDS")))
 ```
 
 !!!NB - FARM CODE - DONT DELETE
+
 ```{r, eval=T}
 gogo()
 ## Run standard normalisation on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --o_file_name "seu_norm.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1
+## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
+
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --o_file_name "seu_norm.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "seu_norm_elbo.RDS"
 ```
 
 Read in seurat objects processed in farm
@@ -263,10 +303,22 @@ Read in seurat objects processed in farm
 ##Read BPcells matrices
 all_msc <- list.files("data/processed/", pattern = "^seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
-  # .[sample_name] %>%
+  .[sample_name] %>%
   map(readRDS)
+
 ```
 
+
+Read in seurat objects processed in farm
+```{r, message=F, warning=F}
+##Read elbo plots
+all_msc_elbo <- list.files("data/processed/", pattern = "^seu_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(readRDS)
+
+all_msc_elbo
+```
 
 ```{r, warning=FALSE, message=FALSE}
 imap(all_msc, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
@@ -344,12 +396,12 @@ scater::plotReducedDim(v3labmscs.ref.sce, dimred = "PCA", colour_by = "stageHL_r
 ```
 
 
-```{r, message=FALSE, warning=FALSE, eval = F}
+```{r, message=FALSE, warning=FALSE, eval = T}
 saveRDS(v3labmscs.ref.sce, "data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS")
 ```
 
 ```{r, eval=T}
-jkjkj()
+gogo()
 ## Run scmap on farm like below
 # nextflow run submsn_scmap.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/scmap.R" --sce_ref "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm.RDS" --w 3 --cos_sim 0.5 --o_file "prelim_anotd.RDS"
 ```
@@ -438,6 +490,15 @@ map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(StagePrelim, StagePrelim
 
 ```{r, warning=FALSE, message=FALSE}
 imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = F, group.by = 'StagePrelim', cols = sp_fld_colors)+ labs(title = .y))
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_msc_anots[["MSC51"]]
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Check if the poorly annotated samples are from mixed infections
+pf_solo_mixed_mdata %>% filter(mixed_infection2 == "mixed") 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -634,4 +695,21 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(StagePrelim))
 #         legend.position = 'bottom')
 # 
 # scm_barpt
+```
+
+
+Run souporcell like below for the filtered barcodes of all infections
+```{r}
+gogo()
+
+# nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf/MSC*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
+```
+
+
+
+Run souporcell like below for the filtered barcodes of pf in mixed infections
+```{r}
+gogo()
+
+#  nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY134373{63,72,89}/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf_mxd/MSC*/outs/sk21_bcodes_pp/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
 ```

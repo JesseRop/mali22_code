@@ -102,7 +102,7 @@ knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/u
 
 
 
-```{r}
+```{r, eval=FALSE}
 
 # system(paste0("hmmIBD -i ibd_analysis/msc14.strain_qcd_cln_gt.tsv  -o ibd_analysis/tr -m 100000"))
 
@@ -112,14 +112,14 @@ knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/u
 
 # 33=7, 48=4/3, 49=6, 55=hsat7???, 38=6??,40=8,39=4
 
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70") %>% str_sort(numeric = T)
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% str_sort(numeric = T)
 sample_name_nms_k1 <-  c("MSC53", "MSC57", "MSC24", "MSC45", "MSC54", "MSC67", "MSC70")
-sample_name_nms_missing <-  c("MSC50_MACS", "MSC50_SLO")
+sample_name_nms_missing <-  c("MSC50_SLO")
 
 sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_name_nms_k1]
 sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_name_nms_missing]
 
-# sample_name_nms <- c("MSC33", "MSC48", "MSC49", "MSC55", "MSC38", "MSC40", "MSC37", "MSC39")
+sample_name_nms <- c("MSC38", "MSC50_SLO",  "MSC41","MSC51", "MSC25") %>% str_sort(numeric = T)
 
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70") %>% sort()
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% str_sort(numeric = T)
@@ -134,12 +134,12 @@ sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_name_nms_missing
 # optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
 # optimum_k = c(8,6,6,7,7,9) %>% set_names(sample_name_nms)
 # optimum_k = c(8) %>% set_names(sample_name_nms)
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2)) %>% .[sample_name_nms]
+opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3)) %>% .[sample_name_nms]
 
 # optimum_k = opt_narrow_clusters_nms
 
 sample_name_k <- map2(sample_name_nms, opt_narrow_clusters_nms, ~rep(.x, each = length(.y))) %>% unlist()
-
+sample_name_nms
 
 ## sorted donor_opt_cluster names
 # sorted_names <- paste0(sample_name_nms, "_", optimum_k)
@@ -155,25 +155,31 @@ grps <- c('stage_afm_strain')
 algn_nms = c('minmap', 'hsat')
 algn_nm = 'minmap'
 
-# gtyp_step = "pbulk_gtypes_preQC"
-gtyp_step = "pbulk_gtypes_GE_postQC"
+gtyp_step = "pbulk_gtypes_preQC"
+# gtyp_step = "pbulk_gtypes_GE_postQC"
 
 # sample_name_nms_al <- rep(sample_name_nms, 2)
-sample_name_nms_al <- rep(map2(sample_name_nms, opt_narrow_clusters_nms, ~rep(.x, each=length(.y))) %>% unlist(), 2)
+sample_name_nms_al <- rep(map2(sample_name_nms, opt_narrow_clusters_nms, ~rep(.x, each=length(.y))) %>% unlist(), length(algn_nms))
 
 # algn_nms_al <- rep(algn_nms, each= length(sample_name_nms))
 algn_nms_al <- rep(algn_nms, each= length(sorted_names))
 
 # sm_aln_nms_al <- paste(rep(sample_name_nms, 2), rep(algn_nms, each= length(sample_name_nms)), sep ='_')
-sm_aln_nms_al <- paste(rep(sorted_names, 2), rep(algn_nms, each= length(sorted_names)), sep ='_')
+sm_aln_nms_al <- paste(rep(sorted_names, length(algn_nms)), rep(algn_nms, each= length(sorted_names)), sep ='_')
 
 sample_set <- "Mali2"
 ```
 
+```{r}
+## Get the necessary variable for the pseudobulking workflow
+# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
+sample_name_nms
+```
 
 #### Source commong functions, varriables and tables
 ```{r}
-##Boxplot labeling function
+## Get the necessary variables for common housekeeping
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
 ```
@@ -191,13 +197,13 @@ for (id in sample_name_nms) {
         # for (p in c(1,2)) {
         for (p in c(1)) {
           # for (al in c("multiallelic", "biallelic")) {
-          system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
+          system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
             )
           
-          system(paste0('rsync -av --include=\'*.vcf\' --exclude=\'*\' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/ /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
+          system(paste0('rsync -av --include=\'*.vcf\' --exclude=\'*\' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/ /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
             )
           
-          system(paste0('rsync -av --delete jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/vartrix_biallelic /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
+          system(paste0('rsync -av --delete jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/vartrix_biallelic /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
             )
         }
       }
@@ -214,8 +220,20 @@ VCF to GDS conversion
 gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
   sm <- ..1
   gp <- ..2
-  map(grps, ~seqVCF2GDS(paste0("data/processed/Pf/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/Pf/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
+  map(grps, ~seqVCF2GDS(paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
 )
+})
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+##Read in the genotypes and annotate
+
+pmap(list(sample_name_k, optimum_k), ~{
+  sm <- ..1
+  gp <- ..2
+  map(grps, ~paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
+
 })
 
 ```
@@ -322,8 +340,8 @@ pf7_mali_only_nmajor001_snp_qc <- pf7_mali_only_nmajor001 %>% dplyr::select(V1, 
 
 gds_rd <- function(sample_id, grp, opt_k){  
   
-  p1_bi <- seqOpen(paste0("data/processed/Pf/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.gds"), allow.duplicate=T)
-  print(paste0("data/processed/Pf/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.gds"))
+  p1_bi <- seqOpen(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.gds"), allow.duplicate=T)
+  print(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.gds"))
   
   print(head(seqGetData(p1_bi, "allele")))
   # print(head(seqGetData(p1_bi, "$dosage")))
@@ -334,7 +352,7 @@ gds_rd <- function(sample_id, grp, opt_k){
   seqClose(p1_bi)
   print(gtypes_p1_bi[1:5,1:5])
   
-  strn_nms <- seqVCF_SampID(paste0("data/processed/Pf/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.vcf")) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G"))
+  strn_nms <- seqVCF_SampID(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k,"_", algn_nm,"/p1/fb_biallelic.vcf")) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G"))
   
   colnames(gtypes_p1_bi) <- c('alleles', 'quality', 'chrom', 'pos', 'depth', 'filt', strn_nms, paste0(strn_nms, rep(c('_DP','_RefN', '_AltN'), each=length(strn_nms))))
 
@@ -388,7 +406,7 @@ gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
 
 ###k6 Clean
 ```{r}
-# list.files("data/processed/Pf/", gtyp_step, "/stg_strn_k8_minimp_qcd/p1/vartrix_biallelic/", pattern = "S.*.mtx", full.names = T, recursive = T, include.dirs = T) 
+# list.files("data/processed/",species, "/", gtyp_step, "/stg_strn_k8_minimp_qcd/p1/vartrix_biallelic/", pattern = "S.*.mtx", full.names = T, recursive = T, include.dirs = T) 
 ```
 
 
@@ -400,8 +418,8 @@ Vartrix matrix to get number of molecules supporting either reference or alterna
 vtx_rd <- function(sample_id, grp, opt_k ){
   
   ##Read in the alternate allele matrix for all the stg/strn combinations and combine into a list - also shortening the names of the matrices (list items)
-  alt_mtx <- list.files(paste0("data/processed/Pf/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
-    set_names(nm = (str_remove_all(.,paste0("data/processed/Pf/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
+  alt_mtx <- list.files(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
+    set_names(nm = (str_remove_all(.,paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
     map(readMM) 
   
   # print(str(alt_mtx))
@@ -432,8 +450,8 @@ vtx_rd <- function(sample_id, grp, opt_k ){
 ```{r}
 ## For troubleshooting above script
 ##Read in the alternate allele matrix for all the stg/strn combinations and combine into a list - also shortening the names of the matrices (list items)
-sf <- list.files(paste0("data/processed/Pf/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
-    set_names(nm = (str_remove_all(.,paste0("data/processed/Pf/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
+sf <- list.files(paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
+    set_names(nm = (str_remove_all(.,paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
     map(readMM) 
 
 
@@ -527,7 +545,7 @@ Combine vartix snp count per cell with freebayes calls
 # Same as above but option to remove some groups  
 
 ##remove doublets as well and low quality SNPS - maybe not include doublets in variant calling with freebayes. Adds no value? or could be used to demonstrate high number of non-distinct and rule out small clusters as doublets and be part of QC
-fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None" ) {
+fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None") {
   gt_fb_vtx_p1_bi <- base::cbind(fb_gtype, vtx_mtx) %>% 
     as.data.frame() %>% 
     mutate(across(c(pos, depth, quality, matches('.*_DP$|.*_RefN$|.*_AltN$|.*sNum$|.*cProp$')), as.numeric)) %>%
@@ -535,7 +553,7 @@ fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None" ) {
     filter(if_any(starts_with('SC'), ~!is.na(.))) %>%
     # filter(quality>75 & depth>40)  %>%
     mutate(filt_reason1 = case_when(quality<=75 | depth<=40 ~ 'Low quality',
-                                    str_detect(chrom, 'Pf_M') ~ 'Mt'))
+                                    str_detect(chrom, mt_chrom_nm) ~ 'Mt'))
   
   print(dim(gt_fb_vtx_p1_bi))
   print(table(gt_fb_vtx_p1_bi$filt_reason1, useNA = 'ifany'))
@@ -559,7 +577,6 @@ fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None" ) {
 ```
 
 ```{r}
-##strain stage k8 raw freebayes vcf + vatrix high quality no mitochondrial DNA
 ss_afm_fb_vtx_p1bi <- pmap(list(unlist(gt_ss_afm_p1_bi, recursive = F), unlist(ss_afm_vtx_mtx, recursive = F)), ~fb_vt_bind(fb_gtype = ..1, vtx_mtx = ..2))
 ```
 
@@ -886,11 +903,16 @@ snps_qc_filts <- function(m14_gt){
 ss_afm_pf7M_qc <- map(ss_afm_pf7M_pf7qc, ~snps_qc_filts(m14_gt=.x))
 ```
 
+
+```{r, fig.height=5, fig.width=14}
+saveRDS(ss_afm_pf7M_qc, paste0("data/processed/",species, "/ss_afm_pf7M_qc.RDS"))
+```
+
 ```{r, eval=FALSE}
 ## Make snp_qc directory for storing qc files
-imap(ss_afm_pf7M_qc, ~system(paste0('mkdir data/processed/Pf/', str_remove(.y, '\\..*'),'/', gtyp_step, '/',str_remove(.y, 'M.*\\.'),'_k', optimum_k[str_remove(.y, '\\..*')],'_', algn_nm,'/p1/snp_qc')))
+imap(ss_afm_pf7M_qc, ~system(paste0('mkdir data/processed/',species,'/', str_remove(.y, '\\..*'),'/', gtyp_step, '/',str_remove(.y, 'M.*\\.'),'_k', optimum_k[str_remove(.y, '\\..*')],'_', algn_nm,'/p1/snp_qc')))
 
-imap(ss_afm_pf7M_qc, ~write_csv(.x, paste0('data/processed/Pf/', str_remove(.y, '\\..*'),'/', gtyp_step, '/',str_remove(.y, 'M.*\\.'),'_k', optimum_k[str_remove(.y, '\\..*')],'_', algn_nm,'/p1/snp_qc/ss_afm_pf7M_qc.csv')))
+imap(ss_afm_pf7M_qc, ~write_csv(.x, paste0('data/processed/',species,'/', str_remove(.y, '\\..*'),'/', gtyp_step, '/',str_remove(.y, 'M.*\\.'),'_k', optimum_k[str_remove(.y, '\\..*')],'_', algn_nm,'/p1/snp_qc/ss_afm_pf7M_qc.csv')))
 
 
 ```
@@ -1078,10 +1100,10 @@ ss_afm_k6r_qc_plt
 ```
 
 
-```{r, fig.height=6, fig.width=24}
+```{r, fig.height=6, fig.width=24, eval=FALSE}
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
 ##!!!CHEATING - SORT OUT
-ss_afm_k6r_lqc_plt <- map(ss_afm_pf7M_lqc, ~cln_plt_snp_filt_categ(annot_snp_qc = .x))
+ss_afm_k6r_lqc_plt <- imap(ss_afm_pf7M_lqc, ~cln_plt_snp_filt_categ(annot_snp_qc = .x, ttl = .y))
 ss_afm_k6r_lqc_plt
 
 ```
@@ -1184,8 +1206,18 @@ ss_afm_pf7M_lqc_infomtv <- map(ss_afm_pf7M_lqc, ~snp_rm_dblt_infomtv(annot_snp_q
 # ss_ag_k6r_pf7M_qc_infomtv <- snp_rm_dblt_infomtv(annot_snp_qc = ss_ag_k6r_pf7M_qc) 
 ```
 
+
 ```{r}
-pf_chr_size = read_delim('../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-52_Pfalciparum3D7_Genome.size', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'Pf3D7_0|Pf3D7_|_v3')) 
+# pf_chr_size = read_delim('Po_gtf_index/Poc65.chrom.sizes.txt', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'PocGH01_0|PocGH01_|_v2'))
+```
+
+```{r}
+# pf_chr_size = read_delim('../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-52_Pfalciparum3D7_Genome.size', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'Pf3D7_0|Pf3D7_|_v3')) 
+```
+
+```{r}
+## Get genome size like this cut -f1,2 fasta.fai > genome.size
+pf_chr_size = read_delim(chrm_sz, col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,chrm_prfx)) 
 ```
 
 IBS megacells from Mi
@@ -1200,7 +1232,7 @@ IBS megacells from Mi
 ```{r}
 
 gtypes_chr_cln<- function(snp_qc_fnl ){
-  gtypes_chr_pos_pos <- snp_qc_fnl %>% dplyr::select(chrom, pos, groups, qc2, alleles) %>% pivot_wider(names_from = groups, values_from = qc2) %>% unite(., col="id", c(chrom, pos), sep = "_", remove = F) %>% mutate(chr = str_remove_all(chrom, 'Pf3D7_0|Pf3D7_|_v3'))
+  gtypes_chr_pos_pos <- snp_qc_fnl %>% dplyr::select(chrom, pos, groups, qc2, alleles) %>% pivot_wider(names_from = groups, values_from = qc2) %>% unite(., col="id", c(chrom, pos), sep = "_", remove = F) %>% mutate(chr = str_remove_all(chrom, chrm_prfx))
 }
 ```
 
@@ -1209,6 +1241,12 @@ gtypes_chr_cln<- function(snp_qc_fnl ){
 ```{r}
 
 ss_afm_pf7M_cln_gt<- map(ss_afm_pf7M_qc_infomtv, ~gtypes_chr_cln(snp_qc_fnl = .x[[1]]))
+```
+
+
+```{r}
+
+saveRDS(ss_afm_pf7M_cln_gt, paste0("data/processed/",species, "/ss_afm_pf7M_cln_gt.RDS"))
 ```
 
 ```{r}
@@ -1509,7 +1547,7 @@ pp_plts <- imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x
 # ss_afm_chromp_smth[1:3]
 ```
 
-```{r, warning=FALSE, fig.width=10, fig.height=10}
+```{r, warning=FALSE, fig.width=8, fig.height=8}
 # strain stage (afm) chromosome painting
 pp_plts
 ```
@@ -1519,35 +1557,22 @@ pp_plts
 list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2)) 
 Turning the below off since they take long and I only need the information relevant to find the right K - chromosome painting is necessary for relatedness exploration after I arrive on right K
 
+MSC25 = 2; but could be 3 or more
+MSC41 = 3;
+MSC51 = 1;
 
+MSC38 best guess = 4
 ```{r, warning=FALSE, eval=T}
 ## optimum k from above
-optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
 optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 
 ##updated strain metadata
-strn_c_new_mdata_m22 <- readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS")
+strn_c_new_mdata_m22 <- readRDS(paste0("data/processed/",species, "/strn_c_new_mdata_m22.RDS"))
 strn_c_new_mdata_m22_min <- strn_c_new_mdata_m22[str_detect(names(strn_c_new_mdata_m22), "_minmap")]
 names(strn_c_new_mdata_m22_min) <-  str_remove(names(strn_c_new_mdata_m22_min), "_minmap")
 ```
 
-
-```{r, warning=FALSE, eval=T}
-
-for (i in names(strn_c_new_mdata_m22_min)) {
-        if (optimum_k_qcd[[i]] == 1) {
-          strn_c_new_mdata_m22_min[[i]][,"StrainQCd"] = "SC0"
-        } else if (optimum_k_qcd[[i]] > 1) {
-          strn_c_new_mdata_m22_min[[i]][,"StrainQCd"] = strn_c_new_mdata_m22_min[[i]][,paste0('Strain_hmo_', str_remove(i, 'SC'), "_minmap_",optimum_k_qcd[[i]])]
-        } 
-    
-  }
-
-```
-
-```{r, warning=FALSE, eval=T}
-saveRDS(strn_c_new_mdata_m22_min, "data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS")
-```
 
 ##Simpler chromosome plots(no continous gradient) for SS_AG and S
 
@@ -1605,7 +1630,13 @@ CONFIRMATION OF STRAINS
 33=8, 
 ```{r, warning=F}
 # strain stage (afm) chromosome painting
-ss_afm_chromp[14]
+names(ss_afm_chromp)
+
+```
+
+```{r, warning=F}
+# strain stage (afm) chromosome painting
+ss_afm_chromp[str_detect(names(ss_afm_chromp), "MSC41.stage_afm_strain.k3")]
 
 ```
 Confirmed
@@ -1616,6 +1647,176 @@ MSC48 k=4 - NegativeF = SC3, NEGATIVEA=SC2
 
 MSC49 - SC4M-LOW SNPS NEGATIVE_A=SC1A
 
+
+```{r, warning=FALSE, eval=T}
+
+for (i in names(strn_c_new_mdata_m22_min)) {
+        if (optimum_k_qcd[[i]] == 1) {
+          strn_c_new_mdata_m22_min[[i]][,"StrainQCd"] = "SC0"
+        } else if (optimum_k_qcd[[i]] > 1) {
+          strn_c_new_mdata_m22_min[[i]][,"StrainQCd"] = strn_c_new_mdata_m22_min[[i]][,paste0('Strain_hmo_', str_remove(i, 'SC'), "_minmap_",optimum_k_qcd[[i]])]
+        } 
+    
+  }
+
+```
+
+Manually assign negative for which we assessed to the relevant Ks
+MSC48 = k4 : NegF==SC3F,  NegA == SC2A
+MSC49 = k6 : NegA==SC1A
+MSC60 = k7 : NegA==SC3A
+MSC66 = k8 : NegA==SC5A
+MSC68 = k4 : NegF==SC2F
+
+
+```{r, warning=FALSE, eval=T}
+man_neg_K  <- list(
+c("Negative", "Female", "SC3"),  
+c("Negative", "Asexual", "SC2"),
+c("Negative", "Asexual", "SC1"),
+c("Negative", "Asexual", "SC3"),
+c("Negative", "Asexual", "SC5"),
+c("Negative", "Female", "SC2")
+) %>% set_names(c("MSC48", "MSC48", "MSC49", "MSC60", "MSC66", "MSC68"))
+```
+
+
+```{r, warning=FALSE, eval=T}
+# 
+# for (i in names(man_neg_K)) {
+#         if (i %in% names(strn_c_new_mdata_m22_min)) {
+#             print(i)
+#             if (man_neg_K[[i]][2] == "Asexual") {
+#             print(man_neg_K[[i]][1])
+#             print(man_neg_K[[i]][3])
+#           } else if (man_neg_K[[i]][2] == "Female") {
+#             print(man_neg_K[[i]][1])
+#             print(man_neg_K[[i]][3])
+#           } 
+#         } else if (names(strn_c_new_mdata_m22_min)) {
+#           print(i)
+#         } 
+#     
+#   }
+# 
+# for (i in names(strn_c_new_mdata_m22_min)) {
+#         if (i %in% names(man_neg_K)) {
+#           strn_c_new_mdata_m22_min[[i]][,"StrainQCd_Man"] = strn_c_new_mdata_m22_min[[i]] %>% 
+#             mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == man_neg_K[[i]][2] ~ "SC2", 
+#                                              stage_afm == "Female" & StrainQCd == man_neg_K[[i]][2] ~ "SC3",
+#                                              T ~ StrainQCd)) %>%
+#             select(StrainQCd_Man)
+#         } else if (optimum_k_qcd[[i]] > 1) {
+#           strn_c_new_mdata_m22_min[[i]][,"StrainQCd_Man"] = strn_c_new_mdata_m22_min[[i]]$StrainQCd
+#         } 
+#     
+#   }
+
+```
+
+Manually assign negative for which we assessed to the relevant Ks
+```{r, warning=FALSE, eval=T}
+strn_c_new_mdata_m22_min[["MSC48"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC48"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC2", 
+                                                                         stage_afm == "Female" & StrainQCd == "Negative" ~ "SC3",
+                                                                         T ~ StrainQCd)) %>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC49"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC49"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC1",
+                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC60"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC60"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC3", 
+                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC66"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC66"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC5", 
+                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC68"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC68"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Female" & StrainQCd == "Negative" ~ "SC2",
+                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
+
+
+```
+
+```{r, warning=FALSE, eval=T}
+
+for (i in names(strn_c_new_mdata_m22_min)) {
+        if (!(i %in% names(man_neg_K))) {
+          print(i)
+          strn_c_new_mdata_m22_min[[i]][,"StrainQCd_Man"] = strn_c_new_mdata_m22_min[[i]]$StrainQCd
+        }
+
+  }
+
+```
+
+
+```{r, warning=FALSE, eval=T}
+saveRDS(strn_c_new_mdata_m22_min, paste0("data/processed/",species, "/strn_c_new_mdata_m22_min_qcd.RDS"))
+```
+
+
+```{r, warning=FALSE, eval=T}
+glimpse(strn_c_new_mdata_m22_min$MSC48)
+```
+
+## Write out for genotyping
+
+Write out strain_qcd + stage_ag for pseudobulk genotyping
+
+```{r, warning=FALSE, eval=T}
+## Get donors with more than 1 strain
+optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
+# optimum_k_polyk <- optimum_k_polyk[!names(optimum_k_polyk) %in% c("MSC37", "MSC38")]
+```
+
+```{r, eval=T}
+## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
+# sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
+sv_dir = "pbulk_gtypes_postQC_cln"
+
+# for (s in names(strn_c_new_mdata_m22_min)) {
+for (s in names(optimum_k_polyk)) {
+  # narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_[a-z]+")]]
+  narrow_k <- optimum_k_polyk[s]
+  ## Assign minimap/hsat mapper directory
+  # algn_nm = str_extract(s, "hsat|minmap|lr_ref")
+  algn_nm = "minmap"
+  # s_nm = str_remove(s, "_[a-z]+")
+  s_nm = s
+  
+  print(algn_nm)
+  print(s_nm)
+  
+  ## !!!NOTE - Dangerous command - activate only when barcodes are modified
+  # system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
+  
+  for (k in narrow_k) {
+    print(narrow_k)
+    # for (str_q in c('StrainQCd_Man')){
+      
+      ss_qcd_ano <- map(strn_c_new_mdata_m22_min[s], ~.x %>% rename("str" = StrainQCd_Man) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      
+      names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+      # print(str(ss_qcd_ano[[1]]))
+
+      system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/strain_k',k,'/'))
+      print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/strain_k',k,'/'))
+
+      imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/strain_k',k,'/',.y, '.tsv')))
+
+      # for(stg_c in c('stage_afm', 'stage_ag')){
+      # for(stg_c in c('stage_ag')){
+        
+        ss_qcd_ano <- map(strn_c_new_mdata_m22_min[s], ~.x %>% rename("str" = StrainQCd_Man, "stg" = stage_ag) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+        print(names(ss_qcd_ano[[1]]))
+
+        system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/'))
+        print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/'))
+
+        imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/',.y, '.tsv')))
+
+    #   }
+    # }
+  
+}
+
+}
+```
 
 ```{r, eval=FALSE}
 ## Function for chromosome painting
