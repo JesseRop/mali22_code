@@ -23,7 +23,8 @@ suppressPackageStartupMessages({
   # library(RColorBrewer)
   # library(MetBrewer)
   library(ComplexHeatmap)
-  # library(SeqArray)
+  library(SNPRelate)
+  library(SeqArray)
   # library(ggrepel)
   # library(ggvenn)
   # library(magick)
@@ -49,9 +50,15 @@ suppressPackageStartupMessages({
 
 ### Common functions
 
+
+```{r}
+## Get the necessary variable for the pseudobulking workflow
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
+```
+
 #### Source commong functions, varriables and tables
 ```{r}
-##Boxplot labeling function
+## Get the necessary variables for common housekeeping
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
@@ -64,8 +71,8 @@ algn_nm = 'minmap'
 # soup_dir = "soupc"
 # sv_dir = "pbulk_gtypes_preQC"
 
-soup_dir = "soupc_GE_postQC"
-sv_dir = "pbulk_gtypes_clean"
+# soup_dir = "soupc_GE_postQC"
+sv_dir = "pbulk_gtypes_postQC_cln"
 
 strain_levels_univrs <- c(paste0("SC", 1:20), "Doublet", "Negative")
 ```
@@ -77,7 +84,7 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 
 ## Declare variables
 
-```{r}
+```{r, eval=FALSE}
 ##Copy souporcell files for the optimum clusters
 
 ##Sample ID
@@ -149,7 +156,32 @@ Section to write the genotypes from the QCd cells into a files
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+## Retain qcd donors troublesome samples - removing MSC38, MSC55 which are giving challenges in assigning strains
+sample_name_nms <- c("MSC33","MSC37","MSC38","MSC39","MSC40", "MSC48", "MSC49", "MSC55", "MSC60", "MSC66", "MSC68")
+sample_challenges <- c("MSC38","MSC39", "MSC55")
+sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_challenges]
 
+```
+
+```{r}
+
+## Read in necessary files
+ss_afm_pf7M_qc <- readRDS("data/processed/Pf/ss_afm_pf7M_qc.RDS") %>% .[str_detect(names(.), paste(sample_name_nms, collapse = "|"))]
+ss_afm_pf7M_cln_gt <- readRDS("data/processed/Pf/ss_afm_pf7M_cln_gt.RDS") %>% .[str_detect(names(.), paste(sample_name_nms, collapse = "|"))]
+
+```
+
+
+```{r}
+## !!!NOTE - For QCD genotypes this should not be necessary for negatives unless they are genuine negative that can't be collapsed with strain manually
+## Remove doublets and negatives
+ss_afm_pf7M_qc <- map(ss_afm_pf7M_qc, ~.x %>% filter(!str_detect(groups, "Doublet|Negative")))
+ss_afm_pf7M_cln_gt <- map(ss_afm_pf7M_cln_gt, ~.x %>% select(-c(contains("Doublet"), contains("Negative"))))
+
+```
+
+Needs to go to common scripts
 ```{r}
 
 ##Function to save tables in excel as sheets
@@ -186,31 +218,35 @@ createWorksheet(c(snps_export_cln, snps_export_qc), paste0("../",sample_set,"/v3
 
 Sections containing IBD and other stuff for QCd strains
 
-```{r, fig.height=4.1, fig.width=4.5, eval=FALSE}
+```{r, fig.height=4.1, fig.width=4.5, eval=T}
 ## All genotypes done separately since when done together the error for DUPLICATE colnames appears
-ss_cln_gt_tbl_afm <- ss_afm_pf7M_cln_gt[c(seq(1,12,3))] %>%
+# ss_cln_gt_tbl_afm <- ss_afm_pf7M_cln_gt[c(seq(1,12,3))] %>%
+#     imap(~ rename_with(.x, function(x) paste(.y, x, sep = "_"), -c(id,chrom, pos, alleles, chr))) %>%
+#     purrr::reduce(left_join, by = c('id','chrom', 'pos', 'alleles', 'chr')) %>% 
+#   rename_with(~str_remove(., '\\.st.*ain'), starts_with(c("MSC")) )
+
+# ss_cln_gt_tbl_afm<-ss_cln_gt_tbl_afm[,sort(colnames(ss_cln_gt_tbl_afm))]
+
+ss_cln_gt_tbl_ag <- ss_afm_pf7M_cln_gt[c(seq(2,length(ss_afm_pf7M_cln_gt), length(grps)))] %>%
     imap(~ rename_with(.x, function(x) paste(.y, x, sep = "_"), -c(id,chrom, pos, alleles, chr))) %>%
     purrr::reduce(left_join, by = c('id','chrom', 'pos', 'alleles', 'chr')) %>% 
-  rename_with(~str_remove(., '\\.st.*ain'), starts_with(c("MSC")) )
+  rename_with(~str_remove_all(., '\\.st.*ain|k[0-9]+_'), starts_with(c("MSC")) )%>% 
+  rename_with(~str_replace_all(., c('MSC'='M', '\\.'='_')), starts_with(c("MSC")) )
 
-ss_cln_gt_tbl_afm<-ss_cln_gt_tbl_afm[,sort(colnames(ss_cln_gt_tbl_afm))]
+ss_cln_gt_tbl_ag <- ss_cln_gt_tbl_ag[,sort(colnames(ss_cln_gt_tbl_ag))]
 
-ss_cln_gt_tbl_ag <- ss_afm_pf7M_cln_gt[c(seq(2,12,3))] %>%
+ss_cln_gt_tbl_s <- ss_afm_pf7M_cln_gt[c(seq(1,length(ss_afm_pf7M_cln_gt), length(grps)))] %>%
     imap(~ rename_with(.x, function(x) paste(.y, x, sep = "_"), -c(id,chrom, pos, alleles, chr))) %>%
     purrr::reduce(left_join, by = c('id','chrom', 'pos', 'alleles', 'chr')) %>% 
-  rename_with(~str_remove(., '\\.st.*ain'), starts_with(c("MSC")) )
+  rename_with(~str_remove_all(., '\\.st.*ain|k[0-9]+_'), starts_with(c("MSC")) )%>% 
+  rename_with(~str_replace_all(., c('MSC'='M', '\\.'='_')), starts_with(c("MSC")) )
 
-ss_cln_gt_tbl_ag<-ss_cln_gt_tbl_ag[,sort(colnames(ss_cln_gt_tbl_ag))]
-
-ss_cln_gt_tbl_s <- ss_afm_pf7M_cln_gt[c(seq(3,12,3))] %>%
-    imap(~ rename_with(.x, function(x) paste(.y, x, sep = "_"), -c(id,chrom, pos, alleles, chr))) %>%
-    purrr::reduce(left_join, by = c('id','chrom', 'pos', 'alleles', 'chr')) %>% 
-  rename_with(~str_remove(., '\\.st.*ain'), starts_with(c("MSC")) )
-
-ss_cln_gt_tbl_s<-ss_cln_gt_tbl_s[,sort(colnames(ss_cln_gt_tbl_s))]
+ss_cln_gt_tbl_s <- ss_cln_gt_tbl_s[,sort(colnames(ss_cln_gt_tbl_s))]
 
 ## 
-ss_cln_all_mtx <- list(ss_cln_gt_tbl_afm, ss_cln_gt_tbl_ag, ss_cln_gt_tbl_s) %>% set_names(c("all.stage_afm_strain_qcd", "all.stage_afm_strain_qcd", "all.strain_qcd"))
+# ss_cln_all_mtx <- list(ss_cln_gt_tbl_afm, ss_cln_gt_tbl_ag, ss_cln_gt_tbl_s) %>% set_names(c("all.stage_afm_strain_qcd", "all.stage_afm_strain_qcd", "all.strain_qcd"))
+ss_cln_all_mtx <- list(ss_cln_gt_tbl_ag, ss_cln_gt_tbl_s) %>% set_names(c("all.stage_ag_strain_qcd", "all.strain_qcd"))
+
 ```
 
 
@@ -246,12 +282,18 @@ ss_cln_all_mtx <- list(ss_cln_gt_tbl_afm, ss_cln_gt_tbl_ag, ss_cln_gt_tbl_s) %>%
 ```{r}
 ## Read in msc annotations 
 
-msc_qcd_anotd_stgstrqc <- readRDS('../Mali/data/processed/Pf/msc_qcd_anotd.RDS')
+msc_qcd_anotd_stgstrqc <- readRDS('../Mali/data/processed/DB52e_star/msc_qcd_anotd.RDS')
 ```
 
 ```{r}
-##Clusters with more than 100
+## Read in msc annotations 
 
+strn_c_new_mdata_m22_min <- readRDS('data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS')
+```
+
+
+```{r}
+##Clusters with more than 20
 # clustr_numbers <- map(strn_c_new_mdata, . %>% 
 #         filter(cluster_ag_n >= 20) %>%
 #         dplyr::count(Strain_qc, stage_ag) %>%  
@@ -263,18 +305,20 @@ msc_qcd_anotd_stgstrqc <- readRDS('../Mali/data/processed/Pf/msc_qcd_anotd.RDS')
 #     bind_rows(., .id='sample') %>%
 #     unite(col = 'sample_cluster',cluster, sample, sep = '_')
 
-clustr_numbers <- map(msc_qcd_anotd_stgstrqc, ~.x@meta.data %>% 
-        filter(strain_ag_n >= 20) %>%
-        dplyr::count(strain_qcd, stage_ag) %>%  
+clustr_numbers <- map(strn_c_new_mdata_m22_min, ~.x %>% 
+        add_count(stage_ag, StrainQCd_Man, name = "strain_ag_n") %>%
+          filter(strain_ag_n >= 20) %>%
+        dplyr::count(StrainQCd_Man, stage_ag) %>%  
       filter(stage_ag == 'Gametocyte') %>%
         mutate(across(stage_ag, ~str_remove_all(., 'ametocyte|sexual'))) %>%
-        filter(strain_qcd != 'PoorQC') %>%
-        unite(col = 'cluster',strain_qcd, stage_ag, sep = '_'))%>% 
+        # filter(strain_qcd != 'PoorQC') %>%
+        unite(col = 'cluster',StrainQCd_Man, stage_ag, sep = '_'))%>% 
     # .[names(.) != 'MSC55'] %>%
     bind_rows(., .id='sample') %>%
     unite(col = 'sample_cluster',cluster, sample, sep = '_')
 
 ```
+
 
 ```{r}
 ## Read in msc annotations 
@@ -381,53 +425,52 @@ gt_all_ibs_hmap<- map(gt_all_ibs_mtx, ~gtypes_ibs_heatmap(mtx=.x))
 
 ```{r}
 ## Read in msc annotations 
-clustr_numbers_afm <- map(msc_qcd_anotd_stgstrqc[1:4], ~.x@meta.data %>% 
-        filter(strain_ag_n >= 30 & !is.na(strain_qcd)) %>%
-        distinct(strain_qcd,stage_afm,strain_afm_n) %>% 
-        mutate(across(stage_afm, ~str_remove_all(., 'emale|ale|sexual|ametocyte'))) %>%
-        unite(col = 'cluster', strain_qcd, stage_afm, sep = '_'))  %>% 
-    bind_rows(., .id='sample') %>%
-  mutate(across(sample, ~str_remove_all(., 'sc'))) %>%
-    unite(col = 'sample_cluster', sample, cluster, sep = '_')%>%
-  mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
+# clustr_numbers_afm <- map(msc_qcd_anotd_stgstrqc[1:4], ~.x@meta.data %>% 
+#         filter(strain_ag_n >= 30 & !is.na(strain_qcd)) %>%
+#         distinct(strain_qcd,stage_afm,strain_afm_n) %>% 
+#         mutate(across(stage_afm, ~str_remove_all(., 'emale|ale|sexual|ametocyte'))) %>%
+#         unite(col = 'cluster', strain_qcd, stage_afm, sep = '_'))  %>% 
+#     bind_rows(., .id='sample') %>%
+#   mutate(across(sample, ~str_remove_all(., 'sc'))) %>%
+#     unite(col = 'sample_cluster', sample, cluster, sep = '_')%>%
+#   mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
+# 
+# rownames(clustr_numbers_afm) <- NULL
 
-rownames(clustr_numbers_afm) <- NULL
-
-clustr_numbers_ag <- map(msc_qcd_anotd_stgstrqc[1:4], ~.x@meta.data %>% 
-        filter(strain_ag_n >= 30 & !is.na(strain_qcd)) %>%
-        distinct(strain_qcd,stage_ag,strain_ag_n) %>% 
+clustr_numbers_ag <- map(strn_c_new_mdata_m22_min, ~.x %>% 
+                           add_count(stage_ag, StrainQCd_Man, name = "strain_ag_n") %>%
+        filter(strain_ag_n >= 20 & !is.na(StrainQCd_Man)) %>%
+        distinct(StrainQCd_Man,stage_ag,strain_ag_n) %>% 
         mutate(across(stage_ag, ~str_remove_all(., 'emale|ale|sexual|ametocyte'))) %>%
-        unite(col = 'cluster', strain_qcd, stage_ag, sep = '_'))  %>% 
+        unite(col = 'cluster', StrainQCd_Man, stage_ag, sep = '_'))  %>% 
     bind_rows(., .id='sample') %>%
-  mutate(across(sample, ~str_remove_all(., 'sc'))) %>%
-    unite(col = 'sample_cluster', sample, cluster, sep = '_')%>%
-  mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
+  mutate(across(sample, ~str_remove_all(., 'SC'))) %>%
+    unite(col = 'sample_cluster', sample, cluster, sep = '_')#%>%
+  #mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
 
 rownames(clustr_numbers_ag) <- NULL
 
-clustr_numbers_s <- map(msc_qcd_anotd_stgstrqc[1:4], ~.x@meta.data %>% 
-        filter(strain_ag_n >= 30 & !is.na(strain_qcd)) %>%
-          add_count(strain_qcd, name = "strain_n") %>% 
-        distinct(strain_qcd, strain_n) %>% 
-        unite(col = 'cluster', strain_qcd, sep = '_'))  %>% 
-    bind_rows(., .id='sample') %>%
-  mutate(across(sample, ~str_remove_all(., 'sc')))%>% 
-    unite(col = 'sample_cluster', sample, cluster, sep = '_')%>%
-  mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
-
 ## This will replace the above once the donor labels msc are capitalized
-clustr_numbers_s_cap <- map(msc_qcd_anotd_stgstrqc[1:4], ~.x@meta.data %>% 
-        filter(strain_ag_n >= 30 & !is.na(strain_qcd)) %>%
-          add_count(strain_qcd, name = "strain_n") %>% 
-        distinct(strain_qcd, strain_n) %>% 
-        unite(col = 'cluster', strain_qcd, sep = '_'))  %>% 
+clustr_numbers_s <- map(strn_c_new_mdata_m22_min, ~.x %>% 
+                           add_count(stage_ag, StrainQCd_Man, name = "strain_ag_n") %>%
+        filter(strain_ag_n >= 20 & !is.na(StrainQCd_Man)) %>%
+          add_count(StrainQCd_Man, name = "strain_n") %>% 
+        distinct(StrainQCd_Man, strain_n) %>% 
+        unite(col = 'cluster', StrainQCd_Man, sep = '_'))  %>% 
     bind_rows(., .id='sample') %>%
-  mutate(across(sample, ~str_remove_all(., 'sc')))%>% 
+  mutate(across(sample, ~str_remove_all(., 'SC')))%>% 
     unite(col = 'sample_cluster', sample, cluster, sep = '_')#%>%
   #mutate(across(sample_cluster, ~str_replace(., "MSC", "M")))
 
 rownames(clustr_numbers_ag) <- NULL
 ```
+
+
+```{r}
+## Read in msc annotations 
+donor_cols = met.brewer(name = "Renoir")[1:length(sample_name_nms)] %>% set_names(str_remove(sample_name_nms, "SC"))
+```
+
 
 
 
@@ -443,12 +486,15 @@ print(colnames(sibd_pht_mtx))
 sibd_pht_mtx <- sibd_pht_mtx[,row.names(sibd_pht_mtx)]
 
 # fa = str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]')
-fa = str_remove(colnames(sibd_pht_mtx), '_qcd.*')
+# fa = str_remove(colnames(sibd_pht_mtx), '_qcd.*')
+fa = str_remove(colnames(sibd_pht_mtx), '_.*')
 c_d = cluster_within_group(sibd_pht_mtx, fa)
 
+print(fa)
 # fr = str_extract(rownames(sibd_pht_mtx), 'ms.*[0-9]')
-fr = str_remove(rownames(sibd_pht_mtx), '_qcd.*')
-print(fr)
+# fr = str_remove(rownames(sibd_pht_mtx), '_qcd.*')
+fr = str_remove(rownames(sibd_pht_mtx), '_.*')
+# print(fr)
 c_r = cluster_within_group(sibd_pht_mtx, fr)
 
 # nms = unique(str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]'))
@@ -457,10 +503,14 @@ nms = unique(str_remove(colnames(sibd_pht_mtx), '_qcd.*'))
 sample_c_cols <- donor_cols
 
 # sibd_pht_mtx_cln <- sibd_pht_mtx %>% as.data.frame()%>% rownames_to_column('sid') %>% mutate(across(sid, ~str_replace_all(., c('G_MSC' = 'M')))) %>% rename_with(~str_replace_all(., c('G_MSC' = 'M')), starts_with('SC')) %>% column_to_rownames('sid') %>% as.matrix()
-sibd_pht_mtx_cln <- sibd_pht_mtx %>% as.data.frame()%>% rownames_to_column('sid') %>% mutate(across(sid, ~str_replace_all(., c('MSC' = 'M', '_qcd'='')))) %>% rename_with(~str_replace_all(., c('MSC' = 'M', '_qcd'='')), starts_with('MSC')) %>% 
-  left_join(., clustr_numbers, by = c('sid'='sample_cluster')) %>% mutate(across(sid, ~paste0(., ' [', !!rlang::sym(strn_cat), ']'))) %>% select(-c(!!rlang::sym(strn_cat))) %>%
-  column_to_rownames('sid') %>% as.matrix()
+sibd_pht_mtx_cln <- sibd_pht_mtx %>% as.data.frame()%>% rownames_to_column('sid') %>% 
+  #mutate(across(sid, ~str_replace_all(., c('MSC' = 'M', '_qcd'='')))) %>% rename_with(~str_replace_all(., c('MSC' = 'M', '_qcd'='')), starts_with('MSC')) %>% 
+  left_join(., clustr_numbers, by = c('sid'='sample_cluster')) %>% 
+  mutate(across(sid, ~paste0(., ' [', !!rlang::sym(strn_cat), ']'))) %>% select(-c(!!rlang::sym(strn_cat))) %>%
+  column_to_rownames('sid') %>% 
+  as.matrix()
 
+print(head(sibd_pht_mtx_cln))
   
 sibd_pht<- Heatmap(sibd_pht_mtx_cln, name=test_nm, 
                    col = colFun, 
@@ -496,27 +546,28 @@ sibd_pht
 ```
 
 
-```{r, fig.height=8, fig.width=10}
+```{r, fig.height=18, fig.width=18}
 
-hms<- pmap(list(gt_all_ibs_mtx, list(clustr_numbers_afm, clustr_numbers_ag, clustr_numbers_s), c("strain_afm_n", "strain_ag_n", "strain_n")), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
+# hms<- pmap(list(gt_all_ibs_mtx, list(clustr_numbers_afm, clustr_numbers_ag, clustr_numbers_s), c("strain_afm_n", "strain_ag_n", "strain_n")), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
+hms<- pmap(list(gt_all_ibs_mtx, list( clustr_numbers_ag, clustr_numbers_s), c("strain_ag_n", "strain_n" )), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
 
 ```
 
 
 ```{r, fig.height=4.5, fig.width=6}
 
-hms<- pmap(list(gt_all_ibs_mtx[3], list(clustr_numbers_s), c("strain_n")), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
+# hms<- pmap(list(gt_all_ibs_mtx[3], list(clustr_numbers_s), c("strain_n")), ~ibs_don_hm(ibsmtx=..1, clustr_numbers=..2, strn_cat=..3))
 
 ```
 
 
 ```{r, fig.height=4.5, fig.width=6}
 ## Capitalize the donor labels - will need to sort out later for entire notebook
-cap_gt_all_ibs_mtx <- gt_all_ibs_mtx[[3]] %>% as.data.frame()%>% rownames_to_column('sid') %>% mutate(across(sid, ~str_replace_all(., c('MSC' = 'MSC', '_qcd'='')))) %>% rename_with(~str_replace_all(., c('MSC' = 'MSC', '_qcd'='')), starts_with('MSC')) %>% column_to_rownames('sid') %>% as.matrix()
+# cap_gt_all_ibs_mtx <- gt_all_ibs_mtx[[3]] %>% as.data.frame()%>% rownames_to_column('sid') %>% mutate(across(sid, ~str_replace_all(., c('MSC' = 'MSC', '_qcd'='')))) %>% rename_with(~str_replace_all(., c('MSC' = 'MSC', '_qcd'='')), starts_with('MSC')) %>% column_to_rownames('sid') %>% as.matrix()
 
 ```
 
-```{r, fig.height=4, fig.width=5}
+```{r, fig.height=4, fig.width=5, eval=FALSE}
 ##Merge strain numbers to IBD results
 
 colFun = suppressWarnings(brewer.pal(100, 'Greens'))
@@ -581,7 +632,7 @@ sibd_pht
 
 ```
 
-```{r, fig.width= 12, fig.height=7}
+```{r, fig.width= 12, fig.height=7, eval=FALSE}
 ##save svg for sk21
 save_plot('plots/mali2021_all/fig4/sibd_pht.svg', plot_grid(ggdraw(sibd_pht)), base_width = 4, base_height = 5)
 ```
@@ -672,24 +723,51 @@ Read in MSC14 genotypes
 
 ```
 
-
 ```{r}
-##Run IBD 
-wdir<- '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/sware/hmmIBD-master'
+##!!NOTE - gfv_p1_bi_strn_pf7_c is created somewhere downstream so this is likely to give an error
 
-system(paste0(wdir,'/hmmIBD -i ',wdir,'/ss_cln_gt_tbl_100_m21.tsv -o ',wdir,'/ss_cln_gt_tbl_100_m21 -m 100000'))
+imap(ss_cln_all_mtx, ~.x %>% dplyr::select(-c(id, chrom, alleles))%>% dplyr::select(chr, pos, any_of(sort(colnames(.)))) %>% filter(!if_all(starts_with('M'), ~is.na(.))) %>% mutate(across(everything(), ~as.numeric(replace_na(., '-1')))) %>% write_tsv(., paste0("data/processed/Pf/ss_ibd_cln_", .y,"_mtx.tsv")))
+
+
+```
+
+```{r, eval=F}
+##Copy souporcell files for the optimum clusters
+
+
+# system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/ss_ibd_cln* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/'))
 
 ```
 
 
 ```{r}
-wdir<- '/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master'
+##Run IBD 
+wdir<- '/software/team222/jr35/hmmIBD'
 
-ss_cln_gt_tbl_100_hmmibd <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21.hmm.txt')
-ss_cln_gt_tbl_100_hmmibd_f <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21.hmm_fract.txt')
+map(names(ss_cln_all_mtx), ~system(paste0(wdir,'/hmmIBD -i data/processed/Pf/ss_ibd_cln_', .x,'_mtx.tsv -o data/processed/Pf/ss_ibd_cln_', .x,' -m 100')))
 
-ss_cln_gt_tbl_100_plus_m14_hmmibd <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm.txt')
-ss_cln_gt_tbl_100_plus_m14_hmmibd_f <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm_fract.txt')
+```
+
+
+```{r}
+
+ss_ibd_cln_all_strain_hmmibd <- read_delim('data/processed/Pf/ss_ibd_cln_all.strain_qcd.hmm.txt')
+ss_ibd_cln_all_strain_hmmibd_f <- read_delim('data/processed/Pf/ss_ibd_cln_all.strain_qcd.hmm_fract.txt')
+
+# ss_cln_gt_tbl_100_plus_m14_hmmibd <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm.txt')
+# ss_cln_gt_tbl_100_plus_m14_hmmibd_f <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm_fract.txt')
+
+
+```
+
+```{r}
+# wdir<- '/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master'
+# 
+# ss_ibd_cln_all_strain_hmmibd <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21.hmm.txt')
+# ss_cln_gt_tbl_100_hmmibd_f <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21.hmm_fract.txt')
+# 
+# ss_cln_gt_tbl_100_plus_m14_hmmibd <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm.txt')
+# ss_cln_gt_tbl_100_plus_m14_hmmibd_f <- read_delim('/Users/jr35/Google Drive/My Drive/PHD_documents/sware/hmmIBD-master/ss_cln_gt_tbl_100_m21_plus_m14.hmm_fract.txt')
 
 
 ```
@@ -709,7 +787,9 @@ cols_rand <- c("#fb9a99", "#cab2d6", "#b2df8a", "#e31a1c", "#ffff99", "#33a02c",
 ```{r, fig.height=8, fig.width=10.5, eval=FALSE}
 ##Merge strain numbers to IBD results
 # ss_n_ibd_tbl100 = ss_cln_gt_tbl_100_hmmibd_f %>% dplyr::select(sample1, sample2, fract_sites_IBD,N_informative_sites) %>% left_join(., clustr_numbers, by = c('sample1'='sample_cluster')) %>% left_join(., clustr_numbers, by = c('sample2'='sample_cluster'), suffix = c('_1', '_2')) %>% mutate(id1 = paste0(sample1, '\n[', n_1, ']'), id2 = paste0(sample2, '\n[', n_2, ']'))  
-ss_n_ibd_tbl100 = ss_cln_gt_tbl_100_plus_m14_hmmibd_f %>% dplyr::select(sample1, sample2, fract_sites_IBD,N_informative_sites) %>% left_join(., clustr_numbers_plusm14, by = c('sample1'='sample_cluster')) %>% left_join(., clustr_numbers_plusm14, by = c('sample2'='sample_cluster'), suffix = c('_1', '_2')) %>% mutate(id1 = paste0(sample1), id2 = paste0(sample2))  
+ss_n_ibd_tbl100 = ss_ibd_cln_all_strain_hmmibd_f %>% dplyr::select(sample1, sample2, fract_sites_IBD,N_informative_sites) %>% 
+  # left_join(., clustr_numbers_plusm14, by = c('sample1'='sample_cluster')) %>% 
+  left_join(., clustr_numbers_s, by = c('sample2'='sample_cluster'), suffix = c('_1', '_2')) %>% mutate(id1 = paste0(sample1), id2 = paste0(sample2))  
 
 ##Get the IBD and the number of sites for each pairwise comparison to annotate heatmap
 s_ibdf_nsites_anno <- ss_n_ibd_tbl100 %>% rename('id2' = id1,  'id1' = id2) %>% bind_rows(., ss_n_ibd_tbl100) %>% mutate(ibdf_nsites = paste0(round(fract_sites_IBD,2), '\n(',N_informative_sites,')'))%>% dplyr::select(starts_with('id'), ibdf_nsites) %>% pivot_wider(names_from = id2, values_from = ibdf_nsites) %>% arrange(id1) %>% mutate(across(starts_with('SC'), ~replace_na(., '1')))%>% column_to_rownames('id1')
@@ -721,14 +801,17 @@ sibd_pht_mtx <- ss_n_ibd_tbl100 %>% rename('id2' = id1,  'id1' = id2) %>% bind_r
 
 sibd_pht_mtx <- sibd_pht_mtx[,row.names(sibd_pht_mtx)]
 
-fa = str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]')
+# fa = str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]')
+fa = str_extract(colnames(sibd_pht_mtx), 'M[0-9]+')
 c_d = cluster_within_group(sibd_pht_mtx, fa)
 
-fr = str_extract(rownames(sibd_pht_mtx), 'ms.*[0-9]')
+# fr = str_extract(rownames(sibd_pht_mtx), 'ms.*[0-9]')
+fr = str_extract(rownames(sibd_pht_mtx), 'M[0-9]+')
 print(fr)
 c_r = cluster_within_group(sibd_pht_mtx, fr)
 
-nms = unique(str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]'))
+# nms = unique(str_extract(colnames(sibd_pht_mtx), 'ms.*[0-9]'))
+nms = unique(str_extract(colnames(sibd_pht_mtx), 'M[0-9]+'))
 # sample_c_cols <- met.brewer("Thomas")[1:length(nms)] %>% set_names(nms)
 sample_c_cols <- cols_rand[1:length(nms)] %>% set_names(nms)
 
@@ -867,15 +950,15 @@ s_combi_ibd_pht
 
 ```{r, fig.height=4.1, fig.width=4.5}
 
-ss_afm_hmap_ibs<- map(ss_afm_pf7M_cln_gt, ~gtypes_chr_cln_ibs_hm(gtypes_chr_pos=.x))
+# ss_afm_hmap_ibs<- map(ss_afm_pf7M_cln_gt, ~gtypes_chr_cln_ibs_hm(gtypes_chr_pos=.x))
 ```
 
 ```{r, fig.height=4.1, fig.width=4.5}
 ## Remove SC8
-ss_afm_pf7M_cln_gt_m14_noSC8 <- ss_afm_pf7M_cln_gt[c("MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] %>% map(~.x %>% select(!contains("SC8")))
-ss_afm_hmap_ibs_m14_noSC8 <- map(ss_afm_pf7M_cln_gt_m14_noSC8, ~gtypes_chr_cln_ibs_hm(gtypes_chr_pos=.x))
-
-ss_afm_hmap_ibs_m14_noSC8
+# ss_afm_pf7M_cln_gt_m14_noSC8 <- ss_afm_pf7M_cln_gt[c("MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] %>% map(~.x %>% select(!contains("SC8")))
+# ss_afm_hmap_ibs_m14_noSC8 <- map(ss_afm_pf7M_cln_gt_m14_noSC8, ~gtypes_chr_cln_ibs_hm(gtypes_chr_pos=.x))
+# 
+# ss_afm_hmap_ibs_m14_noSC8
 ```
 
 
@@ -1278,12 +1361,17 @@ s_combi_ibd_pht
 
 
 
+```{r}
+pf_chr_size = read_delim('../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-52_Pfalciparum3D7_Genome.size', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'Pf3D7_0|Pf3D7_|_v3')) 
+```
+
 
 ```{r}
 
 # k1_ibd_sites_f <- list(gt_fb_vtx_p1_bi_strn_pf7_asx_gam_ibd, gfv_p1_bi_pf7_k7_all_ibd) %>%
 # k8_ibd_sites_f <- list(ss_ag_k6r_pf7M_cln_gt_hmmibd, s_k6r_pf7M_cln_gt_hmmibd) %>%
-k8_ibd_sites_f <- map(ss_afm_pf7M_cln_gt_hmmibd[7:8], ~{
+# k8_ibd_sites_f <- map(ss_afm_pf7M_cln_gt_hmmibd[7:8], ~{
+k8_ibd_sites_f <- map(list(ss_ibd_cln_all_strain_hmmibd), ~{
   tb1=.x
   list(tb1) %>%
   map(~{
@@ -1356,9 +1444,35 @@ ss_afm_k6r_pf7M_ibd_p <- ss_afm_k6r_pf7M_ibd %>% split(., ~factor(comps)) %>% im
 
 
 ```{r, fig.height=2.7, fig.width=6}
-ss_afm_k6r_pf7M_ibd_p
+ss_afm_k6r_pf7M_ibd_p[1:10]
 # plot_grid(plotlist = c(ss_afm_chromp[["MSC14.stage_ag_strain_qcd"]][c("SC3_A_vs_SC4_G")], ss_ag_k6r_pf7M_ibd_p[c("SC3_A_vs_SC4_G")]), ncol = 2)
 ```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p[str_detect(names(ss_afm_k6r_pf7M_ibd_p), "M60.*M68")]
+```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p[str_detect(names(ss_afm_k6r_pf7M_ibd_p), "M49.*M60")]
+```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p[str_detect(names(ss_afm_k6r_pf7M_ibd_p), "M48.*M49")]
+```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p["M48_SC3_vs_M48_SC4"]
+```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p[str_detect(names(ss_afm_k6r_pf7M_ibd_p), "M49.*M49.*")]
+
+```
+
+```{r, fig.height=2.7, fig.width=6}
+ss_afm_k6r_pf7M_ibd_p[str_detect(names(ss_afm_k6r_pf7M_ibd_p), "M68.*M68.*")]
+```
+
 
 ```{r, fig.height=14, fig.width=24}
 ss_ag_k6r_pf7M_ibd <- k8_ibd_sites_f[[1]][[1]] %>% mutate(across(comps, ~str_replace(., 'vs', '_vs_')), rltd = case_when(different == '0' ~ 'Same', different == '1' ~ 'Different')) 
