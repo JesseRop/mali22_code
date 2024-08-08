@@ -98,7 +98,7 @@ initialize variable for the sample names
 ##Sample ID
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
 ## All sample ids removing "MSC38" which seems to have lots of doublets
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
 
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
@@ -452,7 +452,8 @@ all_msc_anotd_preQC <- list(all_msc_anotd_preQC, mt_avg_exp) %>%
 
 # mt_filt <-list(rep(0.4, length(sample_name)))
 # mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38"=0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
-mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38" = 0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
+# mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38" = 0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25, "MSC41" = 0.4, "MSC51" = 0.4, "MSC25" = 0.4)
+mt_filt1 <- unlist(map(all_msc_anotd_preQC, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
 ```
 
 
@@ -460,7 +461,7 @@ Visualization of proportion of mitochondrial genes and ncount
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_anotd_preQC, mt_filt, sample_id_lst, names(all_msc_anotd_preQC))  %>% 
+list(all_msc_anotd_preQC, mt_filt1, sample_id_lst, names(all_msc_anotd_preQC))  %>% 
   purrr::pmap(.,~{
 
     p <- FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 1)+ 
@@ -792,10 +793,10 @@ imap(all_msc_anotd_preQC, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/
 ```
 
 !!!NB - FARM CODE - DONT DELETE
-```{r, eval=F}
+```{r, eval=T}
 gogo()
 ## Run SCT on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm_anotd.RDS" --o_file_name "seu_sctnorm_anotd.RDS" --umap_name "UMAP_SCT" --hvg 500 --cluster_resoln 0.1 --resume
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm_anotd.RDS" --o_file_name "seu_sctnorm_anotd.RDS" --umap_name "UMAP_SCT" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_sct_clusters" --umap_redctn_nm "umap_sct" --redctn "pca" --integrtd_pc30 "yes" --elbo_nm "seu_norm_elbo.RDS" -resume
 ```
 
 Read in seurat objects processed in farm
@@ -821,9 +822,11 @@ all_msc_anotd_ysct <- list.files("data/processed/", pattern = "seu_sctnorm_anotd
 
 ```{r, warning=FALSE, message=FALSE}
 
-imap(all_msc_anotd_ysct, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
+imap(all_msc_anotd_ysct, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "seurat_sct_clusters") + labs(title = .y))
 
 ```
+
+
 
 Visualize low clusters
 ```{r, warning=FALSE, message=FALSE}
@@ -1309,6 +1312,14 @@ Remove those categorised as negative by Souporcell
 
 ```
 
+Get mt_filt based on automatic removal of quantiles
+```{r}
+mt_filt <- unlist(map(all_msc_filt, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
+# api_filt <- unlist(map(all_msc_filt, ~quantile(.x@meta.data[, "percent.api"], 0.995, na.rm = T)))
+
+```
+
+
 ```{r, results='asis'}
 pmap(list(all_msc_filt, mt_filt, names(all_msc_filt)), ~{
     FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "StagePrelimC", pt.size = 1)+ 
@@ -1323,18 +1334,6 @@ pmap(list(all_msc_filt, mt_filt, names(all_msc_filt)), ~{
 ```{r}
 map2(all_msc_filt, mt_filt, ~.@meta.data %>% dplyr::count(percent.mt>.y ))
 ```
-
-```{r}
-## !!!!!!NB -CONSIDER FORE REMOVAL LATER
-#filter out cells with high mitochondrial count
-all_msc_filt <- all_msc_filt %>%
-  map2(., mt_filt, ~.x  %>%
-         subset(., percent.mt < .y )
-  )
-
-```
-
-
 
 ## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
 ```{r}
@@ -1360,11 +1359,11 @@ pmap(list(all_msc_filt, mt_filt, names(all_msc_filt)), ~{
 ```
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+```{r, warning=FALSE, message=FALSE}
 
 map(all_msc_filt, ~{
   .x@meta.data %>%
-    count(StagePrelimC, StagePrelimC)
+    count(StagePrelim, StagePrelimC)
     
     })
 
@@ -1381,14 +1380,14 @@ imap(all_msc_filt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/filt_se
 ```{r, eval=T}
 gogo()
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct.RDS" --o_file_name "filt_seu_norm.RDS" --umap_name "UMAP_F_NORM" --hvg 500 --cluster_resoln 0.1 --resume
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct.RDS" --o_file_name "filt_seu_norm.RDS" --umap_name "UMAP_F_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "m2_list_elbo.RDS" -resume
 ```
 
 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc_filt <- list.files("data/processed/", pattern = "^filt_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_filt <- list.files("data/processed/", pattern = "^filt_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
   .[sample_name] %>%
   map(readRDS)
@@ -1397,35 +1396,15 @@ all_msc_filt <- list.files("data/processed/", pattern = "^filt_seu_norm.RDS$", f
 
 
 ```{r, warning=FALSE, message=FALSE}
-imap(all_msc_filt, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
+imap(all_msc_filt, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "StagePrelimC", pt.size = 1)+ 
+      scale_color_manual(values = sp_fld_colors) + labs(title = .y))
 ```
 
-##### Recheck mitochondrial percent {.tabset}
-Has removing cells with low transcript and gene count also removed cells with high mitochondrial percent
-
-```{r, results='asis'}
-# list(all_msc_anotd_preQC, mt_filt, sample_id_lst)  %>%
-#   purrr::pmap(.,~{
-#     # create tabset for each group
-#     cat('###### ',..3,'   \n')
-#     p <- FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 1)+
-#       geom_hline(yintercept = ..2)  +
-#       theme(axis.text=element_text(size=18),
-#             axis.title=element_text(size=18,face="bold"),
-#             legend.text = element_text(size=22),
-#             legend.title = element_text(size=22,face="bold"),
-#             plot.title = element_blank())
-#     print(p)
-#     cat('\n  ')
-#     cat("\n")
-#   })
-
-```
 
 ## Seurat pre-processing after first pass QC
 
 ```{r}
 saveRDS(all_msc_filt, "data/processed/Pf/all_msc_filt.RDS")
-# saveRDS(all_msc_anotd_preQC, "data/processed/Pf/all_msc_anotd_preQC.RDS")
+
 ```
 
