@@ -98,7 +98,7 @@ initialize variable for the sample names
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
 
 
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
@@ -128,6 +128,7 @@ all_msc_raw_paths <- list.files("/lustre/scratch126/tol/teams/lawniczak/projects
   .[irods_id_sk21_mdata_cln[, c("sample_nm", "irods_id")] %>% deframe() %>% .[sample_id_lst]] %>%
   set_names(sample_id_lst)
 ```
+
 
 ```{r, eval=FALSE}
 all_msc_filt<-map(sample_name_nms, ~readRDS(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/all_msc_filt_",.x,".RDS")))
