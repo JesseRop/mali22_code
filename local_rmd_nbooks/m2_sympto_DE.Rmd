@@ -1128,37 +1128,74 @@ irods_id_sk21_mdata_cln
 ```
 
 ```{r, fig.width=15, fig.height=5}
-donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/MRC_Sample_Manifest_METADATA_raw.csv") 
+donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/MRC_Sample_Manifest_METADATA_raw.csv", col_types =  paste0(c(rep("c", 7), "d", "c","d","d", rep("c", 14)), collapse = ""), show_col_types = T)  
 donor_mdata <- donor_mdata %>% rename_all(., ~str_to_lower(str_replace_all(.,c("\\["="_", "\\]"="", " "="", "-"="",  "\\/"="_", "º"=""))))
 ```
 
+
+```{r, fig.width=15, fig.height=5}
+## Antoine metadata with age
+adara_donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Antoine_MRC_Sample_Manifest_Metadata.csv", col_types =  paste0(c(rep("c", 7), "d", "c","d","d", rep("c", 14)), collapse = ""), show_col_types = T) 
+adara_donor_mdata <- adara_donor_mdata %>% rename_all(., ~str_to_lower(str_replace_all(.,c("\\["="_", "\\]"="", " "="", "-"="",  "\\/"="_", "º"="")))) %>% filter(if_any(everything(), ~!is.na(.)))
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+
+donor_mdata %>%
+  filter(!is.na(short_name) & str_detect(short_name, "MSC"))%>%
+  filter(short_name %in% names(all_msc_w_strns_don)) %>% 
+  select(short_name,  time_of_sampling, time_of_sample_processing)
+
+```
 
 
 
 ```{r, fig.width=15, fig.height=5}
 library(lubridate)
-donor_mdata <- donor_mdata %>%
-  filter(!is.na(short_name)) %>% 
+donor_mdata_cln <- donor_mdata %>%
+  filter(!is.na(short_name) & str_detect(short_name, "MSC")) %>% 
   mutate(across(c(parasitaemia_j0, parasitaemia_j1), ~as.numeric(str_remove(., " Pf.*|Tf.*"))), 
          parasitaemia = coalesce(parasitaemia_j0, parasitaemia_j1),
-         sampling_time_cln = lubridate::hms(paste0(str_remove(time_of_sampling, c(" AM| PM")), ":00")),
-         processing_time_cln = lubridate::hms(time_of_sample_processing))  %>%
-  mutate(smpl_wait_time = as.numeric(as.duration(processing_time_cln - sampling_time_cln),"minutes")) 
+         sampling_time_cln = hms(paste0(str_remove(time_of_sampling, c(" AM| PM")), ":00")),
+         processing_time_cln = str_replace_all(time_of_sample_processing, c("15:30 PM" = "3:30 PM") ),
+         across(processing_time_cln, ~hms(strftime(strptime(., format="%I:%M %p"), format="%H:%M:%S")))) %>%
+  mutate(smpl_wait_time = as.numeric(as.duration(processing_time_cln - sampling_time_cln),"minutes"))# %>%
+  # select(short_name, parasitaemia, time_of_sampling, sampling_time_cln, time_of_sample_processing, processing_time_cln, smpl_wait_time)
 
-donor_mdata_slct <- donor_mdata %>% 
-  select(short_name, parasitaemia, smpl_wait_time, age_years, gender_m_f, weight_kg)
+
+## Add age from antoine metadata
+donor_mdata_slct <- donor_mdata_cln %>% 
+  select(short_name, parasitaemia, smpl_wait_time, gender_m_f, weight_kg, symptomatic) %>% left_join(., adara_donor_mdata %>% select(short_name, age_years), by = "short_name")
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_cln %>%
+  select(time_of_sampling, sampling_time_cln, processing_time_cln)
 ```
 
 ```{r}
-donor_mdata   %>% 
-  mutate(across(c(parasitaemia_j0, parasitaemia_j1), ~as.numeric(str_remove(., " Pf.*|Tf.*"))), parasitaemia = coalesce(parasitaemia_j0, parasitaemia_j1))  %>% 
+donor_mdata_slct   %>% 
+  # mutate(across(c(parasitaemia_j0, parasitaemia_j1), ~as.numeric(str_remove(., " Pf.*|Tf.*"))), parasitaemia = coalesce(parasitaemia_j0, parasitaemia_j1))  %>% 
   # filter(donor %in% ) %>%
   ggplot(aes(x = symptomatic, y = parasitaemia)) +
   geom_boxplot()
 ```
 
 ```{r, fig.width=15, fig.height=5}
-donor_mdata  %>% select(age_years, symptomatic) %>%  ggplot(aes(x = symptomatic, y = age_years)) + geom_boxplot()
+donor_mdata_slct  %>% select(age_years, symptomatic) %>%  ggplot(aes(x = symptomatic, y = age_years)) + geom_boxplot()
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct  %>% filter(short_name %in% names(all_msc_w_strns_don)) %>% select(age_years, symptomatic) %>%  ggplot(aes(x = symptomatic, y = age_years)) + geom_boxplot()
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct  %>% filter(short_name %in% names(all_msc_w_strns_don)) %>% ggplot(aes(x = symptomatic, y = smpl_wait_time)) + geom_boxplot() + geom_point()
 ```
 
 add metadata
@@ -1182,6 +1219,50 @@ v3_m2_asex_harmony_fld_sset <- v3_m2_asex_harmony_fld_sset@meta.data %>%
   select(cell_bc, slingPseudotime_1, slingPseudotime_2) %>% 
   column_to_rownames("cell_bc") %>%
   AddMetaData(v3_m2_asex_harmony_fld_sset, .)
+```
+
+
+Check pseudotime by sampling time
+```{r, fig.width=15, fig.height=5}
+v3_m2_asex_harmony_fld_sset@meta.data %>% 
+  filter(dset == "Field" & !is.na(slingPseudotime_1)) %>%
+  ggplot(aes(x = smpl_wait_time, y = slingPseudotime_1, colour = Symptomatic)) +
+  geom_point()
+```
+
+
+Check pseudotime by sampling time
+```{r, fig.width=15, fig.height=5}
+v3_m2_asex_harmony_fld_sset@meta.data %>% 
+  filter(dset == "Field" & !is.na(slingPseudotime_1)) %>%
+  ggplot(aes(x = parasitaemia, y = slingPseudotime_1, colour = Symptomatic)) +
+  geom_point()
+```
+
+Check pseudotime by sampling time
+```{r, fig.width=15, fig.height=5}
+v3_m2_asex_harmony_fld_sset@meta.data %>% 
+  filter(dset == "Field" & !is.na(slingPseudotime_1)) %>%
+  ggplot(aes(x = donor, y = slingPseudotime_1, colour = StrainQCd)) +
+  geom_boxplot()
+```
+
+```{r, fig.width=15, fig.height=5}
+v3_m2_asex_harmony_fld_sset@meta.data %>% 
+  filter(dset == "Field" & !is.na(slingPseudotime_1)) %>%
+  lm(formula =slingPseudotime_1 ~ smpl_wait_time + parasitaemia, data = .)
+```
+
+
+```{r, fig.width=15, fig.height=5}
+v3_m2_asex_harmony_fld_sset@meta.data %>% 
+  filter(dset == "Field" & !is.na(slingPseudotime_1)) %>%
+  lm(formula =Symptomatic ~ smpl_wait_time + parasitaemia, data = .)
+```
+
+add metadata
+```{r, fig.width=15, fig.height=5}
+donor_mdata_cln %>% filter(short_name %in% unique(v3_m2_asex_harmony_fld_sset@meta.data$donor)) %>% select(short_name, smpl_wait_time, comments, symptomatic)
 ```
 
 ```{r, fig.width=15, fig.height=5}
@@ -1251,11 +1332,35 @@ v3_m2_asex_harmony_fld_sset@meta.data %>% filter(dset != "Lab" & !(str_detect(St
 v3_m2_asex_harmony_fld_sset@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% mutate(across(Symptomatic, ~str_replace_all(., c("No" = "Asymptomatic", "Yes" = "Symptomatic")))) %>% ggplot(aes(x = donor, fill = StrainDon, y = n)) + geom_col(position = position_dodge2()) + facet_wrap(Symptomatic~., scales = "free_x") + theme(legend.position = "right")
 ```
 
-```{r, results="asis"}
-# plotReducedDim(m2_asex_tr_sce, dimred = "UMAP.HARMONY")
+
+```{r}
+## Only those with asexuals and included in analysis
+donor_mdata_slct   %>% 
+  filter(short_name %in% str_remove(unique(st_dist$donor), "_SLO")) %>%
+  # filter(donor %in% ) %>%
+  ggplot(aes(x = symptomatic, y = parasitaemia)) +
+  geom_boxplot() +
+  geom_point()
 ```
 
 
+```{r}
+## Only those with asexuals and included in analysis
+donor_mdata_slct   %>% 
+  filter(short_name %in% st_dist$donor) %>%
+  ggplot(aes(x = symptomatic, y = age_years)) +
+  geom_boxplot()+
+  geom_point()
+```
+
+```{r}
+## Only those with asexuals and included in analysis
+donor_mdata_slct   %>% 
+  filter(short_name %in% st_dist$donor) %>%
+  ggplot(aes(x = symptomatic, y = smpl_wait_time)) +
+  geom_boxplot()+
+  geom_point()
+```
 
 
 Subset to retain only field asexual strains with great than 20 strains per straindon group. Remove stages with few cells - early rings and schizonts which are a minority and maybe poorly labelled
@@ -1783,6 +1888,7 @@ which(checkSeparation(traj_milo_gllm, design.df=symp.design, condition="Symptoma
 ```{r, results="asis", eval=FALSE}
 length(which(checkSeparation(traj_milo_gllm, design.df=symp.design, condition="Symptomatic", min.val=5)))
 ```
+
 ```{r, results="asis", fig.width=30, fig.height=20, eval=FALSE}
 plotNhoodCounts(traj_milo_gllm, which(checkSeparation(traj_milo_gllm, design.df=symp.design, condition="Symptomatic", min.val=5)), design.df=symp.design, condition="Symptomatic")
 ```
@@ -2319,3 +2425,869 @@ topTable(res.dl, coef = "SymptomaticNo")
 ```{r, results="asis", eval=FALSE}
 gogo()
 ```
+
+
+## DREAMLET & MUSCAT  - DONOR WITH RANDOM EFFECTS
+
+Tabulate and get the pseudotime chunks with most numbers 3,4,5
+```{r, results="asis", eval=FALSE}
+m2_asex_tr_sce_pt_chunks@colData[, c("ptime_cat", "Symptomatic", "donor")] %>% data.frame() %>% count(ptime_cat, Symptomatic)
+m2_asex_tr_sce_pt_chunks_345 <- m2_asex_tr_sce_pt_chunks[,m2_asex_tr_sce_pt_chunks@colData$ptime_cat %in% c("ptime_3", "ptime_4", "ptime_5")]
+```
+
+```{r, results="asis"}
+## How to account for batch in tradeseq 
+## https://github.com/statOmics/tradeSeq/issues/97
+set.seed(123456)
+data(countMatrix, package = "tradeSeq")
+data(crv, package = "tradeSeq")
+
+batch_infection <- DataFrame(
+Infection = sample(x = c("Mock", "Infection1", "Infection2"), size = ncol(countMatrix), replace = TRUE),
+Batch = sample(x = c("A", "B", "C"), size = ncol(countMatrix), replace = TRUE)
+)
+
+rownames(batch_infection) <- colnames(countMatrix)
+
+design <- model.matrix(~Infection + Batch, batch_infection)
+
+## Batch design correction for tradeseq
+model.matrix(~  donor, m2_asex_tr_sce_pt_chunks_345@colData[, c("donor", "Symptomatic")] %>% data.frame())
+
+## tradeseq manual example - Batch design correction for tradeseq
+counts <- as.matrix(countMatrix)
+
+batch <- factor(rep(c("A", "B"), each = ncol(counts)/2))
+U <- model.matrix(~batch)
+sceBatch <- fitGAM(counts = counts,
+                   U = U,
+                   sds = crv, 
+                   nknots = 6, 
+                   verbose = FALSE)
+```
+
+```{r, results="asis"}
+## Save for tradeseq
+saveRDS(m2_asex_tr_sce_pt_chunks_345, "data/raw/Pf/m2_asex_tr_sce_pt_chunks_345.RDS")
+```
+
+```{r, results="asis", eval=FALSE}
+
+m2_asex_tr_sce_pt_chunks_345@colData[, c("Symptomatic", "ptime_cat",  "donor")] %>% data.frame() %>% count(Symptomatic, ptime_cat, donor)
+```
+
+```{r, results="asis", eval=FALSE}
+
+m2_asex_tr_sce_pt_chunks_345@colData[, c("Symptomatic", "ptime_cat",  "donor", "StrainDon")] %>% data.frame() %>% count(Symptomatic, ptime_cat, StrainDon)
+```
+
+
+## Dreamlet - pseudobulk by Strain and donor as random intercept effect
+
+```{r, results="asis"}
+# Since 'ind' is the individual and 'StimStatus' is the stimulus status,
+# create unique identifier for each sample
+# m2_asex_tr_sce$id <- paste0(m2_asex_tr_sce$Symptomatic, m2_asex_tr_sce$donor, m2_asex_tr_sce$StrainDon)
+m2_asex_tr_sce_pt_chunks_345$id <- paste0(m2_asex_tr_sce_pt_chunks_345$Symptomatic, m2_asex_tr_sce_pt_chunks_345$StrainDon)
+
+
+# Create pseudobulk data by specifying cluster_id and sample_id
+# Count data for each cell type is then stored in the `assay` field
+# assay: entry in assayNames(sce) storing raw counts
+# cluster_id: variable in colData(sce) indicating cell clusters
+# sample_id: variable in colData(sce) indicating sample id for aggregating cells
+m2_asex_tr_pb <- aggregateToPseudoBulk(m2_asex_tr_sce_pt_chunks_345,
+  assay = "counts",
+  # cluster_id = "StagePrelim",
+  cluster_id = "ptime_cat",
+  sample_id = "id",
+  verbose = FALSE
+)
+
+# one 'assay' per cell type
+assayNames(m2_asex_tr_pb)
+```
+
+
+
+```{r, results="asis"}
+# one 'assay' per cell type
+assayNames(m2_asex_tr_pb)
+
+metadata(m2_asex_tr_pb)$aggr_means
+```
+
+
+```{r, results="asis"}
+
+# form <- ~ (1|donor) + Symptomatic + slingPseudotime_1
+form <- ~ Symptomatic + (1|donor)
+
+# Normalize and apply voom/voomWithDreamWeights
+res.proc <- processAssays(m2_asex_tr_pb, form, min.count = 2)
+
+# the resulting object of class dreamletProcessedData stores
+# normalized data and other information
+res.proc
+```
+
+```{r, results="asis", eval=FALSE}
+# gogo()
+```
+
+```{r, results="asis"}
+# Normalize and apply voom/voomWithDreamWeights
+details(res.proc)
+```
+
+```{r, results="asis"}
+# show voom plot for each cell clusters
+plotVoom(res.proc)
+```
+
+```{r, results="asis"}
+
+# run variance partitioning analysis
+vp.lst <- fitVarPart(res.proc, form)
+```
+
+```{r, results="asis"}
+# Show variance fractions at the gene-level for each cell type
+genes <- vp.lst$gene[1:2]
+plotPercentBars(vp.lst[vp.lst$gene %in% genes, ])
+```
+
+
+```{r, results="asis", fig.width=10, fig.height=10}
+# Summarize variance fractions genome-wide for each cell type
+plotVarPart(vp.lst, label.angle = 60)
+```
+
+```{r, results="asis"}
+# Differential expression analysis within each assay,
+# evaluated on the voom normalized data
+# res.dl <- dreamlet(res.proc, form, method = "random")
+res.dl <- dreamlet(res.proc, form)
+
+# names of estimated coefficients
+coefNames(res.dl)
+```
+
+```{r, results="asis"}
+# the resulting object of class dreamletResult
+# stores results and other information
+res.dl
+```
+
+```{r, results="asis"}
+plotVolcano(res.dl, coef = "SymptomaticYes")
+```
+
+```{r, results="asis"}
+# genes <- c("PF3D7-1240400", "PF3D7-1240900")
+# plotGeneHeatmap(res.dl, coef = "SymptomaticYes", genes = genes)
+```
+
+```{r, results="asis"}
+conflicts_prefer(dreamlet::topTable)
+# results from full analysis
+topTable(res.dl, coef = "SymptomaticYes") 
+```
+
+```{r, results="asis"}
+# only B cells
+topTable(res.dl[["ptime_3"]], coef = "SymptomaticYes") %>% arrange(adj.P.Val)
+```
+
+```{r, results="asis"}
+plotForest(res.dl, coef = "SymptomaticYes", gene = c("PF3D7-1346400"))
+```
+
+```{r, results="asis"}
+genes <- c("PF3D7-1346400", "PF3D7-1478600", "PF3D7-0205000")
+plotGeneHeatmap(res.dl, coef = "SymptomaticYes", genes = genes)
+```
+
+
+```{r, results="asis"}
+m2_asex_tr_sce_pt_chunks_345_seu <- as.Seurat(m2_asex_tr_sce_pt_chunks_345) 
+```
+
+
+```{r, results="asis"}
+FeaturePlot(m2_asex_tr_sce_pt_chunks_345_seu, features = c("PF3D7-1346400", "PF3D7-0205000"), split.by = "Symptomatic") 
+```
+
+```{r, results="asis"}
+# get data
+df <- extractData(res.proc, "ptime_3", genes = "PF3D7-1346400")
+
+# set theme
+thm <- theme_classic() +
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+
+# make plot
+ggplot(df, aes(Symptomatic, `PF3D7-1346400`, colour = donor)) +
+  geom_boxplot() +
+  thm +
+  ylab(bquote(Expression ~ (log[2] ~ CPM))) +
+  ggtitle("PF3D7-1346400")
+```
+
+```{r, results="asis"}
+# get data
+df <- extractData(res.proc, "ptime_3", genes = "PF3D7-0205000")
+
+# set theme
+thm <- theme_classic() +
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+
+# make plot
+ggplot(df, aes(Symptomatic, `PF3D7-0205000`, colour = donor)) +
+  geom_boxplot() +
+  thm +
+  ylab(bquote(Expression ~ (log[2] ~ CPM))) +
+  ggtitle("PF3D7-0205000")
+```
+
+```{r, results="asis"}
+# create a contrasts called 'Diff' that is the difference between expression
+# in the stimulated and controls.
+# More than one can be specified
+contrasts <- c(Diff = "SymptomaticYes - SymptomaticNo")
+
+# Evalaute the regression model without an intercept term.
+# Instead estimate the mean expression in stimulated, controls and then
+# set Diff to the difference between the two
+res.dl2 <- dreamlet(res.proc, ~ 0 + Symptomatic, contrasts = contrasts)
+
+# see estimated coefficients
+coefNames(res.dl2)
+```
+
+```{r, results="asis"}
+# Volcano plot of Diff
+plotVolcano(res.dl2[1:2], coef = "Diff")
+```
+
+```{r, results="asis"}
+# results from full analysis
+topTable(res.dl, coef = "SymptomaticYes")
+
+```
+
+
+```{r, results="asis"}
+# results from full analysis
+# topTable(res.dl, coef = "SymptomaticNo")
+
+```
+
+
+```{r, results="asis", eval=FALSE}
+# results from full analysis
+topTable(res.dl, coef = "SymptomaticNo")
+
+```
+
+```{r, results="asis", eval=FALSE}
+gogo()
+```
+
+## Dreamlet - pseudobulk by donor and donor as random intercept effect
+
+```{r, results="asis"}
+# Since 'ind' is the individual and 'StimStatus' is the stimulus status,
+# create unique identifier for each sample
+# m2_asex_tr_sce$id <- paste0(m2_asex_tr_sce$Symptomatic, m2_asex_tr_sce$donor, m2_asex_tr_sce$StrainDon)
+m2_asex_tr_sce_pt_chunks_345$symp_don <- paste0(m2_asex_tr_sce_pt_chunks_345$Symptomatic, m2_asex_tr_sce_pt_chunks_345$donor)
+
+
+# Create pseudobulk data by specifying cluster_id and sample_id
+# Count data for each cell type is then stored in the `assay` field
+# assay: entry in assayNames(sce) storing raw counts
+# cluster_id: variable in colData(sce) indicating cell clusters
+# sample_id: variable in colData(sce) indicating sample id for aggregating cells
+m2_asex_tr_pb_don <- aggregateToPseudoBulk(m2_asex_tr_sce_pt_chunks_345,
+  assay = "counts",
+  # cluster_id = "StagePrelim",
+  cluster_id = "ptime_cat",
+  sample_id = "symp_don",
+  verbose = FALSE
+)
+
+# one 'assay' per cell type
+assayNames(m2_asex_tr_pb_don)
+```
+
+
+```{r, results="asis"}
+# one 'assay' per cell type
+assayNames(m2_asex_tr_pb_don)
+
+metadata(m2_asex_tr_pb_don)$aggr_means
+```
+
+
+
+```{r, results="asis"}
+
+# form <- ~ (1|donor) + Symptomatic + slingPseudotime_1
+form <- ~ Symptomatic + (1|donor)
+
+# Normalize and apply voom/voomWithDreamWeights
+res.proc_don <- processAssays(m2_asex_tr_pb_don, form, min.count = 2)
+
+# the resulting object of class dreamletProcessedData stores
+# normalized data and other information
+res.proc_don
+```
+
+
+```{r, results="asis"}
+# Normalize and apply voom/voomWithDreamWeights
+details(res.proc_don)
+```
+
+```{r, results="asis"}
+# show voom plot for each cell clusters
+plotVoom(res.proc_don)
+```
+
+
+```{r, results="asis"}
+
+# run variance partitioning analysis
+vp.lst_don <- fitVarPart(res.proc_don, form)
+```
+
+
+```{r, results="asis"}
+# Show variance fractions at the gene-level for each cell type
+genes <- vp.lst_don$gene[1:2]
+plotPercentBars(vp.lst_don[vp.lst_don$gene %in% genes, ])
+```
+
+
+```{r, results="asis", fig.width=10, fig.height=10}
+# Summarize variance fractions genome-wide for each cell type
+plotVarPart(vp.lst_don, label.angle = 60)
+```
+
+
+```{r, results="asis"}
+# Differential expression analysis within each assay,
+# evaluated on the voom normalized data
+# res.dl <- dreamlet(res.proc_don, form, method = "random")
+res.dl_don <- dreamlet(res.proc_don, form)
+
+# names of estimated coefficients
+coefNames(res.dl_don)
+```
+
+
+```{r, results="asis"}
+# the resulting object of class dreamletResult
+# stores results and other information
+res.dl_don
+```
+
+```{r, results="asis"}
+plotVolcano(res.dl_don, coef = "SymptomaticYes")
+```
+
+
+```{r, results="asis"}
+conflicts_prefer(dreamlet::topTable)
+# results from full analysis
+topTable(res.dl_don, coef = "SymptomaticYes") 
+```
+
+
+```{r, results="asis"}
+# only B cells
+topTable(res.dl_don[["ptime_3"]], coef = "SymptomaticYes") %>% arrange(adj.P.Val)
+```
+
+```{r, results="asis"}
+plotForest(res.dl_don, coef = "SymptomaticYes", gene = c("PF3D7-1346400"))
+```
+
+```{r, results="asis"}
+genes <- c("PF3D7-1346400", "PF3D7-1478600", "PF3D7-0205000")
+plotGeneHeatmap(res.dl_don, coef = "SymptomaticYes", genes = genes)
+```
+
+
+```{r, fig.width= 30, fig.height=8}
+m2_asex_tr_sce_pt_chunks_345_seu$symp_don <- paste(m2_asex_tr_sce_pt_chunks_345_seu$Symptomatic, m2_asex_tr_sce_pt_chunks_345_seu$donor, sep = "_")
+FeaturePlot(m2_asex_tr_sce_pt_chunks_345_seu, features = c("PF3D7-1346400", "PF3D7-0205000"), split.by = c("symp_don")) 
+```
+
+
+```{r, results="asis"}
+# get data
+df <- extractData(res.proc_don, "ptime_3", genes = "PF3D7-1346400")
+
+# set theme
+thm <- theme_classic() +
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+
+# make plot
+ggplot(df, aes(Symptomatic, `PF3D7-1346400`, colour = donor)) +
+  geom_point() +
+  thm +
+  ylab(bquote(Expression ~ (log[2] ~ CPM))) +
+  ggtitle("PF3D7-1346400")
+```
+
+```{r, results="asis"}
+# get data
+df <- extractData(res.proc_don, "ptime_3", genes = "PF3D7-0205000")
+
+# set theme
+thm <- theme_classic() +
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5))
+
+# make plot
+ggplot(df, aes(Symptomatic, `PF3D7-0205000`, colour = donor)) +
+  geom_point() +
+  thm +
+  ylab(bquote(Expression ~ (log[2] ~ CPM))) +
+  ggtitle("PF3D7-0205000")
+```
+
+
+```{r, results="asis"}
+# create a contrasts called 'Diff' that is the difference between expression
+# in the stimulated and controls.
+# More than one can be specified
+contrasts <- c(Diff = "SymptomaticYes - SymptomaticNo")
+
+# Evalaute the regression model without an intercept term.
+# Instead estimate the mean expression in stimulated, controls and then
+# set Diff to the difference between the two
+res.dl2 <- dreamlet(res.proc_don, ~ 0 + Symptomatic, contrasts = contrasts)
+
+# see estimated coefficients
+coefNames(res.dl2)
+```
+
+
+## Dreamlet following guidance from https://medium.com/@grioni.andrea/mastering-single-cell-rna-seq-with-dreamlet-41ead4650723 
+
+```{r, results="asis"}
+# create a contrasts called 'Diff' that is the difference between expression
+m2_asex_tr_sce_pt_chunks_345
+```
+```{r, results="asis"}
+# Extract read counts for each Channel/celltype
+ctorder = c("ptime_3", "ptime_4", "ptime_5")
+df_counts <- map_dfr(ctorder, function(x) {
+  data <- assay(pb, x)
+  data.frame(
+    celltype = x,
+    ID = colnames(data),
+    readCounts = Matrix::colSums(data)
+  )
+})
+
+```
+
+```{r, results="asis"}
+# Convert celltype to a factor with the specified order
+df_counts$celltype <- factor(df_counts$celltype, levels = ctorder)
+```
+
+
+```{r, results="asis"}
+# Removing cells with 0 reads.
+df_counts <- df_counts[df_counts$readCounts > 0, ]
+```
+
+
+```{r, results="asis"}
+# Generate violin plot to visualize the distribution of read counts for each cell type
+ggplot(df_counts, aes(x = celltype, y = readCounts, fill = celltype)) +  
+  # Violin plot
+  geom_violin() + 
+  
+  # Boxplot inside violin
+  geom_boxplot(width = 0.1, outlier.size = 0.1) +
+  
+  # Theme and aesthetics
+  theme_bw() + 
+  theme(
+    aspect.ratio = 1, 
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    axis.title.y = element_blank()
+  ) + 
+  
+  # Log scale for y-axis
+  scale_y_log10() +
+  
+  # Horizontal layout
+  coord_flip() +
+  
+  # Labels and title
+  labs(
+    y = "Number of reads observed for each CellType",
+    x = NULL,
+    title = 'Reads per cell cluster for each CellType'
+  )
+```
+
+Show the normalized reads for cell ratio.
+```{r, results="asis"}
+# Convert cell counts to dataframe and pivot to longer format
+df_rate <- cellCounts(pb) |>
+  as_tibble(rownames = "ID") |>
+  tidyr::pivot_longer(cols = -ID, values_to = "ncells", names_to = "celltype") |>
+  dplyr::mutate(celltype = factor(celltype, ctorder))
+
+# Join dataframes and compute normalized reads
+df_joined <- df_counts |>
+  dplyr::inner_join(df_rate, by = c("celltype", "ID")) |>
+  dplyr::mutate(normalizedReads = readCounts/ncells)
+```
+
+
+```{r, results="asis"}
+# Create a violin plot to visualize the normalized read counts for each 'celltype'
+df_joined |>
+  ggplot(aes(celltype, normalizedReads, fill = celltype)) +  
+    # Display distribution of normalized read counts using a violin plot
+    geom_violin(color = NA) + 
+    # Add a boxplot inside the violin plot for a summarized view
+    geom_boxplot(width = 0.1, outlier.size = 0.1) +
+    # Use the classic theme for a polished appearance
+    theme_classic() + 
+    # Adjust theme settings for optimal visualization
+    theme(
+      aspect.ratio = 1, 
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "none"
+    ) + 
+    # Apply a log scale to the y-axis for better data representation
+    scale_y_log10() +
+    # Present the plot horizontally for clarity
+    coord_flip() +
+    # Define labels for the plot
+    labs(
+      y = 'Normalized Reads (Reads per cell)', 
+      x = NULL, 
+      title = 'Normalized Reads per Cell for Each Channel'
+    )
+```
+
+
+
+```{r, results="asis"}
+df <- cellTypeSpecificity( pb )
+
+plotViolin(df, assays=ctorder)
+```
+
+
+```{r, results="asis"}
+# Process the 'df' dataframe to extract top marker genes for each cell type
+my_markers <- df |> 
+  # Convert the dataframe to a tibble and assign row names to 'gene' column
+  tibble::as_tibble(rownames = "gene") |>
+
+  # Exclude rows with 'gene' values containing the pattern "ENSG"
+  dplyr::filter(!str_detect(gene, "ENSG")) |>
+
+  # Transform the dataframe to a long format, with 'cellType' and 'CPM' columns
+  tidyr::pivot_longer(
+    cols = !c(gene, totalCPM), 
+    names_to = "cellType", 
+    values_to = "CPM"
+  ) |>
+
+  # Compute the percentage of CPM for each gene relative to 'totalCPM'
+  dplyr::mutate(percentCPM = CPM / totalCPM * 100) |>
+
+  # Organize data by 'cellType' and order within each group by 'percentCPM'
+  dplyr::group_by(cellType) |>
+  dplyr::arrange(desc(percentCPM)) |>
+
+  # Retain only the top 3 genes for each cell type
+  dplyr::slice(1:3) |>
+
+  # Keep only the 'cellType' and 'gene' columns
+  dplyr::select(cellType, gene) |>
+
+  # Eliminate any repeated rows
+  dplyr::distinct() |>
+
+  # Convert the tibble to a named vector with 'cellType' as names and 'gene' as values
+  tibble::deframe()
+```
+
+
+
+```{r, results="asis"}
+# Plot percent bars for the specified genes and assays
+plotPercentBars(df, genes = unique(my_markers), assays = ctorder)
+```
+
+
+
+```{r, results="asis"}
+dreamlet::plotHeatmap(
+  df,
+  genes=unique(my_markers),
+  assays=ctorder)
+```
+
+
+
+```{r, results="asis"}
+# Create a formula for normalization
+form = ~ (1|SubID) + (1|poolID) + Sex + scale(Age) + Dx
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+```{r, results="asis"}
+
+```
+
+
+
+## MUSCAT
+
+```{r, results="asis"}
+## solution to error https://github.com/HelenaLC/muscat/issues/88
+
+m2_asex_tr_sce_musct345 <- prepSCE(m2_asex_tr_sce_pt_chunks_345, 
+               kid = "ptime_cat", # subpopulation assignments
+               gid = "Symptomatic",  # group IDs (ctrl/stim)
+               sid = "donor",   # sample IDs (ctrl/stim.1234)
+               drop = TRUE) #
+```
+
+```{r, results="asis"}
+pb <- aggregateData(m2_asex_tr_sce_musct345,
+    assay = "counts", 
+    fun = "sum")
+
+# one sheet per subpopulation
+assayNames(pb)
+```
+
+```{r, results="asis"}
+t(head(assay(pb)))
+```
+
+
+
+```{r, results="asis"}
+pb_mds <- pbMDS(pb)
+# use very distinctive shaping of groups & change cluster colors
+pb_mds <- pb_mds + 
+  scale_shape_manual(values = c(17, 4)) +
+  scale_color_manual(values = RColorBrewer::brewer.pal(8, "Set2"))
+# change point size & alpha
+pb_mds$layers[[1]]$aes_params$size <- 5
+pb_mds$layers[[1]]$aes_params$alpha <- 0.6
+# pb_mds
+```
+
+```{r, results="asis"}
+# run DS analysis
+res <- pbDS(pb, verbose = FALSE)
+# access results table for 1st comparison
+tbl <- res$table[[1]]
+# one data.frame per cluster
+names(tbl)
+```
+
+```{r, results="asis"}
+# view results for 1st cluster
+k1 <- tbl[[2]]
+head(format(k1[, -ncol(k1)], digits = 2))
+```
+
+```{r, results="asis"}
+# construct design & contrast matrix
+ei <- metadata(m2_asex_tr_sce_musct345)$experiment_info
+mm <- model.matrix(~ 0 + ei$group_id)
+dimnames(mm) <- list(ei$sample_id, levels(ei$group_id))
+contrast <- makeContrasts("Yes-No", levels = mm)
+
+# run DS analysis
+pbDS(pb, design = mm, contrast = contrast)
+```
+
+
+```{r, results="asis"}
+# filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
+tbl_fil <- lapply(tbl, function(u) {
+  u <- dplyr::filter(u, p_adj.loc < 0.3, abs(logFC) > .01)
+  dplyr::arrange(u, p_adj.loc)
+})
+
+# nb. of DS genes & % of total by cluster
+n_de <- vapply(tbl_fil, nrow, numeric(1))
+p_de <- format(n_de / nrow(m2_asex_tr_sce_musct345) * 100, digits = 3)
+data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
+```
+
+
+
+```{r, results="asis"}
+# view top 2 hits in each cluster
+top2 <- bind_rows(lapply(tbl_fil, top_n, 2, p_adj.loc))
+format(top2[, -ncol(top2)], digits = 2)
+```
+
+
+
+```{r, results="asis"}
+frq <- calcExprFreqs(m2_asex_tr_sce_musct345, assay = "counts", th = 0)
+# one sheet per cluster
+assayNames(frq)
+```
+
+
+```{r, results="asis"}
+# expression frequencies in each
+# sample & group; 1st cluster
+t(head(assay(frq), 5))
+```
+
+
+
+```{r, results="asis"}
+gids <- levels(m2_asex_tr_sce_musct345$group_id)
+frq10 <- vapply(as.list(assays(frq)), 
+  function(u) apply(u[, gids] > 0.00001, 1, any), 
+  logical(nrow(m2_asex_tr_sce_musct345)))
+t(head(frq10))
+```
+
+```{r, results="asis"}
+nk <- length(kids <- levels(m2_asex_tr_sce_musct345$cluster_id))
+ns <- length(sids <- levels(m2_asex_tr_sce_musct345$sample_id))
+names(kids) <- kids; names(sids) <- sids
+```
+
+
+
+```{r, results="asis"}
+tbl_fil2 <- lapply(kids, function(k)
+  tryCatch(
+    expr = { dplyr::filter(tbl_fil[[k]], 
+    gene %in% names(which(frq10[, k])))}, error = function(e) NULL))
+
+tbl_fil2<-tbl_fil2[!sapply(tbl_fil2,is.null)]
+
+# nb. of DS genes & % of total by cluster
+n_de <- vapply(tbl_fil2, nrow, numeric(1))
+p_de <- format(n_de / nrow(m2_asex_tr_sce_musct345) * 100, digits = 3)
+data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
+```
+
+
+```{r, results="asis", eval=FALSE}
+# tidy format; attach pre-computed expression frequencies
+resDS(m2_asex_tr_sce_musct345, res, bind = "row", frq = frq)
+
+# big-table (wide) format; attach CPMs
+resDS(m2_asex_tr_sce_musct345, res, bind = "col", cpm = TRUE)
+```
+
+
+```{r, results="asis"}
+# compute expression frequencies on the fly
+resDS(m2_asex_tr_sce_musct345, res, frq = TRUE)
+```
+
+
+```{r, results="asis", eval=FALSE}
+library(UpSetR)
+de_gs_by_k <- map(tbl_fil, "gene")
+upset(fromList(de_gs_by_k))
+```
+
+
+```{r, results="asis", eval=FALSE}
+# pull top-8 DS genes across all clusters
+top8 <- bind_rows(tbl_fil) %>% 
+  slice_min(p_adj.loc, n = 8, 
+    with_ties = FALSE) %>% 
+  pull("gene")
+
+# for ea. gene in 'top8', plot t-SNE colored by its expression 
+ps <- lapply(top8, function(g)
+  .plot_dr(m2_asex_tr_sce_musct345[, cs100], "TSNE", g) + 
+    ggtitle(g) + theme(legend.position = "none"))
+
+# arrange plots
+plot_grid(plotlist = ps, ncol = 4, align = "vh")
+```
+
+
+```{r, results="asis"}
+plotExpression(m2_asex_tr_sce_musct345[, m2_asex_tr_sce_musct345$cluster_id == "ptime_4"],
+  features = tbl_fil$ptime_3$gene[seq_len(1)],
+  x = "sample_id", colour_by = "group_id", ncol = 3) +
+  guides(fill = guide_legend(override.aes = list(size = 5, alpha = 1))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r, results="asis"}
+plotExpression(m2_asex_tr_sce_musct345[, m2_asex_tr_sce_musct345$cluster_id == "ptime_4"],
+  features = tbl_fil$ptime_4$gene[seq_len(2)],
+  x = "sample_id", colour_by = "group_id", ncol = 3) +
+  guides(fill = guide_legend(override.aes = list(size = 5, alpha = 1))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r, results="asis", eval=FALSE}
+# top-5 DS genes per cluster
+pbHeatmap(m2_asex_tr_sce_musct345, res[[1]], k = "ptime_4")
+```
+
+
+```{r, results="asis", eval=FALSE}
+# top-5 DS genes per cluster
+pbHeatmap(m2_asex_tr_sce_musct345, res, top_n = 1)
+```
+
+
+
