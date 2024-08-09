@@ -177,46 +177,46 @@ soupo_kselect_list_pp <- readRDS("data/processed/Pf/soupo_kselect_list_pp.RDS")
 
 SoupX function
 ```{r, eval=F}
-get_SoupX <- function(data, path){
-  
-  # data <- FindNeighbors(data, k.param = 20)
-  # data <- FindClusters(data, resolution = 0.5)
-  
-  # print(DimPlot(data, group.by <- 'seurat_clusters'))
-  
-  # toc <- data@assays[["RNA"]]@counts
-  toc <- data[["RNA"]]$counts
-  
-  tod <- Seurat::Read10X(paste0(path))
-  tod@Dimnames[[1]] <- toc@Dimnames[[1]]
-  
-  sc <- SoupChannel(tod, toc)
-  sc <- setClusters(sc, data$seurat_clusters)
-  
-  sc <- autoEstCont(sc)
-  #ggsave(paste0('Raw_Cellranger/', Project(dataset), "/rho_", name, specific, ".pdf"))
-  adjusted <- adjustCounts(sc)
-  data <- CreateSeuratObject(adjusted)
-  # data <- seurat_SCT(data)
-  data <- seurat_norm_stand(Seurat_object = data, hvg = 500)
-  return(list(data, sc))
-}
+# get_SoupX <- function(data, path){
+#   
+#   # data <- FindNeighbors(data, k.param = 20)
+#   # data <- FindClusters(data, resolution = 0.5)
+#   
+#   # print(DimPlot(data, group.by <- 'seurat_clusters'))
+#   
+#   # toc <- data@assays[["RNA"]]@counts
+#   toc <- data[["RNA"]]$counts
+#   
+#   tod <- Seurat::Read10X(paste0(path))
+#   tod@Dimnames[[1]] <- toc@Dimnames[[1]]
+#   
+#   sc <- SoupChannel(tod, toc)
+#   sc <- setClusters(sc, data$seurat_clusters)
+#   
+#   sc <- autoEstCont(sc)
+#   #ggsave(paste0('Raw_Cellranger/', Project(dataset), "/rho_", name, specific, ".pdf"))
+#   adjusted <- adjustCounts(sc)
+#   data <- CreateSeuratObject(adjusted)
+#   # data <- seurat_SCT(data)
+#   data <- seurat_norm_stand(Seurat_object = data, hvg = 500)
+#   return(list(data, sc))
+# }
 ```
 
 
 Run soupX
 
 ```{r , eval=F}
-# path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
-hvg =500
-# all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
-all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~{
-  tryCatch({
-    get_SoupX(..1, ..2)
-    }, error = function(e)  e$message)
-})
-
-failed_supx <- names(all_msc_nosct_supx_4_dblt[map(all_msc_nosct_supx_4_dblt, ~class(.x)[1]) == "character"])
+# # path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
+# hvg =500
+# # all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
+# all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~{
+#   tryCatch({
+#     get_SoupX(..1, ..2)
+#     }, error = function(e)  e$message)
+# })
+# 
+# failed_supx <- names(all_msc_nosct_supx_4_dblt[map(all_msc_nosct_supx_4_dblt, ~class(.x)[1]) == "character"])
 
 ```
 
@@ -224,6 +224,8 @@ failed_supx <- names(all_msc_nosct_supx_4_dblt[map(all_msc_nosct_supx_4_dblt, ~c
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=F}
 ## Run Soupx in farm
+gogo()
+# nextflow run submsn_soupx.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/soupx.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_norm.RDS" --input_raw_mtx "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/raw_feature_bc_matrix.h5" --o_file_name "soupx_filt_seu_norm.RDS" --hvg 500
 ```
 
 
@@ -255,11 +257,22 @@ Replace with unadjusted object if soupx not successful
 
 # all_msc_nosct_supx_4_dblt[failed_supx] <- all_msc_filt[failed_supx]
 # DefaultAssay(all_msc_nosct_supx_4_dblt[[failed_supx]]) <- "RNA"
-all_msc_nosct_supx_4_dblt[failed_supx[1]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[1]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[1]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
-all_msc_nosct_supx_4_dblt[failed_supx[2]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[2]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[2]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
-all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name]
+# all_msc_nosct_supx_4_dblt[failed_supx[1]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[1]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[1]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
+# all_msc_nosct_supx_4_dblt[failed_supx[2]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[2]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[2]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
+# all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name]
+
 ```
 
+
+```{r ,include=FALSE, message=FALSE, warning=FALSE}
+##
+for (i in 1:length(failed_supx)) {
+
+  all_msc_nosct_supx_4_dblt[failed_supx[i]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[i]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[i]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
+
+}
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name]
+```
 
 
 ```{r , message=FALSE, warning=FALSE}
@@ -280,7 +293,7 @@ imap(all_msc_nosct_supx_4_dblt, ~DimPlot(.x, group.by = "StagePrelimC") + labs(t
 ```
 
 FARM CODE
-```{r, eval=TF}
+```{r, eval=T}
 ## write out seurat bpcells object files for normalization processing in farm
 imap(all_msc_nosct_supx_4_dblt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/filt_seu_supx.RDS")))
 ```
@@ -289,7 +302,17 @@ imap(all_msc_nosct_supx_4_dblt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/se
 ```{r, eval=T}
 gogo()
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_supx.RDS" --o_file_name "filt_seu_norm_supx.RDS" --umap_name "UMAP_F_S_NORM" --hvg 500 --cluster_resoln 0.1 --resume
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_supx.RDS" --o_file_name "filt_seu_norm_supx.RDS" --umap_name "UMAP_F_S_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_supx" --umap_redctn_nm "umap.f.s.norm" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "filt_seu_norm_supx_elbo.RDS" --resume
+```
+
+
+```{r}
+filt_seu_norm_supx_elbo <-  list.files("data/processed/", pattern = "^filt_seu_norm_supx_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(readRDS)
+
+filt_seu_norm_supx_elbo
 ```
 
 
