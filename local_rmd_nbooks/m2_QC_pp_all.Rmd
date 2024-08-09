@@ -653,6 +653,10 @@ algn_nm <- "minmap"
 ##Read in strain information
 soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
 
+# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS") %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
+
+
+
 ##Creating Binary variable for Doublet/Singlet for doublet finder in the samples with more than 2 strains
 # soupo_kselect_list_pp[2:10] <- soupo_kselect_list_pp[2:10] %>%
 soupo_kselect_list_pp <- soupo_kselect_list_pp %>%
