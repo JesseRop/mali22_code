@@ -69,11 +69,11 @@ sample_set = 'Mali2'
 algn_nm = 'minmap'
 species = 'Pf'
 
-soup_dir = "soupc"
-sv_dir = "pbulk_gtypes_preQC"
+# soup_dir = "soupc"
+# sv_dir = "pbulk_gtypes_preQC"
 
-# soup_dir = "soupc_GE_postQC"
-# sv_dir = "pbulk_gtypes_GE_postQC"
+soup_dir = "soupc_GE_postQC"
+sv_dir = "pbulk_gtypes_GE_postQC"
 
 strain_levels_univrs <- c(paste0("SC", 1:20), "Doublet", "Negative")
 ```
@@ -187,7 +187,7 @@ system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users
 
 ```
 
-```{r, message=FALSE}
+```{r, message=FALSE, warning=FALSE}
 ## Read in log likelihoods for estimation of number of clusters from elbow plots
 clusters_log_likelihoods_lst = map2(sample_name_nms_al, rep(algn_nms, each= length(sample_name_nms)), ~read_table(paste0('data/processed/',species,'/', .x,'/', soup_dir, '/',.y,'/clusters_log_likelihoods.txt'), col_names = c('No_of_clusters', 'td1','td2','td3', 'td4','log_likelihood')) %>% select(-(starts_with("td"))) %>% mutate(across(No_of_clusters, ~str_remove_all(., ".*out_dir_k|/clusters.err:best")))) %>% set_names(paste(sample_name_nms_al, rep(algn_nms, each= length(sample_name_nms)), sep ='_'))
 ```
