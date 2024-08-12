@@ -150,47 +150,7 @@ source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/
 ```
 
 
-```{r, eval=F}
-### Copy souporcell files for the optimum clusters
-
-for (i in 1:length(sample_name)) {
-  for (a in 1:length(algn_nms)) {
-  
-  ## Create new directories
-  system(
-    paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', sample_name[i],'/', soup_dir, '/', algn_nms[a],'/k', opt_clusters[i])
-  )
-  
-  ##Transfers
-  ##souporcell genotyping files
-  system(
-    paste0('rsync -av --include="clusters.tsv" --exclude="*" jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', sample_name[i], '/', soup_dir, '/', algn_nms[a],'/k' , opt_clusters[i],'/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', sample_name[i],'/', soup_dir, '/', algn_nms[a],'/k', opt_clusters[i])
-    
-    # paste0('rsync -av --include="cluster_genotypes.vcf" --include="clusters.tsv" --exclude="*" jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/souporcell_outputs/',species,'/', source_irods[i], '/k' , opt_clusters[i],'/* /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', sample_name[i],'/Pf/soupc/', algn_nms[a],'/k', opt_clusters[i])
-    )
-  
-  }
-}
-
-
-
-```
-
-
-
 ## Log likelihood Elbow plots visualisations for all MSCs
-```{r, message=FALSE, eval=F}
-## copy from farm
-map2(sample_name_nms_al, rep(algn_nms, each= length(sample_name_nms)), ~system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', .x, '/', soup_dir, '/',.y,'/clusters_log_likelihoods.txt /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', .x,'/', soup_dir, '/',.y,'/')))
-
-```
-
-NB - LOCAL CODE
-```{r, message=FALSE, eval=F}
-## copy from farm
-system(paste0('rsync -av jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/', species,'/all_msc_anotd_preQC_mdata.RDS /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/'))
-
-```
 
 ```{r, message=FALSE, warning=FALSE}
 ## Read in log likelihoods for estimation of number of clusters from elbow plots
@@ -820,28 +780,18 @@ snk_plts
 
 
 ```{r}
-# optimum_k = c(8,6,6,7,7,9,3,8,3,3,3) %>% set_names(sample_name_nms)
-# optimum_k_aln = rep(c(8,6,6,7,7,9,3,8,3,3,3),length(algn_nms)) %>% set_names(sm_aln_nms_al)
-
-optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
-
-## having k=2 for samples with k=1 to verify no additional strains
-# optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =2, "MSC57" =2, "MSC24" =2, "MSC37" =5, "MSC39" =4, "MSC45" =2, "MSC50_SLO" =2, "MSC54" =2, "MSC67" =2, "MSC68" =3, "MSC70" =2)
-
-# optimum_k_actual_aln = rep(optimum_k_actual, length(algn_nms)) %>% set_names(sm_aln_nms_al)
+## Select most likely optimum k
+optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2) %>% .[sample_name_nms]
 
 optimum_k_aln = rep(optimum_k, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 
-# optimum_k = c(8,6, 4,5,5) %>% set_names(sample_name_nms)
-# optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
-# optimum_k_aln = rep(c(8,6,6,7,7),length(algn_nms)) %>% set_names(sm_aln_nms_al)
 ```
 
 
 
 ```{r, fig.width=6, fig.height=4}
 ## Rename the initial k colnames which is unchanged when harmonizing strain annotation for Sankey plot and factorized newly generated strain harmonized vectors
-# strn_harmnzd_tbls_5 <- list(strn_harmnzd_tbls_5, map(don_k_names, ~.x[1]), map(don_hmonizd_k_names, ~.x[1])) %>%
+
 strn_harmnzd_tbls <- list(strn_harmnzd_tbls, map(don_k_names_aln, ~.x[1]), map(don_hmonizd_k_names_aln, ~.x[1])) %>%
   pmap(~{
     ..1 %>% 
@@ -854,7 +804,7 @@ strn_harmnzd_tbls <- list(strn_harmnzd_tbls, map(don_k_names_aln, ~.x[1]), map(d
 
 ```{r, fig.width=6, fig.height=4}
 ## !! NOTE - VERY IMPORTANT to verify that the strain renaming to harmonize names for sankey plot function has been done correctly
-# strn_harmnzd_assesmnt <- list(strn_harmnzd_tbls_5, don_k_names, don_hmonizd_k_names) %>%
+
 strn_harmnzd_assesmnt <- list(strn_harmnzd_tbls, don_k_names_aln, don_hmonizd_k_names_aln) %>%
   pmap(~{
     tbl <- ..1
@@ -1035,7 +985,7 @@ Strain_qc_cutoff=0
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2:4), "MSC57" = c(2:4))
 
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3))
+opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3)) %>% .[sample_name_nms]
 
 
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5))
