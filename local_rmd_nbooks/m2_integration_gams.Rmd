@@ -224,22 +224,9 @@ DimPlot(m2_fm_harmony_int, dims = c(2,3), group.by = "donor", pt.size = 1.5, red
 
 ```{r, fig.width=12, fig.height=4}
 
-FeaturePlot(m2_fm_harmony_int, features = c("PF3D7-0301800", "PF3D7-1002000", "PF3D7-0608800"), pt.size = 1, reduction = "umap.harmony", ncol = 3, slot = "data")
+FeaturePlot(m2_fm_harmony_int, features = c("PF3D7-0406200", "PF3D7-1469900", "PF3D7-0903800"), pt.size = 1, reduction = "umap.harmony", ncol = 3, slot = "data")
 ```
 
-HRP2-PF3D7_0831800
-EXP1-PF3D7_1121600
-FIRA-PF3D7_0501400
-LDH-PF3D7_1324900
-SERA5-PF3D7_0207600
-KAHRP-PF3D7_0202000
-CRT-PF3D7_0709000
-MRP1-PF3D7_0112200
-MPC1- PF3D7_1340800
-```{r, fig.width=12, fig.height=12}
-
-FeaturePlot(m2_fm_harmony_int, features = c("PF3D7-0831800", "PF3D7-1121600"), pt.size = 1, reduction = "umap.harmony", ncol = 3, slot = "data")
-```
 
 ```{r}
 DimPlot(m2_fm_harmony_int, reduction = "pca", group.by = "stage")
@@ -263,28 +250,28 @@ DimPlot(m2_fm_harmony_int, pt.size = 0.4, reduction = "umap.harmony", group.by =
 
 ```{r}
 ## 
-m2_fm_harmony_int <- FindClusters(m2_fm_harmony_int, resolution = 0.08, cluster.name = "harmony_clusters_ss")
+m2_f_harmony_int <- FindClusters(m2_f_harmony_int, resolution = 0.08, cluster.name = "harmony_clusters_ss")
 
 ```
 
 ```{r}
-DimPlot(m2_fm_harmony_int, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss")
+DimPlot(m2_f_harmony_int, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss")
 ```
 
 
 ```{r}
-Idents(m2_fm_harmony_int) <- "harmony_clusters_ss"
+Idents(m2_f_harmony_int) <- "harmony_clusters_ss"
 ```
 
 
 ```{r}
 m2_fm_harmony_int_jnd <- JoinLayers(m2_fm_harmony_int)
-asx_devt_mrks <- FindAllMarkers(m2_fm_harmony_int_jnd)
+sx_devt_mrks <- FindAllMarkers(m2_fm_harmony_int_jnd)
 ```
 
 
 ```{r}
-top3_gns <- asx_devt_mrks %>% filter(p_val_adj ==0) %>% group_by(cluster) %>% slice_max(order_by = avg_log2FC, n = 3) %>% left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+top3_gns <- sx_devt_mrks %>% filter(p_val_adj ==0) %>% group_by(cluster) %>% slice_max(order_by = avg_log2FC, n = 3) %>% left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Gene")], by = c("gene" = "gene_id"))
 top3_gns
 ```
 
@@ -308,7 +295,7 @@ FeaturePlot(m2_fm_harmony_int, features = top3_gns$gene, pt.size = 0.01, reducti
 ```
 
 ```{r, eval=T}
-Seurat_object <- JoinLayers(m2_fm_harmony_int)
+Seurat_object <- JoinLayers(m2_f_harmony_int)
 
 ## Convert seurat object to SCE
 sce_obj <- SingleCellExperiment(assays = list(counts = as(Seurat_object[["RNA"]]$counts, Class = "dgCMatrix")), colData = Seurat_object@meta.data)
