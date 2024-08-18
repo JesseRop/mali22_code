@@ -172,8 +172,9 @@ sample_set <- "Mali2"
 
 ```{r}
 ## Get the necessary variable for the pseudobulking workflow
+source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
+# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
 sample_name_nms
 ```
 
@@ -1428,7 +1429,10 @@ ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, ~gtypes_ibs_heatmap_one_don(mtx=.x, dendo 
 
 ```{r, fig.height=5.1, fig.width=5.5}
 
-ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, ~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = T))
+ss_afm_ibs_hmap_clust <- map(ss_afm_ibs_mtx, possibly(~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = T), "NAs cant be clustered"))
+# imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x, ttl=.y, lg = "none"), 'No overlapping SNPs between the 2 groups'))
+ss_afm_ibs_hmap_clust
+                      
 ```
 
 ```{r}
@@ -1636,7 +1640,7 @@ names(ss_afm_chromp)
 
 ```{r, warning=F}
 # strain stage (afm) chromosome painting
-ss_afm_chromp[str_detect(names(ss_afm_chromp), "MSC41.stage_afm_strain.k3")]
+ss_afm_chromp[str_detect(names(ss_afm_chromp), "MSC50_SLO.stage_afm_strain.k2")]
 
 ```
 Confirmed
@@ -1716,17 +1720,29 @@ c("Negative", "Female", "SC2")
 
 Manually assign negative for which we assessed to the relevant Ks
 ```{r, warning=FALSE, eval=T}
-strn_c_new_mdata_m22_min[["MSC48"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC48"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC2", 
-                                                                         stage_afm == "Female" & StrainQCd == "Negative" ~ "SC3",
-                                                                         T ~ StrainQCd)) %>% select(StrainQCd_Man)
-strn_c_new_mdata_m22_min[["MSC49"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC49"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC1",
-                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
-strn_c_new_mdata_m22_min[["MSC60"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC60"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC3", 
-                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
-strn_c_new_mdata_m22_min[["MSC66"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC66"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC5", 
-                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
-strn_c_new_mdata_m22_min[["MSC68"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC68"]] %>% mutate(StrainQCd_Man = case_when(stage_afm == "Female" & StrainQCd == "Negative" ~ "SC2",
-                                                                         T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC48"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC48"]] %>% 
+  mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC2", 
+                                   stage_afm == "Female" & StrainQCd == "Negative" ~ "SC3",
+                                   T ~ StrainQCd)) %>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC49"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC49"]] %>% 
+  mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC1",
+                                   T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC60"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC60"]] %>% 
+  mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC3", 
+                                   T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC66"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC66"]] %>% 
+  mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC5", 
+                                   T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC68"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC68"]] %>% 
+  mutate(StrainQCd_Man = case_when(stage_afm == "Female" & StrainQCd == "Negative" ~ "SC2",
+                                   T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC50_SLO"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC50_SLO"]] %>% 
+  mutate(StrainQCd_Man = case_when(StrainQCd == "Negative" ~ "SC2",
+                                   T ~ StrainQCd))%>% select(StrainQCd_Man)
+strn_c_new_mdata_m22_min[["MSC55"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC55"]] %>% 
+  mutate(StrainQCd_Man = case_when(StrainQCd == "Negative" ~ "SC2",
+                                   T ~ StrainQCd)) %>% select(StrainQCd_Man)
+
 
 
 ```
@@ -1762,6 +1778,7 @@ Write out strain_qcd + stage_ag for pseudobulk genotyping
 optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
 # optimum_k_polyk <- optimum_k_polyk[!names(optimum_k_polyk) %in% c("MSC37", "MSC38")]
 ```
+
 
 ```{r, eval=T}
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
@@ -1816,6 +1833,11 @@ for (s in names(optimum_k_polyk)) {
 }
 
 }
+```
+
+
+```{r, warning=FALSE, eval=T}
+# nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
 ```
 
 ```{r, eval=FALSE}
