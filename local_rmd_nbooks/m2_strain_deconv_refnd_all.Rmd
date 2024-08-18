@@ -906,7 +906,7 @@ ss_afm_pf7M_qc <- map(ss_afm_pf7M_pf7qc, ~snps_qc_filts(m14_gt=.x))
 
 
 ```{r, fig.height=5, fig.width=14}
-saveRDS(ss_afm_pf7M_qc, paste0("data/processed/",species, "/ss_afm_pf7M_qc.RDS"))
+saveRDS(ss_afm_pf7M_qc, paste0("data/processed/",species, "/", "/ss_afm_pf7M_qc.RDS"))
 ```
 
 ```{r, eval=FALSE}
@@ -1568,7 +1568,8 @@ MSC51 = 1;
 MSC38 best guess = 4
 ```{r, warning=FALSE, eval=T}
 ## optimum k from above
-optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
+# optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =6, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
 optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 
 ##updated strain metadata
@@ -1783,7 +1784,7 @@ optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
 ```{r, eval=T}
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
-sv_dir = "pbulk_gtypes_postQC_cln"
+# sv_dir = "pbulk_gtypes_postQC_cln"
 
 # for (s in names(strn_c_new_mdata_m22_min)) {
 for (s in names(optimum_k_polyk)) {
@@ -1837,6 +1838,7 @@ for (s in names(optimum_k_polyk)) {
 
 
 ```{r, warning=FALSE, eval=T}
+gogo()
 # nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
 ```
 
