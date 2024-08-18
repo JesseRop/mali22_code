@@ -49,127 +49,13 @@ suppressPackageStartupMessages({
 
 # MSC parasites strain deconvolution and VCF visualization 
 
-## Variable declarations
-
-```{r}
-##Strain cluster colours
-# strain_cols <- c(met.brewer(name = 'Austria')[c(1,7, 4,5,6)], 'light gray')
-# 
-# strain_cols_o_i <-c("#910000", "#f20000", "#007c71", "#00f2dd", "#c39a00", "#ffd94d", "#7570B3","#708db3", "#9770b3", "#C9E0F1", "#a40000" , "#00b7a7", "#ffcd12","#a40000" , "#00b7a7", "#ffcd12", 'black', 'lavender', 'lightgray', 'grey')
-# names(strain_cols_o_i) <- c('G1_o', 'G1_i','G2_o',  'G2_i', 'G3_o',  'G3_i', 'G2_G1', 'G2_G3', 'G3_G1', 'G1_p_i','G1_b', 'G2_b', 'G3_b', 'G1', 'G2', 'G3', 'Doublet', 'G1_3i','Negative',  'Less5')
-# strain_cols_n <-c("#910000", "#ff1a8d", "#007c71", "#0ea300", "#00deca", "#9a96c7", "#5d57a4", "#a8875b","#708db3", "#c39a00", "#ffd94d", "#9770b3", "#C9E0F1", "#a40000" , "#00b7a7", "#ffcd12","thistle","#a40000" , "#00b7a7", "#e7f1f9", 'black', 'grey')
-# #, 'lavender', 'lightgray', 'grey'
-# names(strain_cols_n) <- c('SC2', 'SC1','SC5',  'SC4', 'SC3',  'SC6', 'SC7', 'SC8', 'S3_S1', 'S1_p_i','S1_b', 'S2_b', 'S3_b', 'S1', 'S2', 'S3', 'Doublet', 'SC1_3i','Negative', 'Lab', 'Less5', NA)
-# 
-# sp_fld_colors <- c('Late ring'= '#78C679',#met.brewer('Java')[2],
-#                    'Early trophozoite'='#FEEEAA',#met.brewer('Java')[3],
-#                    'Female (LE)'= met.brewer('Ingres')[5],
-#                    'Female (HE)'= '#551A8B', #met.brewer('Ingres')[7],
-#                    # 'Male (LE)'=met.brewer('Nizami')[6],
-#                    # 'Male (HE)'=met.brewer('Nizami')[8],
-#                    # 'Gametocyte (male)'=met.brewer('Austria')[5],
-#                    'Male (LE)'=met.brewer('Ingres')[7],#'#a2e19e',
-#                    'Male (HE)'= 'mediumpurple',#'#039911',
-#                    'Gametocyte (male)'='#3DED97',
-#                    'Gametocyte (female)'=met.brewer('Ingres')[6],
-#                    'Lab' = '#D3D3D3',
-#                    'Unassigned'='#DCDCDC',
-#                    'Failed QC' = 'grey',
-#                    'Not assigned' = 'grey',
-#                    'Atlas' = 'grey',
-#                    'Early ring'='#D1EC9F',
-#                      'Late trophozoite'='#FEB24C',
-#                      'Early schizont'='#C9E8F1',
-#                      'Late schizont'='#85B1D3',
-#                    'Gametocyte (developing)'='thistle'
-# )
-
-
-# donor_cols_m = met.brewer("Wissing")[c(2,4,1,3,5)] %>% set_names(paste0(c("MSC33", "MSC48","MSC49", "MSC55", "MSC60"), '.mrna'))
-# donor_cols = met.brewer("Wissing")[c(2,4,1,3,5)] %>% set_names(c("MSC33", "MSC48","MSC49", "MSC55", "MSC60"))
-
-# donor_cols_m = met.brewer("Wissing")[c(4,1,3,5)] %>% set_names(paste0(c("MSC48","MSC49", "MSC55", "MSC60"), '.mrna'))
-# donor_cols = met.brewer("Wissing")[c(4,1,3,5)] %>% set_names(c("MSC48","MSC49", "MSC55", "MSC60"))
-
-# stg_refnd_lvls = c('Early ring','Late ring','Early trophozoite','Late trophozoite','Early schizont','Late schizont', "Gametocyte (committed)","Gametocyte (developing)","Gametocyte (branching)", "Female (low count)", "Female (high count)" , "Gametocyte (early female)","Gametocyte (late female)","Male (low count)", "Male (high count)", "Gametocyte (early male)","Gametocyte (late male)", "Unassigned", "Failed QC", "Not assigned") %>% str_to_sentence(.)
-
-# sample_set="Mali2"
-```
+## Setup and sourcing 
 
 ```{r setup}
 knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/'))
 ```
 
-
-
-```{r, eval=FALSE}
-
-# system(paste0("hmmIBD -i ibd_analysis/msc14.strain_qcd_cln_gt.tsv  -o ibd_analysis/tr -m 100000"))
-
-##Sample names
-# sample_name_nms <- c("MSC33") %>% sort()
-# sample_name_nms <- c("MSC33") %>% str_sort(numeric = T)
-
-# 33=7, 48=4/3, 49=6, 55=hsat7???, 38=6??,40=8,39=4
-
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% str_sort(numeric = T)
-sample_name_nms_k1 <-  c("MSC53", "MSC57", "MSC24", "MSC45", "MSC54", "MSC67", "MSC70")
-sample_name_nms_missing <-  c("MSC50_SLO")
-
-sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_name_nms_k1]
-sample_name_nms <- sample_name_nms[!sample_name_nms %in% sample_name_nms_missing]
-
-sample_name_nms <- c("MSC38", "MSC50_SLO",  "MSC41","MSC51", "MSC25") %>% str_sort(numeric = T)
-
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70") %>% sort()
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% str_sort(numeric = T)
-# sample_name <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% str_sort(numeric = T)
-
-# sample_name_nms <- c("MSC48","MSC49", "MSC55", "MSC60") %>% str_sort(numeric = T)
-# sample_name <- c("MSC48","MSC49", "MSC55", "MSC60") %>% str_sort(numeric = T)
-
-# sample_ids <- paste0(sample_name_nms, '_', source_irods_nms) %>% set_names(sample_name_nms)
-# sample_ids <- paste0(sample_name_nms, '_', source_irods_nms) %>% set_names(sample_name_nms)
-# optimum_k = c(8,6, 4,5,5,10) %>% set_names(sample_name_nms)
-# optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
-# optimum_k = c(8,6,6,7,7,9) %>% set_names(sample_name_nms)
-# optimum_k = c(8) %>% set_names(sample_name_nms)
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3)) %>% .[sample_name_nms]
-
-# optimum_k = opt_narrow_clusters_nms
-
-sample_name_k <- map2(sample_name_nms, opt_narrow_clusters_nms, ~rep(.x, each = length(.y))) %>% unlist()
-sample_name_nms
-
-## sorted donor_opt_cluster names
-# sorted_names <- paste0(sample_name_nms, "_", optimum_k)
-sorted_names <- imap(opt_narrow_clusters_nms, ~paste0(.y, "_", .x)) %>% unlist(., recursive =F, use.names=F)
-
-optimum_k <- opt_narrow_clusters_nms %>% unlist() %>% set_names(sorted_names)
-
-# grps <- c('stage_afm_strain_qcd', 'stage_ag_strain_qcd', 'strain_qcd')
-
-grps <- c('stage_afm_strain')
-
-##Alignment incorporation
-algn_nms = c('minmap', 'hsat')
-algn_nm = 'minmap'
-
-gtyp_step = "pbulk_gtypes_preQC"
-# gtyp_step = "pbulk_gtypes_GE_postQC"
-
-# sample_name_nms_al <- rep(sample_name_nms, 2)
-sample_name_nms_al <- rep(map2(sample_name_nms, opt_narrow_clusters_nms, ~rep(.x, each=length(.y))) %>% unlist(), length(algn_nms))
-
-# algn_nms_al <- rep(algn_nms, each= length(sample_name_nms))
-algn_nms_al <- rep(algn_nms, each= length(sorted_names))
-
-# sm_aln_nms_al <- paste(rep(sample_name_nms, 2), rep(algn_nms, each= length(sample_name_nms)), sep ='_')
-sm_aln_nms_al <- paste(rep(sorted_names, length(algn_nms)), rep(algn_nms, each= length(sorted_names)), sep ='_')
-
-sample_set <- "Mali2"
-```
-
+#### Source variables specific to this run - this pseudobulk strain analysis script is ran several times with different inputs
 ```{r}
 ## Get the necessary variable for the pseudobulking workflow
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
@@ -178,7 +64,7 @@ source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/
 sample_name_nms
 ```
 
-#### Source commong functions, varriables and tables
+#### Source colours, plotting functions and commonly used tables etc
 ```{r}
 ## Get the necessary variables for common housekeeping
 source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
@@ -239,31 +125,6 @@ pmap(list(sample_name_k, optimum_k), ~{
 
 ```
 
-Prepare table for highly informative SNPs table for making bam files in farm by adding gene postions and formating appropriately for the format required by farm scripts
-
-```{r, message=FALSE}
-##Metadata from all p.falciparum genes downloaded from plasmoDB
-# Pf3D7_genes_plasmoDB <- read_csv("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Pf3D7_genomes_gtfs_indexs/Pf3d7_Genes_Summary_270922.csv") %>% 
-#   dplyr::rename("gene_id" = `Gene ID` ) %>% 
-#   group_by(gene_id) %>% 
-#   add_count(name='gn_iso') %>% 
-#   ungroup() %>%
-#   mutate(across(gene_id, ~case_when(gn_iso>1 ~ source_id,
-#                                     TRUE ~ as.character(.)))) %>% 
-#   mutate(across(gene_id, ~str_replace(.,"_", "-")))%>%
-#   dplyr::rename('Gene_name' = `Gene Name or Symbol`, 'Ka_Ks' = `NonSyn/Syn SNP Ratio All Strains`, 'TM_domains'=`# TM Domains`) %>% 
-#   mutate(across(where(is.character), ~na_if(., "N/A")),
-#          Gene = coalesce(`Gene_name`, gene_id)
-#   )  %>%
-#   group_by(Gene) %>% 
-#   add_count() %>% 
-#   ungroup() %>%
-#   mutate(across(Gene, ~case_when(n>1 ~ paste0(.,'_', gene_id),
-#                                  TRUE ~ as.character(.))))
-# '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali/data/processed/Pf/msc14/', gtyp_step, '/stage_'
-```
-
-
 
 ```{r, results="hide"}
 ##Merge SNP information above with annotations from plasmoDB to get gene positions etc for plotting
@@ -304,11 +165,6 @@ pf7_mali <- read_csv("../../Pf3D7_genomes_gtfs_indexs/pf7_data/pf7_variants/Mali
 
 pf7_mali_ibd_whitelst <- pf7_mali %>% 
   filter(is_invariant == F &  is_biallelic == T & minor_af > 0.1)
-
-# pf7_waf <- read_csv("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Pf3D7_genomes_gtfs_indexs/pf7_variants/AF-W-freqs.csv")
-# 
-# pf7_waf_ibd_whitelst <- pf7_waf %>% 
-#   filter(is_invariant == F &  is_biallelic == T & minor_af > 0.1)
 
 ```
 
@@ -366,7 +222,6 @@ gds_rd <- function(sample_id, grp, opt_k){
 ###########k8_raw stage_afm_strain
 ```{r, warning=FALSE, message=FALSE}
 ##Read in the genotypes and annotate
-# gt_ss_afm_p1_bi <- gds_rd(sample_id = "MSC48_5736STDY13782212", grp = "stage_afm_strain_k6_minimp")
 
 gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
   sm <- ..1
@@ -375,41 +230,6 @@ gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
   
 })
 ```
-
-###########k8_raw strain
-```{r}
-# ##k8 raw strain stage labels
-# k6r_s_vcf_ids <- c("SC7", "SC6", "SC5", "SC3", "SC2", "SC1", "Doublet")
-# 
-# ##Read in the genotypes and annotate
-# gt_s_k6r_p1_bi <- gds_rd(gds_path = "strain_qcd_k8_minimp/p1/fb_biallelic.gds", strn_nms = k6r_s_vcf_ids)
-# dim(gt_s_k6r_p1_bi)
-```
-
-```{r}
-##soupo k6
-#seqClose(fb_p1_bi)
-
-##Replace the clean cells genotype with the raw cells genotype
-# gtypes_fb_p1_bi <-gt_ss_k6r_p1_bi
-```
-
-```{r}
-##remove doublets as well
-# gt_fb_vtx_p1_cx_bi <- gtypes_fb_p1_cx_bi %>% 
-#   as.data.frame() %>% 
-#   dplyr::select(!contains('Doublet')) %>%
-#   dplyr::select(!contains('G1_i_F')) %>%
-#   mutate(across(c(pos, depth, quality, matches('^DP.*|^Ref.*|^Alt.*'), matches('.*sNum$|.*cProp$')), as.numeric)) %>%
-#   filter(quality>75 & depth>40)  #%>%
-#   #filter(!(quality>200 & depth>30)
-```
-
-###k6 Clean
-```{r}
-# list.files("data/processed/",species, "/", gtyp_step, "/stg_strn_k8_minimp_qcd/p1/vartrix_biallelic/", pattern = "S.*.mtx", full.names = T, recursive = T, include.dirs = T) 
-```
-
 
 Vartrix matrix to get number of molecules supporting either reference or alternate allele - all
 
@@ -451,38 +271,10 @@ vtx_rd <- function(sample_id, grp, opt_k ){
 ```{r}
 ## For troubleshooting above script
 ##Read in the alternate allele matrix for all the stg/strn combinations and combine into a list - also shortening the names of the matrices (list items)
-sf <- list.files(paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
-    set_names(nm = (str_remove_all(.,paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
-    map(readMM) 
-
-
-```
-
-
-```{r}
-##Read in the alternate allele matrix for all the stg/strn combinations and combine into a list - also shortening the names of the matrices (list items)
-sf[["SC8_A_alt"]] %>% str
-
-```
-
-```{r}
-##Function to read vartrix output and annotate
-# a=list.files(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/msc14/", gtyp_step, "/stage_afm_strain_qcd_k8_minmap/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
-#     set_names(nm = (str_remove_all(.,paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/msc14/", gtyp_step, "/stage_afm_strain_qcd_k8_minmap/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
+# sf <- list.files(paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
+#     set_names(nm = (str_remove_all(.,paste0("data/processed/",species, "/", "MSC33" ,"/", gtyp_step, "/", "stage_afm_strain", "_k", "8", "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
 #     map(readMM) 
-#   
-#   ##Count, for each SNP, the total alternate allele count over all cells and proportion of cell that have alternate allele - Using base R because it is faster
-#   alt_mtx_stats = lapply(a, function(x) base::cbind(x, rowSums(x) , rowSums(x != 0)/ncol(x))[,c(ncol(x)+1, ncol(x)+2)])
-#   
-#   ##Name the matrix columns with the name of the stg/strn and suffix of snpNum (total snp count over all cell) and celProp (proportion of cell that have alternate allele)
-#   nmd_alt_mt<- lapply(names(alt_mtx_stats), function(x) {
-#        colnames(alt_mtx_stats[[x]]) <- paste0(x, c('_sNum', '_cProp'))
-#        as.matrix(alt_mtx_stats[[x]])
-#    })
-#   
-#   nmd_alt_mt <- do.call(base::cbind, nmd_alt_mt) 
-#   
-# }
+
 
 ```
 
@@ -490,7 +282,6 @@ sf[["SC8_A_alt"]] %>% str
 ###########k8_raw stage_afm_strain
 ```{r}
 ##Read in the genotypes and annotate
-# gt_ss_afm_p1_bi <- gds_rd(sample_id = "MSC48_5736STDY13782212", grp = "stage_afm_strain_k6_minimp")
 # NOTE - if we get error then check the header of the raw .mtx and .ref files from vartrix for consistency in number of records "number of rows of matrices must match (see arg 15)"
 
 ss_afm_vtx_mtx <-pmap(list(sample_name_k, optimum_k), ~{
@@ -503,48 +294,9 @@ ss_afm_vtx_mtx <-pmap(list(sample_name_k, optimum_k), ~{
 
 ###########k8_raw -TO BE DELETED IF RAW NOT PREFERED
 
-```{r}
-##Function to read stage afm + strain (ss) k8 raw (r) vartrix output and annotate
-# ss_afm_vtx_mtx <- vtx_rd(sample_id = "MSC48_5736STDY13782212", grp = "stage_afm_strain_k6_minimp")
-
-```
-
-```{r}
-##Function to read stage ag + strain (ss) k8 raw (r) vartrix output and annotate
-# ss_ag_k6r_vtx_mtx <- vtx_rd(vtx_path = 'stage_ag_strain_qcd_k8_minimp/p1/vartrix_biallelic/')
-
-```
-
-```{r}
-##Function to read strain (s) k8 raw vartrix output and annotate
-# s_k6r_vtx_mtx <- vtx_rd(vtx_path = 'strain_qcd_k8_minimp/p1/vartrix_biallelic/')
-
-```
-
 
 Combine vartix snp count per cell with freebayes calls
 ```{r}
-##remove doublets as well and low quality SNPS - maybe not include doublets in variant calling with freebayes. Adds no value? or could be used to demonstrate high number of non-distinct and rule out small clusters as doublets and be part of QC
-# fb_vt_bind <- function(fb_gtype , vtx_mtx ) {
-#   gt_fb_vtx_p1_bi <- base::cbind(fb_gtype, vtx_mtx) %>% 
-#     as.data.frame() %>% 
-#     mutate(across(c(pos, depth, quality, matches('.*_DP$|.*_RefN$|.*_AltN$|.*sNum$|.*cProp$')), as.numeric)) %>%
-#     filter(quality>75 & depth>40)  
-#   
-#   print(dim(gt_fb_vtx_p1_bi))
-#   
-#   ##remove  mitochondrial calls
-#   gt_fb_vtx_p1_bi <- gt_fb_vtx_p1_bi %>%
-#     filter(!str_detect(chrom, 'Pf_M'))
-#   
-#   print(dim(gt_fb_vtx_p1_bi))
-#   
-#   return(gt_fb_vtx_p1_bi)
-#   
-# }
-
-# Same as above but option to remove some groups  
-
 ##remove doublets as well and low quality SNPS - maybe not include doublets in variant calling with freebayes. Adds no value? or could be used to demonstrate high number of non-distinct and rule out small clusters as doublets and be part of QC
 fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None") {
   gt_fb_vtx_p1_bi <- base::cbind(fb_gtype, vtx_mtx) %>% 
@@ -571,57 +323,17 @@ fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None") {
 ```
 
 
-
 ```{r}
-##strain stage k8 raw freebayes vcf + vatrix high quality no mitochondrial DNA
-# ss_k6r_fb_vtx_p1bi <- fb_vt_bind(fb_gtype = gt_ss_k6r_p1_bi, vtx_mtx = ss_k6r_vtx_mtx, rm_grps = paste(c("SC8_F", "SC8_A", "SC7_A", "SC1_M", "SC1_F", "SC4_F", "SC4_M", "SC5_A.*"), collapse = '.*|'))
-```
+## raw freebayes vcf + vatrix high quality no mitochondrial DNA
 
-```{r}
 ss_afm_fb_vtx_p1bi <- pmap(list(unlist(gt_ss_afm_p1_bi, recursive = F), unlist(ss_afm_vtx_mtx, recursive = F)), ~fb_vt_bind(fb_gtype = ..1, vtx_mtx = ..2))
 ```
 
-```{r}
-##strain stage k8 raw freebayes vcf + vatrix high quality no mitochondrial DNA
-# ss_ag_k6r_fb_vtx_p1bi <- fb_vt_bind(fb_gtype = gt_ss_ag_k6r_p1_bi, vtx_mtx = ss_ag_k6r_vtx_mtx)
-```
-
-```{r}
-##strain k8 raw freebayes vcf + vatrix high quality no mitochondrial DNA
-# s_k6r_fb_vtx_p1bi <- fb_vt_bind(fb_gtype = gt_s_k6r_p1_bi, vtx_mtx = s_k6r_vtx_mtx)
-```
-
-
-VCF with minimum alternate allele fraction being 0.2 and ploidy 1 - NOT USED
-```{r}
-##Filter to retain those genotypes where the sum of quality for either alternate or reference alleles is > 50
-# 
-# gt_fb_vtx_p1_bi_qc_q <- gt_fb_vtx_p1_bi_qc %>%
-#   mutate(G1_i_A_qc = case_when(G1_i_A_RefN >50 |G1_i_A_AltN >50 ~ G1_i_A_qc),
-#          # G1_i_F_qc = case_when(G1_i_F_RefN >50 |G1_i_F_AltN >50 ~ G1_i_F_qc),
-#          G1_i_F_qc = case_when(G1_i_F_RefN >50 |G1_i_F_AltN >50 ~ G1_i_F_qc),
-#          G1_o_A_qc = case_when(G1_o_A_RefN >50 |G1_o_A_AltN >50 ~ G1_o_A_qc),
-#          G1_o_F_qc = case_when(G1_o_F_RefN >50 |G1_o_F_AltN >50 ~ G1_o_F_qc),
-#          G1_o_M_qc = case_when(G1_o_M_RefN >50 |G1_o_M_AltN >50 ~ G1_o_M_qc),
-#          G2_i_A_qc = case_when(G2_i_A_RefN >50 |G2_i_A_AltN >50 ~ G2_i_A_qc),
-#          G2_i_F_qc = case_when(G2_i_F_RefN >50 |G2_i_F_AltN >50 ~ G2_i_F_qc),
-#          G2_i_M_qc = case_when(G2_i_M_RefN >50 |G2_i_M_AltN >50 ~ G2_i_M_qc),
-#          G2_o_F_qc = case_when(G2_o_F_RefN >50 |G2_o_F_AltN >50 ~ G2_o_F_qc),
-#          G2_o_M_qc = case_when(G2_o_M_RefN >50 |G2_o_M_AltN >50 ~ G2_o_M_qc),
-#          G3_i_A_qc = case_when(G3_i_A_RefN >50 |G3_i_A_AltN >50 ~ G3_i_A_qc),
-#          G3_o_F_qc = case_when(G3_o_F_RefN >50 |G3_o_F_AltN >50 ~ G3_o_F_qc),
-#          G3_o_M_qc = case_when(G3_o_M_RefN >50 |G3_o_M_AltN >50 ~ G3_o_M_qc),
-#          Doublet_A_qc = case_when(Doublet_A_RefN >50 |Doublet_A_AltN >50 ~ Doublet_A_qc)#,
-#          # Doublet_A_qc = case_when(RefN_Doublet_A - AltN_Doublet_A >20 ~ Doublet_A)
-#          ) #%>%
-#   #filter(!if_all(ends_with('_qc'), ~ is.na(.)))
-
-```
 
 ## SNPS from the pf7 paper without filtering
 
 ```{r}
-##soupo k6 with pf7 all variants including poor quality
+##soupo with pf7 all variants including poor quality
 
 gt_pf7_merge <- function(gt_tbl){  
   gt_pf7_mali <- pf7_mali_only_snp_qc %>% 
@@ -637,22 +349,10 @@ gt_pf7_merge <- function(gt_tbl){
 ```
 
 ```{r}
-##strain stage k8 raw genotypes merge with pf Mali
+## raw genotypes merge with pf Mali
 
 ss_afm_pf7_mali <- map(ss_afm_fb_vtx_p1bi, ~gt_pf7_merge(gt_tbl=.x))
 
-```
-
-```{r}
-##strain stage k8 raw genotypes merge with pf Mali
-
-# ss_ag_k6r_pf7_mali <- gt_pf7_merge(gt_tbl=ss_ag_k6r_fb_vtx_p1bi, gt_tbl_nm='ss_ag_k6r_pf7_mali')
-```
-
-```{r}
-##strain stage k8 raw genotypes merge with pf Mali
-
-# s_k6r_pf7_mali <- gt_pf7_merge(gt_tbl=s_k6r_fb_vtx_p1bi, gt_tbl_nm='s_k6r_pf7_mali')
 ```
 
 
@@ -661,7 +361,7 @@ ss_afm_pf7_mali <- map(ss_afm_fb_vtx_p1bi, ~gt_pf7_merge(gt_tbl=.x))
 
 ss_afm_pf7_mali[[1]] %>%  group_by(chrom,pos) %>% mutate(across(type, ~factor(., levels = c('SNP', 'INDEL', 'OVERLAP')))) %>% arrange(type, .by_group = T) %>% arrange(dplyr::desc(AF), .by_group = T) #%>% View()
 
-# s_k6r_pf7_mali %>% group_by(chrom,pos) %>% mutate(across(type, ~factor(., levels = c('SNP', 'INDEL', 'OVERLAP')))) %>% arrange(type, .by_group = T) %>% arrange(dplyr::desc(AF), .by_group = T) %>% distinct(., pick(chrom, pos), .keep_all = T) %>% dplyr::select(c('chrom', 'pos','alleles','ref', 'alt',  'type', 'AF', 'AC')) %>% View()
+
 ```
 
 ```{r}
@@ -679,21 +379,9 @@ pf7_snps_qc_multitop <- function(gt_pf7_mali) {
 ```
 
 ```{r}
-##strain k8 raw genotypes merge with pf7M (pf7Mali) retaining only the top SNPs from the Mali dataset where there are complex alleles with overlaps with indel etc
+## raw genotypes merge with pf7M (pf7Mali) retaining only the top SNPs from the Mali dataset where there are complex alleles with overlaps with indel etc
 
 ss_afm_pf7M_snptop <- map(ss_afm_pf7_mali, ~pf7_snps_qc_multitop(gt_pf7_mali=.x))
-```
-
-```{r}
-##strain k8 raw genotypes merge with pf7M (pf7Mali) retaining only the top SNPs from the Mali dataset where there are complex alleles with overlaps with indel etc
-
-# ss_ag_k6r_pf7M_snptop <- pf7_snps_qc_multitop(gt_pf7_mali=ss_ag_k6r_pf7_mali)
-```
-
-```{r}
-##strain k8 raw genotypes merge with pf7M (pf7Mali) retaining only the top SNPs from the Mali dataset where there are complex alleles with overlaps with indel etc
-
-# s_k6r_pf7M_snptop <- pf7_snps_qc_multitop(gt_pf7_mali=s_k6r_pf7_mali)
 ```
 
 
@@ -734,19 +422,6 @@ m14_pf7_prep_viz <- function(m14_gt, pf7_base = pf7_mali) {
 
 ss_afm_pf7M_jcb <- map(ss_afm_pf7M_snptop, ~m14_pf7_prep_viz(m14_gt=.x))
 ```
-
-```{r, fig.height=5, fig.width=10}
-##strain stage k8 raw genotypes merge with pf Mali
-
-# ss_ag_k6r_pf7M_jcb <- m14_pf7_prep_viz(m14_gt=ss_ag_k6r_pf7M_snptop)
-```
-
-```{r, fig.height=5, fig.width=10}
-##strain stage k8 raw genotypes merge with pf Mali
-
-# s_k6r_pf7M_jcb <- m14_pf7_prep_viz(m14_gt=s_k6r_pf7M_snptop)
-```
-
 
 
 ```{r}
@@ -793,15 +468,6 @@ pf7_hlght <- function(m14_gt ) {
 ```{r}
 ss_afm_pf7M_pf7qc <- map(ss_afm_pf7M_snptop, ~pf7_hlght(m14_gt=.x))
 ```
-
-```{r}
-# ss_ag_k6r_pf7M_pf7qc <- pf7_hlght(m14_gt=ss_ag_k6r_pf7M_snptop)
-```
-
-```{r}
-# s_k6r_pf7M_pf7qc <- pf7_hlght(m14_gt=s_k6r_pf7M_snptop)
-```
-
 
 ```{r, fig.height=4, fig.width=15}
 ##Function for cleaner plot of SNPs falling in the different filter categories for each stage +/ strain cluster
@@ -918,20 +584,6 @@ imap(ss_afm_pf7M_qc, ~write_csv(.x, paste0('data/processed/',species,'/', str_re
 
 ```
 
-```{r}
-# ss_ag_k6r_pf7M_qc <- snps_qc_filts(m14_gt=ss_ag_k6r_pf7M_pf7qc)
-# 
-# ss_ag_k6r_pf7M_qc %>% write_csv(., '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/msc48/', gtyp_step, '/stage_ag_strain_qcd_k8_minimp/p1/snp_qc/ss_ag_k6r_pf7M_qc.csv')
-
-```
-
-```{r}
-# s_k6r_pf7M_qc <- snps_qc_filts(m14_gt=s_k6r_pf7M_pf7qc)
-# 
-# s_k6r_pf7M_qc %>% write_csv(., '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/msc48/', gtyp_step, '/strain_qcd_k8_minimp/p1/snp_qc/s_k6r_pf7M_qc.csv')
-
-```
-
 Minimal QC (lessQC [lqc]) retaining the "Noisy", "Non distinct", 'Ref inverted' and 'Alt inverted' categories
 ```{r}
 ##!!!! NOTE :Same script as above just commenting out the lines to remove "Noisy", "Non distinct", 'Ref inverted' and 'Alt inverted' categories - Need to find a clever way to do this to avoid repetition
@@ -1028,23 +680,18 @@ Count those absent in pf7
 ```{r, fig.height=5, fig.width=14}
 ##SNPs in pf7
 # ss_ag_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% distinct(pick(chrom,pos)) %>% dim
-# s_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% distinct(pick(chrom,pos)) %>% dim
 # 
 # ##SNPs where there's less than 8 UMI
 # ss_ag_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% distinct(chrom,pos) %>% dim
-# s_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% distinct(chrom,pos) %>% dim
 # 
 # ##Genotypes where there's less than 8 UMI
 # ss_ag_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dim
-# s_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dim
-# 
+#
 # ##Counts of genotypes where there's less than 8 UMI across groups (range medium)
 # ss_ag_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dplyr::count(groups, filt_reason)
-# s_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dplyr::count(groups, filt_reason)
 # 
 # ##Summary of genotypes where there's less than 8 UMI across groups (range medium)
 # ss_ag_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dplyr::count(groups, filt_reason) %>% pull(n) %>% summary
-# s_k6r_pf7M_qc %>% dplyr::distinct(chrom, pos, filt_reason, groups) %>% filter(filt_reason != 'Absent in Pf7') %>% filter(filt_reason == 'Low UMI support') %>% dplyr::count(groups, filt_reason) %>% pull(n) %>% summary
 
 ```
 
@@ -1196,21 +843,15 @@ return(list(annot_snp_qc_nd, annot_snp_qc_infomtv))
 
 ```{r, fig.height=5, fig.width=14}
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
-# ss_afm_pf7M_qc_infomtv <- map(ss_afm_pf7M_qc, ~snp_rm_dblt_infomtv(annot_snp_qc = .x))
-# ss_ag_k6r_pf7M_qc_infomtv <- snp_rm_dblt_infomtv(annot_snp_qc = ss_ag_k6r_pf7M_qc) 
 ss_afm_pf7M_qc_infomtv <- map(ss_afm_pf7M_qc, ~snp_rm_dblt_infomtv(annot_snp_qc = .x, clst2rmv = "None"))
 ```
 
 ```{r, fig.height=5, fig.width=14}
 ##By retaining only SNPs with absolute difference between alt and ref >10 we also factor in depth per allele per cluster
 ss_afm_pf7M_lqc_infomtv <- map(ss_afm_pf7M_lqc, ~snp_rm_dblt_infomtv(annot_snp_qc = .x))
-# ss_ag_k6r_pf7M_qc_infomtv <- snp_rm_dblt_infomtv(annot_snp_qc = ss_ag_k6r_pf7M_qc) 
+
 ```
 
-
-```{r}
-# pf_chr_size = read_delim('Po_gtf_index/Poc65.chrom.sizes.txt', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'PocGH01_0|PocGH01_|_v2'))
-```
 
 ```{r}
 # pf_chr_size = read_delim('../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-52_Pfalciparum3D7_Genome.size', col_names = c('chrom', 'size')) %>% mutate(chr = str_remove_all(chrom,'Pf3D7_0|Pf3D7_|_v3')) 
@@ -1238,7 +879,6 @@ gtypes_chr_cln<- function(snp_qc_fnl ){
 ```
 
 
-
 ```{r}
 
 ss_afm_pf7M_cln_gt<- map(ss_afm_pf7M_qc_infomtv, ~gtypes_chr_cln(snp_qc_fnl = .x[[1]]))
@@ -1250,21 +890,11 @@ ss_afm_pf7M_cln_gt<- map(ss_afm_pf7M_qc_infomtv, ~gtypes_chr_cln(snp_qc_fnl = .x
 saveRDS(ss_afm_pf7M_cln_gt, paste0("data/processed/",species, "/ss_afm_pf7M_cln_gt.RDS"))
 ```
 
-```{r}
-## !!!! NOTE - Remove SC8 in MSC14 as shown to be poor quality
-# ss_afm_pf7M_cln_gt[c("MSC14.stage_afm_strain_qcd", "MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] <- ss_afm_pf7M_cln_gt[c("MSC14.stage_afm_strain_qcd", "MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] %>% map(., ~dplyr::select(.x, -c(contains("SC8")))) 
-```
-
 
 ```{r}
 ss_afm_pf7M_cln_gt_lqc <- map(ss_afm_pf7M_lqc_infomtv, ~gtypes_chr_cln(snp_qc_fnl = .x[[1]]))
 ```
 
-
-```{r}
-## !!!! NOTE - Remove SC8 in MSC14 as shown to be poor quality
-# ss_afm_pf7M_cln_gt_lqc[c("MSC14.stage_afm_strain_qcd", "MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] <- ss_afm_pf7M_cln_gt_lqc[c("MSC14.stage_afm_strain_qcd", "MSC14.stage_ag_strain_qcd", "MSC14.strain_qcd")] %>% map(., ~dplyr::select(.x, -c(contains("SC8")))) 
-```
 
 ```{r, fig.height=3.8, fig.width=4.2}
 ##Heatmap function
@@ -1295,16 +925,7 @@ gtypes_chr_cln_ibs_hm <- function(gtypes_chr_pos){
   colFun = suppressWarnings(brewer.pal(100, 'Greens'))
   colFun = circlize::colorRamp2(seq(0.5, 1, length.out = length(colFun)), 
                                   colFun)
-  # celltype_col = brewer.pal(8,'Dark2')[as.numeric(as.factor(sapply(strsplit(colnames(ibs$ibs),split=':'),'[',3)))]
-  # names(celltype_col) = as.factor(sapply(strsplit(colnames(ibs$ibs),split=':'),'[',3))
-  
-  # hm = Heatmap(ibs$ibs, col = colFun, show_row_names = TRUE, 
-  #                show_column_names = TRUE, show_row_dend = T, 
-  #                show_column_dend = T, row_title_rot = 0, cluster_rows = F, cluster_columns = F)
-  
-  # colnames(a) <- stg_strn_ordr %>% str_replace_all(.,  c('G'='SC', '1_i'='1','1_o'='2', '2_i_A'='3_A', '2_i_M' = '4_M', '2_i_F' = '4_F', '2_o'='5','3_i'='6','3_o'='7') )
-  # rownames(a) <- stg_strn_ordr %>% str_replace_all(.,  c('G'='SC', '1_i'='1','1_o'='2', '2_i_A'='3_A', '2_i_M' = '4_M', '2_i_F' = '4_F', '2_o'='5','3_i'='6','3_o'='7') )
-    
+
   hm = Heatmap(ibs$ibs, name='IBS', col = colFun, show_row_names = TRUE, 
                  show_column_names = TRUE, show_row_dend = T, 
                  show_column_dend = T, row_title_rot = 0, cluster_rows = T, cluster_columns = T)
@@ -1501,12 +1122,6 @@ ss_afm_wndws <- map(ss_afm_pf7M_afm_comps, ~b_strn_c_wndw_fn(strn_c_tbl = .x))
 
 ```
 
-```{r, fig.height=4.1, fig.width=4.5}
-# ss_100_plus_m14_wndws<- b_strn_c_wndw_fn(strn_c_tbl=ss_100_plus_m14_comps)
-
-# ss_ag_hmap_ibs<-gtypes_chr_cln_ibs_hm(gtypes_chr_pos=ss_ag_k6r_pf7M_cln_gt)
-```
-
 
 ```{r}
 ## Function for chromosome painting
@@ -1548,7 +1163,7 @@ Pie of snps compared
 # strain stage (afm) chromosome painting
 pp_plts <- imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x, ttl=.y, lg = "none"), 'No overlapping SNPs between the 2 groups'))
 
-# ss_afm_chromp_smth[1:3]
+
 ```
 
 ```{r, warning=FALSE, fig.width=8, fig.height=8}
