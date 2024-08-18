@@ -1336,6 +1336,8 @@ c("Negative", "Female", "SC2")
 
 Manually assign negative for which we assessed to the relevant Ks
 ```{r, warning=FALSE, eval=T}
+
+
 strn_c_new_mdata_m22_min[["MSC48"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_min[["MSC48"]] %>% 
   mutate(StrainQCd_Man = case_when(stage_afm == "Asexual" & StrainQCd == "Negative" ~ "SC2", 
                                    stage_afm == "Female" & StrainQCd == "Negative" ~ "SC3",
@@ -1365,8 +1367,10 @@ strn_c_new_mdata_m22_min[["MSC55"]][,"StrainQCd_Man"] <- strn_c_new_mdata_m22_mi
 
 ```{r, warning=FALSE, eval=T}
 
+donors_manual_strain_asn <- c("MSC48", "MSC49", "MSC60", "MSC66", "MSC68", "MSC50_SLO", "MSC55")
+
 for (i in names(strn_c_new_mdata_m22_min)) {
-        if (!(i %in% names(man_neg_K))) {
+        if (!(i %in% donors_manual_strain_asn)) {
           print(i)
           strn_c_new_mdata_m22_min[[i]][,"StrainQCd_Man"] = strn_c_new_mdata_m22_min[[i]]$StrainQCd
         }
@@ -1393,6 +1397,9 @@ Write out strain_qcd + stage_ag for pseudobulk genotyping
 ## Get donors with more than 1 strain
 optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
 # optimum_k_polyk <- optimum_k_polyk[!names(optimum_k_polyk) %in% c("MSC37", "MSC38")]
+
+## Genotype also for monoclonal
+optimum_k_polyk <- optimum_k_qcd
 ```
 
 
@@ -1415,7 +1422,7 @@ for (s in names(optimum_k_polyk)) {
   print(s_nm)
   
   ## !!!NOTE - Dangerous command - activate only when barcodes are modified
-  # system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
+  system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
   
   for (k in narrow_k) {
     print(narrow_k)
@@ -1454,7 +1461,7 @@ for (s in names(optimum_k_polyk)) {
 
 ```{r, warning=FALSE, eval=T}
 gogo()
-# nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
+# nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC55,MSC50_SLO}/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
 ```
 
 ```{r, eval=FALSE}
