@@ -312,7 +312,6 @@ all_msc_filt %>% map(., ~.x@meta.data %>% count(StagePrelim, StagePrelimC))
 
 ## scDblFinder
 
-
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
 gogogo()
@@ -1269,7 +1268,7 @@ saveRDS(all_msc_w_dblts, "data/processed/Pf/all_msc_w_dblts.RDS")
 ```{r, eval=F}
 
 ##Remove souporcell doublet
-all_msc_w_dblts <- readRDS("data/processed/Pf/all_msc_w_dblts.RDS")
+# all_msc_w_dblts <- readRDS("data/processed/Pf/all_msc_w_dblts.RDS")
 
 ```
 
@@ -1423,7 +1422,7 @@ for (i in names(all_msc_filt_no_dblts)) {
 
 ```
 FARM CODE
-```{r, eval=F}
+```{r, eval=T}
 ##write out for normalization processing in farm
 
 for (i in 1:length(sample_name)) {
@@ -1431,8 +1430,8 @@ for (i in 1:length(sample_name)) {
   
   ##Transfers
   ##souporcell genotyping files
-  saveRDS(all_msc_filt[[sample_name[i]]],
-    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/filt_seu_sct.RDS')
+  saveRDS(all_msc_filt_no_dblts_sset[[sample_name[i]]],
+    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/all_msc_filt_no_dblts_sset.RDS')
     )
   
 }
@@ -1440,49 +1439,21 @@ for (i in 1:length(sample_name)) {
 
 ```
 
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_filt_no_dblts_sset.RDS" --o_file_name "all_msc_filt_no_dblts.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "all_msc_filt_no_dblts_elbo.RDS" --resume
+
+```
+
 Read in seurat objects processed in farm
-```{r, message=F, warning=F, eval=F}
+```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
-all_msc_filt <- list.files("data/processed/", pattern = "filt_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_filt_no_dblts <- list.files("data/processed/", pattern = "all_msc_filt_no_dblts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
   .[sample_name] %>%
   map(readRDS)
 ```
-
-```{r, eval=F}
-
-all_msc_filt_no_dblts <- all_msc_filt_no_dblts %>%
-  map(. %>% seurat_norm_stand()
-  )
-```
-
-
-#### Elbow plot for PC determination
-
-```{r, results='asis', eval=F}
-##adding clusters that are used to display mitochondrial count
-map(all_msc_filt_no_dblts, ElbowPlot)
-```
-
-
-
-```{r, message=FALSE, warning=FALSE, eval=F}
-# pc_list <-list(5L,4L,4L, 5L, 5L, 5L)
-# # res_list <- c(0.16,0.12,0.12,0.12,0.12)
-# res_list <- c(0.1,0.1,0.12,0.12,0.2,0.2)
-
-pc_list <- list(rep(6L, length(sample_name_nms)))
-res_list <- list(rep(0.4, length(sample_name_nms)))
-
-
-all_msc_filt_no_dblts <- list(all_msc_filt_no_dblts, pc_list, res_list) %>%
-  pmap(~RunUMAP(..1, dims = 1:..2, n.components = 3L, verbose=F, seed.use = 949) %>%
-         FindNeighbors(., dims = 1:..2, verbose = FALSE) %>%
-         FindClusters(., resolution = ..3, verbose=F)
-  )
-
-```
-
 
 #### Visualize reclustered QCd cells
 
