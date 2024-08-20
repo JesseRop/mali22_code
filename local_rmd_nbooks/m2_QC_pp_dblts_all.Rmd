@@ -1794,20 +1794,6 @@ gogo()
 # nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc_GE_postQC" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
 ```
 
-Copy the Qcd barcodes to farm for souporcell
-```{r, results='asis', eval=F}
-
-imap(all_msc_filt_no_dblts, ~{
-  system(paste0('mkdir /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/'))
-  write(colnames(.x), paste0('data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))
-  system(paste0('gzip /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))
-  system(
-        paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv.gz jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/Pf/',.y,'/soupc_GE_postQC/')
-      )
-})
-
-```
-
 
 Packages and environment information
 ```{r}
