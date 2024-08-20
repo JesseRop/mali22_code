@@ -46,6 +46,7 @@ suppressPackageStartupMessages({
   library(ggsankey)
   library(caret)
   library(BPCells)
+  library(png)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
@@ -735,15 +736,54 @@ rm(genes_msc)
 ```
 
 ```{r}
+gogo()
+## Run this script in farm
+# python scrblt.py 
+# python /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/python_nbooks
+```
 
-scrublet_o <- pmap(list(all_msc_w_dblts, py$db_scores_ls, py$prd_db_ls), ~data.frame('bcode'= colnames(..1), 'scrub_scores'=..2, 'scrub_doublet'=..3))
+```{r}
+## Read scrublet output
+scrb_doublet_scores <- list.files("data/processed/Pf", pattern = "doublet_scores.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(read_csv)
+```
 
+```{r}
+## Read scrublet output
+predicted_doublets_scores <- list.files("data/processed/Pf", pattern = "predicted_doublets.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(read_csv)
 ```
 
 Visualize scrublet scores
 ```{r}
-imap(scrublet_o, ~{ggplot(data = .x, aes(x=scrub_scores)) + geom_histogram()+
-    labs(title = .y)})
+## Read scrublet plots for threshold
+
+scrb_png <- list.files("data/processed/Pf", pattern = "scrblt_thresh.png$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(readPNG)
+
+imap(scrb_png, ~{
+  plot(1:2, type='n', xlab="", ylab="", axes=FALSE, main = .y)
+  rasterImage(.x, 1, 1, 2, 2)
+  })
+```
+```{r}
+## Read scrublet plots for threshold
+
+scrb_umap_png <- list.files("data/processed/Pf", pattern = "scrblt_umap.png$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
+  .[sample_name] %>%
+  map(readPNG)
+
+imap(scrb_umap_png, ~{
+  plot(1:2, type='n', xlab="", ylab="", axes=FALSE, main = .y)
+  rasterImage(.x, 1, 1, 2, 2)
+  })
 ```
 
 ```{r}
