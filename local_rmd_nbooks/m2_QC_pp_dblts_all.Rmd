@@ -97,45 +97,17 @@ initialize variable for the sample names
 
 ##Sample ID
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70")
+
 sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
-
-
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
 
 ##Samples
 sample_name <- sample_name_nms
 sample_id_lst <- sample_name_nms
 
-##Sample IDs
-# source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215", "5736STDY13437393") %>% set_names(sample_name_nms)
-# source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215") %>% set_names(sample_name_nms)
-
 
 ```
 
-
-```{r, results='hide', eval=FALSE}
-# list.files("data/processed/", pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
-list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
-  set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_')))
-```
-
-Save paths to raw MSC files in list - also needed for soupX below
-```{r, eval=F}
-all_msc_raw_paths <- list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/", pattern = "raw_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre.*Pf//|/outs.*') %>% str_replace(., '/', '_'))) %>%
-  .[irods_id_sk21_mdata_cln[, c("sample_nm", "irods_id")] %>% deframe() %>% .[sample_id_lst]] %>%
-  set_names(sample_id_lst)
-```
-
-
-```{r, eval=FALSE}
-all_msc_filt<-map(sample_name_nms, ~readRDS(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2/data/processed/Pf/all_msc_filt_",.x,".RDS")))
-```
-
-
+Read in preprocessed filtered
 ```{r, eval=T}
 all_msc_filt <- readRDS("data/processed/Pf/all_msc_filt.RDS")
 ```
@@ -171,52 +143,6 @@ soupo_kselect_list_pp <- readRDS("data/processed/Pf/soupo_kselect_list_pp.RDS")
 ## Doublet removal
 
 ### SoupX ambient transcript removal
-
-SoupX function
-```{r, eval=F}
-# get_SoupX <- function(data, path){
-#   
-#   # data <- FindNeighbors(data, k.param = 20)
-#   # data <- FindClusters(data, resolution = 0.5)
-#   
-#   # print(DimPlot(data, group.by <- 'seurat_clusters'))
-#   
-#   # toc <- data@assays[["RNA"]]@counts
-#   toc <- data[["RNA"]]$counts
-#   
-#   tod <- Seurat::Read10X(paste0(path))
-#   tod@Dimnames[[1]] <- toc@Dimnames[[1]]
-#   
-#   sc <- SoupChannel(tod, toc)
-#   sc <- setClusters(sc, data$seurat_clusters)
-#   
-#   sc <- autoEstCont(sc)
-#   #ggsave(paste0('Raw_Cellranger/', Project(dataset), "/rho_", name, specific, ".pdf"))
-#   adjusted <- adjustCounts(sc)
-#   data <- CreateSeuratObject(adjusted)
-#   # data <- seurat_SCT(data)
-#   data <- seurat_norm_stand(Seurat_object = data, hvg = 500)
-#   return(list(data, sc))
-# }
-```
-
-
-Run soupX
-
-```{r , eval=F}
-# # path = 'data/raw/MSC14/5736STDY11771546_DB52e_star/raw_feature_bc_matrix/'
-# hvg =500
-# # all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~get_SoupX(..1, ..2))
-# all_msc_nosct_supx_4_dblt <- pmap(list(all_msc_filt, all_msc_raw_paths), ~{
-#   tryCatch({
-#     get_SoupX(..1, ..2)
-#     }, error = function(e)  e$message)
-# })
-# 
-# failed_supx <- names(all_msc_nosct_supx_4_dblt[map(all_msc_nosct_supx_4_dblt, ~class(.x)[1]) == "character"])
-
-```
-
 
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
