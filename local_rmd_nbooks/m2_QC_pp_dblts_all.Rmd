@@ -159,11 +159,7 @@ all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePre
 
 ```
 
-```{r}
 
-all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePrelimC %in% c("Early trophozoite", "Late ring") ~ "Asexual", str_detect(StagePrelimC, "ale") ~ "Gametocytes", T ~ StagePrelimC)) %>% count(stage_c_ag))
-
-```
 
 ```{r}
 # all_msc_filt <- readRDS("data/processed/Pf/all_msc_filt.RDS")
@@ -222,7 +218,7 @@ Run soupX
 
 
 !!!NB - FARM CODE - DONT DELETE
-```{r, eval=F}
+```{r, eval=T}
 ## Run Soupx in farm
 gogo()
 # nextflow run submsn_soupx.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/soupx.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_norm.RDS" --input_raw_mtx "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/raw_feature_bc_matrix.h5" --o_file_name "soupx_filt_seu_norm.RDS" --hvg 500
@@ -312,7 +308,7 @@ filt_seu_norm_supx_elbo <-  list.files("data/processed/", pattern = "^filt_seu_n
   .[sample_name] %>%
   map(readRDS)
 
-filt_seu_norm_supx_elbo
+imap(filt_seu_norm_supx_elbo, ~.x + labs(title = .y))
 ```
 
 
@@ -329,12 +325,14 @@ all_msc_nosct_supx_4_dblt <- list.files("data/processed/", pattern = "^filt_seu_
 
 #### Visualize gene count in soup corrected
 ```{r, results='asis'}
-map(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'nFeature_RNA', dims = c(1,3)) +
+imap(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'nFeature_RNA', dims = c(1,3)) +
+       labs(title = .y) +
       theme(axis.text=element_text(size=18), 
             axis.title=element_text(size=18,face="bold"), 
             legend.text = element_text(size=22), 
             legend.title = element_text(size=22,face="bold"),
-            plot.title = element_blank())
+            # plot.title = element_blank()
+            )
 )
 
 ```
@@ -353,7 +351,7 @@ all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>%
 ```
 
 ```{r, results='asis'}
-map(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'percent.mt', dims = c(1,2)))
+imap(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'percent.mt', dims = c(1,2)) +labs(title = .y))
 
 ```
 
@@ -371,10 +369,18 @@ fp_fn <- function(obj = all_msc_nosct_supx_4_dblt[[1]], mks = marker_nms, mk_nms
     plot_grid(plotlist = ., nrow = ceiling(length(markers)/4)) 
 }
 
-map(all_msc_nosct_supx_4_dblt, ~fp_fn(obj = .x))
+imap(all_msc_nosct_supx_4_dblt, ~fp_fn(obj = .x) %>% 
+       plot_grid(ggdraw() + draw_label(.y), . ,ncol = 1, rel_heights = c(0.1, 1)))
 ```
 
 
+
+Check the distribution of stages - scdblfinder will give error if only one category in stage - Using StagePrelim instead of StagePrelimC
+```{r}
+
+all_msc_filt %>% map(., ~.x@meta.data %>% count(StagePrelim, StagePrelimC))
+
+```
 
 
 ## scDblFinder
@@ -556,12 +562,16 @@ all_msc_w_dblts <- list(all_msc_filt, scf_outputs) %>%
 
 ```
 
-
+```{r, message=FALSE}
+##Doublet removal
+DimPlot(all_msc_nosct_supx_4_dblt[[1]], reduction = 'umap.f.s.norm')
+# DimPlot(all_msc_w_dblts[[1]],reduction = "umap.f.s.norm")
+```
 
 ```{r}
 ## Add UMAP dimensions from the soupx corrected object used to get doublets
 for (i in names(all_msc_w_dblts)) {
-  all_msc_w_dblts[[i]]@reductions[["umap_soupx"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions[["umap"]]
+  all_msc_w_dblts[[i]]@reductions[["umap.f.s.norm"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions[["umap.f.s.norm"]]
 }
 ```
 
@@ -569,7 +579,7 @@ for (i in names(all_msc_w_dblts)) {
 ```{r, message=FALSE}
 ##Doublet removal
 DimPlot(all_msc_w_dblts[[1]])
-# DimPlot(all_msc_w_dblts[[1]],reduction = "umap_soupx")
+# DimPlot(all_msc_w_dblts[[1]],reduction = "umap.f.s.norm")
 ```
 
 ##### scdblfinder visualizations
@@ -642,6 +652,15 @@ dbr = map(all_msc_filt, ~(ncol(.)/1000)*0.008)
 
 
 ```{r}
+write(names(counts_msc), file = "data/processed/Pf/don_nms.txt")
+
+imap(counts_msc, ~writeMM(.x, paste0("data/processed/Pf/", .y ,"/seu_obj/counts_msc.mtx")))
+imap(genes_msc, ~write(.x, paste0("data/processed/Pf/", .y ,"/seu_obj/genes_msc.txt")))
+
+# dbr = map(all_msc_filt, ~(ncol(.)/1000)*0.008)
+```
+
+```{r}
 ## Remove names from the objects as it seems to give the error AttributeError: 'str' object has no attribute 'T'
 
 names(counts_msc) <- NULL
@@ -663,7 +682,6 @@ import numpy as np
 
 db_scores_ls = []
 prd_db_ls = []
-histogms = []
 
 for mat, gns, dbr in zip(r.counts_msc, r.genes_msc, r.dbr):
   counts_matrix = mat.T.tocsc()
@@ -724,7 +742,8 @@ scrublet_o <- pmap(list(all_msc_w_dblts, py$db_scores_ls, py$prd_db_ls), ~data.f
 
 Visualize scrublet scores
 ```{r}
-map(scrublet_o, ~{ggplot(data = .x, aes(x=scrub_scores)) + geom_histogram()})
+imap(scrublet_o, ~{ggplot(data = .x, aes(x=scrub_scores)) + geom_histogram()+
+    labs(title = .y)})
 ```
 
 ```{r}
@@ -784,7 +803,8 @@ dbt_methods_optimum <- c("scf_class_supx_rand", "scrub_doublet")
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-map(all_msc_w_dblts, ~.x@meta.data %>% ggplot(aes(x = seurat_clusters, y= sim_lab1, color = strain_gt)) + geom_boxplot() + geom_hline(yintercept = 0.85) + facet_wrap(. ~ StagePrelimC, nrow = 1, scales = "free_x"))
+imap(all_msc_w_dblts, ~.x@meta.data %>% ggplot(aes(x = seurat_clusters, y= sim_lab1, color = strain_gt)) + geom_boxplot() + geom_hline(yintercept = 0.85) + facet_wrap(. ~ StagePrelimC, nrow = 1, scales = "free_x")+
+    labs(title = .y))
 ```
 
 
@@ -815,12 +835,13 @@ all_msc_w_dblts <- map(all_msc_w_dblts, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-map(all_msc_w_dblts, ~{
+imap(all_msc_w_dblts, ~{
   .x@meta.data %>%
     ggplot(aes(x = seurat_clusters, y= sim_lab1, color = hetero_dblts)) + 
     geom_boxplot() + 
     geom_hline(yintercept = 0.85) + 
-    facet_wrap(. ~ StagePrelimC, nrow = 1, scales = "free_x")
+    facet_wrap(. ~ StagePrelimC, nrow = 1, scales = "free_x") +
+    labs(title = .y)
     })
 
 ```
@@ -846,7 +867,7 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(hetero_dblts == "Doublet") %>% row.names(), reduction = "umap_soupx"))
+imap(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(hetero_dblts == "Doublet") %>% row.names(), reduction = "umap.f.s.norm") + labs(title = .y))
 
 ```
 
@@ -883,7 +904,7 @@ all_msc_w_dblts[[3]]@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelimC", reduction = "umap_soupx"))
+map(all_msc_w_dblts, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelimC", reduction = "umap.f.s.norm"))
 ```
 
 
@@ -1286,7 +1307,7 @@ return(list(cell_qc_filt_obj, cell_qc_plot))
 ```{r, results='asis',  fig.width = 8, fig.height = 4}
 ##adding clusters that are used to display mitochondrial count
 
-map(cell_qc_objs, ~.x[2])
+imap(cell_qc_objs, ~.x[2]+ labs(title = .y))
 ```
 
 
@@ -1520,7 +1541,7 @@ all_msc_filt_no_dblts <- all_msc_filt_no_dblts %>%
     # map(. %>% subset(., subset = scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.1 & scf_class_rand_dbt_prop < 0.1)) %>%
     map(. %>% subset(., subset = scf_class_norm == "Singlet")) %>%
     map(. %>% subset(., subset = scf_class_norm_dbt_prop < 0.1 | scf_class_rand_dbt_prop < 0.1)) %>%
-    map(. %>% subset(., subset = scrub_doublet_dbt_prop < 0.1))
+    map(. %>% subset(., subset = scrub_doublet_dbt_prop < 0.13)) ## !!NOTE - was 0.1 but MSC50_SLO has all clusters > 0.12
   # map(. %>% subset(., subset = scf_class_supx_rand == "Singlet" & scrub_doublet == 'Singlet'))
 
 ```
@@ -1954,6 +1975,13 @@ imap(all_msc_filt_no_dblts, ~{
 
 ```
 
+
+
+Packages and environment information
+```{r}
+gogo()
+# nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc_GE_postQC" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
+```
 
 Copy the Qcd barcodes to farm for souporcell
 ```{r, results='asis', eval=F}
