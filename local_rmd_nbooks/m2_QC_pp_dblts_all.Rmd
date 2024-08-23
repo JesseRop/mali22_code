@@ -1299,8 +1299,8 @@ map(all_msc_w_dblts, ~.x@meta.data %>% dplyr::count(strain_gt))
 ```{r}
 
 ##Remove souporcell doublet
-all_msc_filt_no_strainDblts <- all_msc_w_dblts %>%
-  map(. %>% subset(., subset = strain_gt %in% c("Doublet"), invert = TRUE))
+# all_msc_filt_no_strainDblts <- all_msc_w_dblts %>%
+#   map(. %>% subset(., subset = strain_gt %in% c("Doublet"), invert = TRUE))
 
 ```
 
@@ -1308,13 +1308,13 @@ all_msc_filt_no_strainDblts <- all_msc_w_dblts %>%
 ```{r}
 ##Seurat object
 ##Remove cluster 7 with lots of doublets MSC14
-# subset(all_msc_filt_no_strainDblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet)
+# subset(all_msc_w_dblts[[4]], subset = seurat_clusters_dblt == "7") %>% .@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet)
 
 ##Remove cluster 8 with lots of doublets (0.205) MSC14 - losing 31 singlets
-# all_msc_filt_no_strainDblts[[4]] <- subset(all_msc_filt_no_strainDblts[[4]], subset = seurat_clusters_dblt != "7")
+# all_msc_w_dblts[[4]] <- subset(all_msc_w_dblts[[4]], subset = seurat_clusters_dblt != "7")
 
 ##Remove cluster 8 with lots of doublets (0.368) MSC14 - losing 12 singlets
-# all_msc_filt_no_strainDblts[[4]] <- subset(all_msc_filt_no_strainDblts[[4]], subset = seurat_clusters_dblt != "8")
+# all_msc_w_dblts[[4]] <- subset(all_msc_w_dblts[[4]], subset = seurat_clusters_dblt != "8")
 
 ```
 
@@ -1323,7 +1323,7 @@ all_msc_filt_no_strainDblts <- all_msc_w_dblts %>%
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm_dbt_prop > 0.1) %>% count(seurat_clusters, scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop,   scf_class_norm_dbt_nums, scrub_doublet_dbt_nums))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(scf_class_norm_dbt_prop > 0.1) %>% count(seurat_clusters, scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop,   scf_class_norm_dbt_nums, scrub_doublet_dbt_nums))
 
 ```
 
@@ -1332,7 +1332,7 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm_dbt_pro
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet))
+map(all_msc_w_dblts, ~.@meta.data %>% dplyr::count(scf_class_norm, scrub_doublet))
 
 ```
 ##### Check doublet clusters
@@ -1340,7 +1340,7 @@ map(all_msc_filt_no_strainDblts, ~.@meta.data %>% dplyr::count(scf_class_norm, s
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% count(scf_class_norm_dbt_prop > 0.1))
+map(all_msc_w_dblts, ~.x@meta.data %>% count(scf_class_norm_dbt_prop > 0.1))
 
 ```
 
@@ -1349,7 +1349,7 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% count(scf_class_norm_dbt_prop
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(!((scf_class_norm_dbt_prop > 0.1 & scf_class_rand_dbt_prop > 0.1) | scrub_doublet_dbt_prop > 0.1)) %>% rownames_to_column("bcode") %>% mutate(across(c(scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop), ~round(., 2))) %>% count(seurat_clusters, scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(!((scf_class_norm_dbt_prop > 0.1 & scf_class_rand_dbt_prop > 0.1) | scrub_doublet_dbt_prop > 0.1)) %>% rownames_to_column("bcode") %>% mutate(across(c(scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop), ~round(., 2))) %>% count(seurat_clusters, scf_class_norm_dbt_prop,scf_class_rand_dbt_prop, scrub_doublet_dbt_prop))
 
 ```
 
@@ -1357,7 +1357,7 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(!((scf_class_norm_dbt_
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet") %>% count(scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet") %>% count(scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20))
 
 ```
 
@@ -1365,7 +1365,7 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Sin
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20) %>% count(scrub_doublet_dbt_prop < 0.40))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20) %>% count(scrub_doublet_dbt_prop < 0.40))
 
 ```
 
@@ -1373,13 +1373,13 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Sin
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20) %>% count(scrub_doublet))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20) %>% count(scrub_doublet))
 
 ```
 
 ```{r}
 
-map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet") %>% count(scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scf_class_norm_dbt_prop>0.2 ))
+map(all_msc_w_dblts, ~.x@meta.data %>% filter(scf_class_norm == "Singlet") %>% count(scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scf_class_norm_dbt_prop>0.2 ))
 
 ```
 
@@ -1387,7 +1387,7 @@ map(all_msc_filt_no_strainDblts, ~.x@meta.data %>% filter(scf_class_norm == "Sin
 ##Seurat object
 ##Remove doublets
 
-imap(all_msc_filt_no_strainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop", "scf_class_norm_dbt_prop", "scf_class_rand_dbt_prop"), ncol = 5) + labs(title =.y))
+imap(all_msc_w_dblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop", "scf_class_norm_dbt_prop", "scf_class_rand_dbt_prop"), ncol = 5) + labs(title =.y))
 
 ```
 
@@ -1395,7 +1395,7 @@ imap(all_msc_filt_no_strainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_
 ##Seurat object
 ##Remove doublets
 
-imap(all_msc_filt_no_strainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop", "scf_class_norm_dbt_prop"), reduction = "pca") + labs(title =.y))
+imap(all_msc_w_dblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop", "scf_class_norm_dbt_prop"), reduction = "pca") + labs(title =.y))
 
 ```
 ```{r, message=FALSE}
@@ -1408,7 +1408,7 @@ imap(all_msc_filt_no_strainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_
 ##Seurat object
 ##Remove doublets
 
-# all_msc_filt_no_strainDblts <- all_msc_filt_no_strainDblts %>%
+# all_msc_w_dblts <- all_msc_w_dblts %>%
 #     # map(. %>% subset(., subset = scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.1 & scf_class_rand_dbt_prop < 0.1))
 #     map(. %>% subset(., subset = scf_class_norm == "Singlet" & !((scf_class_norm_dbt_prop > 0.1 & scf_class_rand_dbt_prop > 0.1) | scrub_doublet_dbt_prop > 0.1)))
   # map(. %>% subset(., subset = scf_class_supx_rand == "Singlet" & scrub_doublet == 'Singlet'))
@@ -1419,7 +1419,7 @@ imap(all_msc_filt_no_strainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_
 ##Seurat object
 ##Remove stage doublets
 
-all_msc_filt_no_StgStrainDblts <- all_msc_filt_no_strainDblts %>%
+all_msc_filt_no_StgDblts <- all_msc_w_dblts %>%
     # map(. %>% subset(., subset = scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.1 & scf_class_rand_dbt_prop < 0.1)) %>%
     map(. %>% subset(., subset = scf_class_norm == "Singlet")) %>%
     map(. %>% subset(., subset = scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20)) #%>%
@@ -1428,14 +1428,14 @@ all_msc_filt_no_StgStrainDblts <- all_msc_filt_no_strainDblts %>%
   # map(. %>% subset(., subset = scf_class_supx_rand == "Singlet" & scrub_doublet == 'Singlet'))
 
 ## Table of removal of stage doublets by scdblfinder
-map(all_msc_filt_no_strainDblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgStrainDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
+map(all_msc_w_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
 ```
 
 ```{r, fig.width=15, fig.height=4}
 ##Seurat object
 ##Remove doublets
 
-imap(all_msc_filt_no_StgStrainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop")) + labs(title =.y))
+imap(all_msc_filt_no_StgDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop")) + labs(title =.y))
 
 ```
 
@@ -1443,13 +1443,13 @@ imap(all_msc_filt_no_StgStrainDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scr
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_StgStrainDblts, ~.x@meta.data %>% count(scrub_doublet))
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% count(scrub_doublet))
 
 ```
 
 ```{r}
 
-map(all_msc_filt_no_StgStrainDblts, ~.x@meta.data %>% count(scrub_doublet_dbt_prop, scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scrub_doublet_dbt_prop>0.2 ))
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% count(scrub_doublet_dbt_prop, scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scrub_doublet_dbt_prop>0.2 ))
 
 ```
 
@@ -1457,19 +1457,19 @@ map(all_msc_filt_no_StgStrainDblts, ~.x@meta.data %>% count(scrub_doublet_dbt_pr
 ##Seurat object
 ##Remove doublets
 
-all_msc_filt_no_StgStrainDblts <- all_msc_filt_no_StgStrainDblts %>%
+all_msc_filt_no_StgDblts <- all_msc_filt_no_StgDblts %>%
     map(. %>% subset(., subset = scrub_doublet == "Singlet")) %>%
     map(. %>% subset(., subset = scrub_doublet_dbt_prop < 0.5))  ## !!NOTE - was 0.1 but MSC50_SLO has high number of doublets - maybe SLO lysed many gams and soup content high
 
 ## Table of removal of stage doublets by scdblfinder
-map(all_msc_filt_no_strainDblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgStrainDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
+map(all_msc_w_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
 ```
 
 
 
 ```{r, results='asis'}
 
-map(all_msc_filt_no_StgStrainDblts, dim)
+map(all_msc_filt_no_StgDblts, dim)
 
 ```
 
@@ -1498,8 +1498,8 @@ map(all_msc_w_dblts, ~{
 ```{r}
 ## Change the default assay
 
-for (i in names(all_msc_filt_no_StgStrainDblts)) {
-  DefaultAssay(all_msc_filt_no_StgStrainDblts[[i]]) <- "RNA"
+for (i in names(all_msc_filt_no_StgDblts)) {
+  DefaultAssay(all_msc_filt_no_StgDblts[[i]]) <- "RNA"
 }
 
 ```
@@ -1512,8 +1512,8 @@ for (i in 1:length(sample_name)) {
   
   ##Transfers
   ##souporcell genotyping files
-  saveRDS(all_msc_filt_no_StgStrainDblts[[sample_name[i]]],
-    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/all_msc_filt_no_StgStrainDblts.RDS')
+  saveRDS(all_msc_filt_no_StgDblts[[sample_name[i]]],
+    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/all_msc_filt_no_StgDblts.RDS')
     )
   
 }
@@ -1524,7 +1524,7 @@ for (i in 1:length(sample_name)) {
 ```{r, eval=T}
 gogo()
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_filt_no_StgStrainDblts.RDS" --o_file_name "msc_filt_no_dblts.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "msc_filt_no_dblts_elbo.RDS" --findpc_mthd "perpendicular line" --resume
+# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_filt_no_StgDblts.RDS" --o_file_name "msc_filt_no_dblts.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "msc_filt_no_dblts_elbo.RDS" --findpc_mthd "perpendicular line" --resume
 
 ```
 
