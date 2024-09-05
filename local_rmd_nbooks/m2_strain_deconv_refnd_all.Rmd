@@ -1034,10 +1034,6 @@ saveRDS(ss_afm_pf7M_cln_gt_lqc, paste0("data/processed/",species, "/" , sv_dir, 
 ```
 
 
-```{r}
-gogo()
-```
-
 
 For the verification of souporcell K assignment among several Ks proceed to notebook 'm2_strain_deconv_K_verification_all.Rmd' after running this
 For plotting of final qcd K and set of genotypes proceed to notebook 'm2_strain_postQC_decon_IBD.Rmd' after running this
