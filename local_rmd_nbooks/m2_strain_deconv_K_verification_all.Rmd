@@ -600,6 +600,21 @@ optimum_k_polyk <- optimum_k_qcd
 ```
 
 
+```{r, warning=FALSE, eval=T}
+## Strain downsampling for faster runs
+set.seed(123)
+
+strn_c_new_mdata_m22_min_ds <- map(strn_c_new_mdata_m22_min, ~{
+  .x %>% 
+  filter(stage_ag %in% c("Asexual", "Gametocyte")) %>% 
+  group_by(StrainQCd_Man, stage_ag) %>% 
+  mutate(samp = sample(n())) %>%
+  mutate(pbulk_cell = case_when(stage_ag == "Asexual" & samp <= 2000 ~ "yes", stage_ag == "Gametocyte" & samp <= 1000 ~ "yes" )) %>%
+  filter(pbulk_cell == "yes") 
+})
+```
+
+
 ```{r, eval=T}
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
@@ -618,6 +633,9 @@ for (s in names(optimum_k_polyk)) {
   print(algn_nm)
   print(s_nm)
   
+  ## Select between downsampled and full cell barcodes. Downsampled allows faster runtime while maintaining power
+  strn_mdata_tbl <- if (downsample_cells == "yes") { strn_c_new_mdata_m22_min_ds } else { strn_c_new_mdata_m22_min }
+
   ## !!!NOTE - Dangerous command - activate only when barcodes are modified
   system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
   
@@ -625,7 +643,7 @@ for (s in names(optimum_k_polyk)) {
     print(narrow_k)
     # for (str_q in c('StrainQCd_Man')){
       
-      ss_qcd_ano <- map(strn_c_new_mdata_m22_min[s], ~.x %>% rename("str" = StrainQCd_Man) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      ss_qcd_ano <- map(strn_mdata_tbl[s], ~.x %>% rename("str" = StrainQCd_Man) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
       
       names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
       # print(str(ss_qcd_ano[[1]]))
@@ -638,7 +656,7 @@ for (s in names(optimum_k_polyk)) {
       # for(stg_c in c('stage_afm', 'stage_ag')){
       # for(stg_c in c('stage_ag')){
         
-        ss_qcd_ano <- map(strn_c_new_mdata_m22_min[s], ~.x %>% rename("str" = StrainQCd_Man, "stg" = stage_ag) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        ss_qcd_ano <- map(strn_mdata_tbl[s], ~.x %>% rename("str" = StrainQCd_Man, "stg" = stage_ag) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
         names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
         print(names(ss_qcd_ano[[1]]))
 
