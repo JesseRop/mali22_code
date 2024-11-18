@@ -137,85 +137,6 @@ FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt, features = "PF3D7-0925700", reduct
 
 ```{r}
 ## Weird cluster 2 markers
-Idents(v3_m2_asex_harmony_ss_res_fld_pt) <- "harmony_clusters_asex"
-cl2_markrs <- FindMarkers(v3_m2_asex_harmony_ss_res_fld_pt, ident.1 = "2")
-
-```
-
-```{r}
-## Weird cluster 2 markers
-cl2_markrs %>% rownames_to_column('gene_id')  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
-
-## PF3D7-0204900 https://www.sciencedirect.com/science/article/pii/S0006291X20321744#abs0010
-## PF3D7-0204900 https://academic.oup.com/femsre/article/30/4/596/2367720
-## Possible copy number variant since they are in the same location in the genome
-
-## GARP - antigarp induces pf death and present in relatively resistant individuals https://pubmed.ncbi.nlm.nih.gov/32427965/
-## GARP high expression in K13580Y mutant as well as pfemp1 - https://www.biorxiv.org/content/biorxiv/early/2023/12/06/2023.12.06.570387.full.pdf 
-
-## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
-
-## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
-
-## PfA-M17 essential gene and drug target (compound 3) implicated in the final stage of hemoglobin digestion - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9470162/ https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1010926 
-
-##PF3D7-1223900 Contained in drug resistance gene duplication https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7774857/ https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-019-0708-9, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9948948/
-
-```
-
-```{r}
-## Expression of AF1 genes in unique cluster - https://www.biorxiv.org/content/10.1101/2024.01.20.576496v1.full.pdf
-cl2_markrs %>% rownames_to_column('gene_id') %>% mutate(across(gene_id, ~str_replace(., "-", "_"))) %>% filter(gene_id %in% c("PF3D7_1035500", "PF3D7_1035600", "PF3D7_1035400", "PF3D7_1035300", "PF3D7_0930300", "PF3D7_0207600", "PF3D7_0207500", "PF3D7_1149200", "PF3D7_0401800", "PF3D7_1370300", "PF3D7_1149000", "PF3D7_0935900", "PF3D7_0936000", "PF3D7_1039000", "PF3D7_1149300", "PF3D7_0424400", "PF3D7_0830800", "PF3D7_1477600", "PF3D7_0935800")) %>% mutate(across(gene_id, ~str_replace(., "_", "-"))) %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
-
-```
-
-```{r}
-## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(seurat_clusters, donor, Symptomatic)
-```
-
-```{r}
-## Weird cluster 2 markers
-harmony_int <- readRDS("data/processed/Pf/m2_all/harmony_int.RDS")
-```
-
-```{r}
-## Weird cluster 2 markers
-harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor)
-```
-
-
-```{r}
-## Weird cluster 2 markers
-harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor, Strain_DN) %>% arrange(desc(n))
-```
-
-```{r}
-## Weird cluster 2 markers
-cbs<- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames()
-
-harmony_int@meta.data %>% rownames_to_column("bcode") %>% filter(bcode %in% cbs) %>% count(harmony_clusters, seurat_clusters, donor) %>% arrange(desc(n))
-
-```
-
-```{r}
-
-DimPlot(harmony_int[,harmony_int@meta.data$StagePrelimC == "Asexual"], reduction = "umap.harmony", cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt, reduction = "umap.harmony",cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
-
-cbs_49 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2" & donor == "MSC49") %>% rownames() %>% str_remove(., "M49_")
-DimPlot(msc_w_cln_strns[["MSC49"]], cells.highlight = cbs_49, pt.size = 0.5, dims = c(1,2), label = F)
-
-cbs_48 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames() %>% str_remove(., "M48_")
-DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = cbs_48, pt.size = 0.5, dims = c(1,2), label = F)
-
-```
-
-```{r}
-## Weird cluster 2 markers
 v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
 
 ```
@@ -2658,6 +2579,88 @@ plt = umap_meta_df %>%
   guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
 
 print(plt)
+
+```
+
+Explore particular clusters 
+
+
+```{r}
+## Weird cluster 2 markers
+Idents(v3_m2_asex_harmony_ss_res_fld_pt) <- "harmony_clusters_asex"
+cl2_markrs <- FindMarkers(v3_m2_asex_harmony_ss_res_fld_pt, ident.1 = "2")
+
+```
+
+```{r}
+## Weird cluster 2 markers
+cl2_markrs %>% rownames_to_column('gene_id')  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
+
+## PF3D7-0204900 https://www.sciencedirect.com/science/article/pii/S0006291X20321744#abs0010
+## PF3D7-0204900 https://academic.oup.com/femsre/article/30/4/596/2367720
+## Possible copy number variant since they are in the same location in the genome
+
+## GARP - antigarp induces pf death and present in relatively resistant individuals https://pubmed.ncbi.nlm.nih.gov/32427965/
+## GARP high expression in K13580Y mutant as well as pfemp1 - https://www.biorxiv.org/content/biorxiv/early/2023/12/06/2023.12.06.570387.full.pdf 
+
+## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
+
+## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
+
+## PfA-M17 essential gene and drug target (compound 3) implicated in the final stage of hemoglobin digestion - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9470162/ https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1010926 
+
+##PF3D7-1223900 Contained in drug resistance gene duplication https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7774857/ https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-019-0708-9, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9948948/
+
+```
+
+```{r}
+## Expression of AF1 genes in unique cluster - https://www.biorxiv.org/content/10.1101/2024.01.20.576496v1.full.pdf
+cl2_markrs %>% rownames_to_column('gene_id') %>% mutate(across(gene_id, ~str_replace(., "-", "_"))) %>% filter(gene_id %in% c("PF3D7_1035500", "PF3D7_1035600", "PF3D7_1035400", "PF3D7_1035300", "PF3D7_0930300", "PF3D7_0207600", "PF3D7_0207500", "PF3D7_1149200", "PF3D7_0401800", "PF3D7_1370300", "PF3D7_1149000", "PF3D7_0935900", "PF3D7_0936000", "PF3D7_1039000", "PF3D7_1149300", "PF3D7_0424400", "PF3D7_0830800", "PF3D7_1477600", "PF3D7_0935800")) %>% mutate(across(gene_id, ~str_replace(., "_", "-"))) %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
+
+```
+
+```{r}
+## Weird cluster 2 markers
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(seurat_clusters, donor, Symptomatic)
+```
+
+```{r}
+## Weird cluster 2 markers
+harmony_int <- readRDS("data/processed/Pf/m2_all/harmony_int.RDS")
+```
+
+```{r}
+## Weird cluster 2 markers
+harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor)
+```
+
+
+```{r}
+## Weird cluster 2 markers
+harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor, Strain_DN) %>% arrange(desc(n))
+```
+
+```{r}
+## Weird cluster 2 markers
+cbs<- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames()
+
+harmony_int@meta.data %>% rownames_to_column("bcode") %>% filter(bcode %in% cbs) %>% count(harmony_clusters, seurat_clusters, donor) %>% arrange(desc(n))
+
+```
+
+```{r}
+
+DimPlot(harmony_int[,harmony_int@meta.data$StagePrelimC == "Asexual"], reduction = "umap.harmony", cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt, reduction = "umap.harmony",cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
+
+cbs_49 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2" & donor == "MSC49") %>% rownames() %>% str_remove(., "M49_")
+DimPlot(msc_w_cln_strns[["MSC49"]], cells.highlight = cbs_49, pt.size = 0.5, dims = c(1,2), label = F)
+
+cbs_48 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames() %>% str_remove(., "M48_")
+DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = cbs_48, pt.size = 0.5, dims = c(1,2), label = F)
 
 ```
 
