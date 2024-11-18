@@ -58,7 +58,9 @@ suppressPackageStartupMessages({
   library(scuttle)
   library(irlba)
   library(BiocParallel)
-  # library(tradeSeq)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
@@ -76,9 +78,9 @@ suppressPackageStartupMessages({
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 ```
 
 ```{r setup}
@@ -100,7 +102,7 @@ msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
 
 Strain info
 ```{r}
-strn_c_new_mdata_m22_min_qcd <- readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS")
+# strn_c_new_mdata_m22_min_qcd <- readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS")
 ```
 
 
@@ -113,8 +115,11 @@ imap(msc_w_cln_strns, ~DimPlot(.x, group.by = "StrainDon")  + labs(title = .y))
 Integrated asexual
 ```{r}
 ## subset where field parasites are for slingshot
-v3_m2_asex_harmony_ss_res_fld <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
+v3_m2_asex_harmony_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+
 ```
+
 
 
 ## MAST DE of interesting clusters and also for strains
@@ -122,18 +127,18 @@ v3_m2_asex_harmony_ss_res_fld <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_ha
 
 ```{r}
 ## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
-DimPlot(v3_m2_asex_harmony_ss_res_fld, reduction = "umap.harmony", group.by = "harmony_clusters_asex", pt.size = 0.5, dims = c(1,2), label = T)
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt, reduction = "umap.harmony", group.by = "harmony_clusters_asex", pt.size = 0.5, dims = c(1,2), label = T)
 
 ```
 
 ```{r, fig.width=30, fig.height=6}
-FeaturePlot(v3_m2_asex_harmony_ss_res_fld, features = "PF3D7-0925700", reduction = "umap.harmony", split.by = "donor", pt.size = 2, ncol = 7)
+FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt, features = "PF3D7-0925700", reduction = "umap.harmony", split.by = "donor", pt.size = 2, ncol = 7)
 ```
 
 ```{r}
 ## Weird cluster 2 markers
-Idents(v3_m2_asex_harmony_ss_res_fld) <- "harmony_clusters_asex"
-cl2_markrs <- FindMarkers(v3_m2_asex_harmony_ss_res_fld, ident.1 = "2")
+Idents(v3_m2_asex_harmony_ss_res_fld_pt) <- "harmony_clusters_asex"
+cl2_markrs <- FindMarkers(v3_m2_asex_harmony_ss_res_fld_pt, ident.1 = "2")
 
 ```
 
@@ -166,8 +171,8 @@ cl2_markrs %>% rownames_to_column('gene_id') %>% mutate(across(gene_id, ~str_rep
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(seurat_clusters, donor, Symptomatic)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(seurat_clusters, donor, Symptomatic)
 ```
 
 ```{r}
@@ -178,19 +183,19 @@ harmony_int <- readRDS("data/processed/Pf/m2_all/harmony_int.RDS")
 ```{r}
 ## Weird cluster 2 markers
 harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor)
 ```
 
 
 ```{r}
 ## Weird cluster 2 markers
 harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor, Strain_DN) %>% arrange(desc(n))
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor, Strain_DN) %>% arrange(desc(n))
 ```
 
 ```{r}
 ## Weird cluster 2 markers
-cbs<- v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames()
+cbs<- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames()
 
 harmony_int@meta.data %>% rownames_to_column("bcode") %>% filter(bcode %in% cbs) %>% count(harmony_clusters, seurat_clusters, donor) %>% arrange(desc(n))
 
@@ -199,33 +204,33 @@ harmony_int@meta.data %>% rownames_to_column("bcode") %>% filter(bcode %in% cbs)
 ```{r}
 
 DimPlot(harmony_int[,harmony_int@meta.data$StagePrelimC == "Asexual"], reduction = "umap.harmony", cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
-DimPlot(v3_m2_asex_harmony_ss_res_fld, reduction = "umap.harmony",cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt, reduction = "umap.harmony",cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
 
-cbs_49 <- v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2" & donor == "MSC49") %>% rownames() %>% str_remove(., "M49_")
+cbs_49 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2" & donor == "MSC49") %>% rownames() %>% str_remove(., "M49_")
 DimPlot(msc_w_cln_strns[["MSC49"]], cells.highlight = cbs_49, pt.size = 0.5, dims = c(1,2), label = F)
 
-cbs_48 <- v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames() %>% str_remove(., "M48_")
+cbs_48 <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames() %>% str_remove(., "M48_")
 DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = cbs_48, pt.size = 0.5, dims = c(1,2), label = F)
 
 ```
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
 
 ```
 
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
 
 ```
 
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(donor %in% c("MSC48", "MSC49")) %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(donor %in% c("MSC48", "MSC49")) %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
 
 ```
 
@@ -233,19 +238,19 @@ v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(donor %in% c("MSC48", "MSC49"
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & str_detect(StrainDon, "Doublet|Negative")) %>% count(donor, Symptomatic, StrainDon)
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & str_detect(StrainDon, "Doublet|Negative")) %>% count(donor, Symptomatic, StrainDon)
 
 ```
 
 
 ```{r}
 ## Weird cluster 2 markers
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
 
 ```
 
 ```{r}
-st_dist <- v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
+st_dist <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
 
 ```
 
@@ -262,12 +267,12 @@ sstbl %>% ggplot(aes(x=Status, y=Strain)) + geom_boxplot() + geom_point(aes(colo
 ```
 
 ```{r}
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% mutate(across(Symptomatic, ~str_replace_all(., c("No" = "Asymptomatic", "Yes" = "Symptomatic")))) %>% ggplot(aes(x = donor, fill = StrainDon, y = n)) + geom_col() 
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% mutate(across(Symptomatic, ~str_replace_all(., c("No" = "Asymptomatic", "Yes" = "Symptomatic")))) %>% ggplot(aes(x = donor, fill = StrainDon, y = n)) + geom_col() 
 ```
 
 
 ```{r, fig.width= 10, fig.height= 5}
-v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% mutate(across(Symptomatic, ~str_replace_all(., c("No" = "Asymptomatic", "Yes" = "Symptomatic")))) %>% ggplot(aes(x = donor, fill = StrainDon, y = n)) + geom_col(position = position_dodge2()) + facet_wrap(Symptomatic~., scales = "free_x") + theme_classic()+ theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1), text = element_text(size = 20)) 
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% mutate(across(Symptomatic, ~str_replace_all(., c("No" = "Asymptomatic", "Yes" = "Symptomatic")))) %>% ggplot(aes(x = donor, fill = StrainDon, y = n)) + geom_col(position = position_dodge2()) + facet_wrap(Symptomatic~., scales = "free_x") + theme_classic()+ theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1), text = element_text(size = 20)) 
 ```
 
 ```{r}
@@ -282,7 +287,9 @@ v3_m2_asex_harmony_ss_res_fld@meta.data %>% filter(dset != "Lab" & !(str_detect(
 
 
 ```{r, eval=T}
+# v3_m2_asex_harmony_sce_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_fld_sshot.RDS")
 v3_m2_asex_harmony_sce_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_fld_sshot.RDS")
+
 ```
 
 ```{r}
@@ -313,12 +320,12 @@ m2_asex_tr_sce_pt_chunks_sshot@colData[,c('ptime_cat', 'ptime_bal_cat')] <- m2_a
 ```{r}
 ## Save for pseudotime correlatation with bulk in notebook m2_corr2pubd_bulk.Rmd
 ## Subset seurat with pseudotime and add it and save
-v3_m2_asex_harmony_ss_res_fld_ptime1 <- v3_m2_asex_harmony_ss_res_fld[,colnames(m2_asex_tr_sce_pt_chunks_sshot)]
+v3_m2_asex_harmony_ss_res_fld_pt_ptime1 <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_tr_sce_pt_chunks_sshot)]
 
-v3_m2_asex_harmony_ss_res_fld_ptime1@meta.data$slingPseudotime_1 <- m2_asex_tr_sce_pt_chunks_sshot$slingPseudotime_1
+v3_m2_asex_harmony_ss_res_fld_pt_ptime1@meta.data$slingPseudotime_1 <- m2_asex_tr_sce_pt_chunks_sshot$slingPseudotime_1
 
-saveRDS(v3_m2_asex_harmony_ss_res_fld_ptime1, "data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_ptime1.RDS")
-rm(v3_m2_asex_harmony_ss_res_fld_ptime1)
+saveRDS(v3_m2_asex_harmony_ss_res_fld_pt_ptime1, "data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt_ptime1.RDS")
+rm(v3_m2_asex_harmony_ss_res_fld_pt_ptime1)
 ```
 
 ```{r}
@@ -386,6 +393,8 @@ m2_asex_bal_sce <- pmap(list(m2_asex_sce, balanced_cells_str), ~..1[,..2$cell_bc
 ```
 
 ### Retain cells with strains having more than 10 in each stage
+
+
 ```{r}
 ##Remove groups with less than 10
 m2_asex_bal_sce <- map(m2_asex_bal_sce, ~.x[,.x@colData[, 'StrainDon', drop = F] %>% data.frame()  %>% rownames_to_column('bcode') %>% group_by(StrainDon) %>% filter(n() >=20) %>% pull(bcode)])
@@ -456,11 +465,14 @@ balanced_cells_tbl_str[[1]] %>% count(ptime_bal_cat, StrainDon)
 ```
 
 
-```{r, results="asis", fig.width=6, fig.height=4}
+```{r, results="asis", fig.width=4, fig.height=3}
 library("ggpubr")
 
-umap_meta_df <- reducedDims(v3_m2_asex_harmony_sce_ss)$UMAP[,c(1,2)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_sce_ss@colData[,c("StagePrelim", "slingPseudotime_1", "orig.ident", "StrainDon", "Symptomatic")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") #%>% 
+umap_meta_df <- reducedDims(v3_m2_asex_harmony_sce_ss)$UMAP[,c(1,2)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_sce_ss@colData[,c("StagePrelim", "slingPseudotime_1", "orig.ident", "StrainDon", "Symptomatic", "donor", "strain")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") #%>% 
 # mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+##Remove groups with less than 20
+umap_meta_df <- umap_meta_df %>% group_by(StrainDon) %>% filter(n() >=20) %>% filter(!is.na(strain))
 
 tm <- theme_classic()+
   theme(axis.text=element_blank(), 
@@ -489,28 +501,197 @@ dens_thme <- theme(axis.text=element_text(size=22),
 #   slice_sample(n = .y) )
 
 tbl = map(m2_asex_bal_sce, ~umap_meta_df[umap_meta_df$cell_bc %in% colnames(.x),])
+all_cells_tbl = map(names(m2_asex_bal_sce), ~umap_meta_df[umap_meta_df$donor == .x, ])
 
-map(tbl, ~.x%>%
-  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+map(c(tbl, all_cells_tbl), ~.x%>%
+  ggplot(., aes(x = slingPseudotime_1, col=strain, fill=strain)) + 
   geom_density(aes(y = ..count..*0.3), size=2, bw = 0.3, alpha=.2)+
   # geom_freqpoly()+
   theme_classic()+
-  dens_thme +
+  dens_thme  +
   labs(x = "Pseudotime", y="Counts") +
   guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
 )
 
-map(tbl, ~.x%>%
-  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") + 
-  stat_compare_means(method = "wilcox.test") +gbox_theme
+map(c(tbl, all_cells_tbl), ~.x%>%
+  ggboxplot(., y = "slingPseudotime_1",x="strain", col="strain") + 
+  stat_compare_means(aes(label = paste0("P = ", after_stat(p.format))), method = "wilcox.test", label.x = 1.25,
+  label.y = 4) +
+    gbox_theme+
+  theme(legend.position = "none")+
+  labs(x = "Strain", y="Pseudotime")
 )
   
 
 
 ```
 
+
+```{r, results="asis", fig.width=3.2, fig.height=2.8}
+library("ggpubr")
+str_cols = c("SC1" = "#dcbeff", "SC5" = "#008080")
+umap_meta_df_49 <- reducedDims(v3_m2_asex_harmony_sce_ss)$UMAP[,c(1,2)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_sce_ss@colData[,c("StagePrelim", "slingPseudotime_1", "orig.ident", "StrainDon", "Symptomatic", "donor", "strain", "stage")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% filter(donor == "MSC49")  #%>% 
+# mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+##Remove groups with less than 20
+umap_meta_df_49 <- umap_meta_df_49 %>% group_by(StrainDon) %>% filter(n() >=20) %>% filter(!is.na(strain))
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size =15, face = "bold") )
+
+gbox_theme<- theme(axis.text=element_text(size=15),
+        axis.title=element_text(size=15,face="bold"), 
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold"),
+        legend.position = "bottom")
+        
+dens_thme <- theme(axis.text=element_text(size=22),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=22,face="bold"), 
+        legend.text = element_text(size = 20) ,
+        legend.title = element_text(size = 20, face = "bold"),
+        legend.position = "bottom")
+
+# smpl = map(m2_asex_sce, ~umap_meta_df_49[umap_meta_df_49$cell_bc %in% colnames(.x),]  %>% 
+#   count(StrainDon) %>% pull(n) %>% min())
+# 
+# tbl = map2(m2_asex_sce,smpl, ~umap_meta_df_49[umap_meta_df_49$cell_bc %in% colnames(.x),]   %>%
+#   group_by(StrainDon) %>% 
+#   slice_sample(n = .y) )
+
+tbl = map(m2_asex_bal_sce["MSC49"], ~umap_meta_df_49[umap_meta_df_49$cell_bc %in% colnames(.x),])
+all_cells_tbl = map(names(m2_asex_bal_sce["MSC49"]), ~umap_meta_df_49[umap_meta_df_49$donor == .x, ])
+
+strn_dens_pt_plt <- map(c(tbl, all_cells_tbl), ~.x%>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.3), size=1.5, bw = 0.3, alpha=.2)+
+    scale_color_manual(values = strain_don_cols) +
+  # geom_freqpoly()+
+  theme_classic()+
+  dens_thme  +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "left", title = "Strain"),
+         fill = "none")
+)
+strn_dens_pt_plt
+
+
+box_pt_plt <- map(c(tbl, all_cells_tbl), ~.x%>%
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon", size = 1) +
+    scale_color_manual(values = strain_don_cols)+ 
+  stat_compare_means(aes(label = paste0("P = ", after_stat(p.format))), size = 7, method = "wilcox.test", label.x = 1.1,
+  label.y = 4) +
+    gbox_theme+
+    theme(axis.text=element_text(size=22),
+        axis.text.x = element_blank(), 
+        axis.title=element_text(size=22,face="bold"), 
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold")#,
+        # legend.position = "bottom"
+        )+
+  labs(x = "Strain", y="Pseudotime", color="Strain")
+)
+  
+box_pt_plt
+
+```
+
+
+```{r, fig.width=6, fig.height=2.6}
+
+str_lege <- cowplot::get_plot_component(strn_dens_pt_plt[[2]], 'guide-box-bottom', return_all = TRUE) 
+
+plot_grid(
+  plot_grid(box_pt_plt[[2]]+ theme(legend.position = "none", axis.title.x = element_blank()) , 
+            strn_dens_pt_plt[[1]] + theme(legend.position = "none"), nrow = 1),
+  str_lege,
+  nrow = 2,
+  rel_heights = c(8,2)
+)
+```
+
+```{r, fig.width=3, fig.height=2.8}
+# custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
+
+all_cells_tbl[[1]] %>%
+  ggplot(., aes(x = umapharmony_1, y = umapharmony_2, colour = stage))+
+  geom_point(size = 1) +
+  facet_wrap(StrainDon ~.,  nrow = 1) +
+  theme_classic()+
+  theme(#legend.position = "bottom", 
+        legend.position = "none",
+        axis.text = element_blank(),
+        # strip.text =element_text(size=16,face="bold", colour = 'black'),
+        strip.text =element_text(size=16,face="bold", colour = 'black'))+
+  # guides(x = "axis_nested") +
+  labs(x = "UMAP_1", y="UMAP_2") 
+```
+
+```{r, fig.width=2.5, fig.height=2}
+# custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
+
+all_cells_tbl[[1]] %>%
+  ggplot(., aes(x = umapharmony_1, y = umapharmony_2, colour = stage))+
+  geom_point(size = 1) +
+  facet_wrap(StrainDon ~.,  nrow = 1) +
+  theme_classic()+
+  scale_color_manual(values = sp_fld_colors) +
+  theme(#legend.position = "bottom", 
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        # strip.text =element_text(size=16,face="bold", colour = 'black'),
+        strip.text =element_text(size=16,face="bold", colour = 'black'))+
+  # guides(x = "axis_nested") +
+  labs(x = "UMAP_1", y="UMAP_2") 
+```
+
+```{r, fig.width=1.17, fig.height=2.5}
+# custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
+
+all_cells_tbl[[1]] %>%
+  ggplot(., aes(x = umapharmony_1, y = umapharmony_2, colour = slingPseudotime_1))+
+  geom_point(size = 1) +
+  # facet_wrap(StrainDon ~.,  nrow = 1) +
+  scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+  theme_classic()+
+  theme(legend.position = "bottom", 
+        #legend.position = "none",
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold") ) +
+    guides(color = guide_colourbar(title.position = "top")) +
+  labs(x = "UMAP_1", y="UMAP_2") 
+```
+
+```{r, results="asis", fig.width= 3.5, fig.height=2.8}
+
+
+
+DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony", group.by = "stage", split.by = "Symptomatic", pt.size = 0.1)+
+  scale_color_manual(values = sp_fld_colors) +
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.position = "bottom",
+        # legend.position = "none",
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold"),
+        plot.title = element_blank(),
+        strip.text =element_text(size=16,face="bold", colour = 'black')) +
+    guides(color = guide_legend(title.position = "top", nrow =1, override.aes = list(size = 3))) +
+  labs(x = "UMAP_1", y="UMAP_2") 
+```
+
 #### Put subseted objects into a list and calculate metrics need for plotting and tradeseq input
 ```{r}
+
+str_cols = c("SC1" = "#dcbeff", "SC5" = "#008080")
 lins = rep(1,4)
 # lins_m = rep(c(1,2),4)
 
@@ -536,27 +717,27 @@ imap(m2_asex_bal_cw, ~saveRDS(.x, paste0('/lustre/scratch126/tol/teams/lawniczak
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-# v3_m2_asex_harmony_ss_res_fld_bal <- v3_m2_asex_harmony_ss_res_fld[,colnames(m2_asex_bal_sce[[1]])]
-# v3_m2_asex_harmony_ss_res_fld_bal@meta.data$pseudotime <- m2_asex_bal_sce[[1]]$slingPseudotime_1
-# v3_m2_asex_harmony_ss_res_fld_bal@meta.data$ptime_cat <- m2_asex_bal_sce[[1]]$ptime_cat
+# v3_m2_asex_harmony_ss_res_fld_pt_bal <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_bal_sce[[1]])]
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- m2_asex_bal_sce[[1]]$slingPseudotime_1
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- m2_asex_bal_sce[[1]]$ptime_cat
 
 ```
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-# v3_m2_asex_harmony_ss_res_fld_bal@meta.data$sympto <- ifelse(v3_m2_asex_harmony_ss_res_fld_bal@meta.data$Symptomatic == "Yes", "Symptomatic", "Asymptomatic")
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$sympto <- ifelse(v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$Symptomatic == "Yes", "Symptomatic", "Asymptomatic")
 # 
-# FeaturePlot(v3_m2_asex_harmony_ss_res_fld_bal, reduction = "umap.harmony", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "sympto ")
+# FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt_bal, reduction = "umap.harmony", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "sympto ")
 
 ```
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-# v3_m2_asex_harmony_ss_res_fld_bal <- v3_m2_asex_harmony_ss_res_fld[,colnames(m2_asex_sympto_bal_sce[[1]])]
-# v3_m2_asex_harmony_ss_res_fld_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
-# v3_m2_asex_harmony_ss_res_fld_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
+# v3_m2_asex_harmony_ss_res_fld_pt_bal <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_sympto_bal_sce[[1]])]
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
 # 
-# DimPlot(v3_m2_asex_harmony_ss_res_fld_bal, reduction = "umap.harmony", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "Symptomatic")
+# DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_bal, reduction = "umap.harmony", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "Symptomatic")
 
 ```
 
@@ -567,51 +748,53 @@ imap(m2_asex_bal_cw, ~saveRDS(.x, paste0('/lustre/scratch126/tol/teams/lawniczak
 ```
 
 
-```{r, results="asis", eval=T}
-m2_asex_sympto_bal_sce_ts <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/m2_asex_sympto_bal_sce_ts.RDS")
-m2_asex_sympto_bal_sce_de <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/m2_asex_sympto_bal_sce_de.RDS")
-```
-
-
 Read in tradeseq files from local
 ```{r}
-list.files('data/processed/Pf/pseudotime_tradeseq_op', pattern = "tseq_obj.*_M.*DS$", full.names = T) %>% 
-  str_sort(., numeric = T)  %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/.*obj_|\\.RDS') %>% str_replace_all(., c( 'StrainDon'='StrainsDE')) ))
-```
-
-
-```{r}
-ts_sce_ub_de_k7 <- list.files('data/processed/Pf/pseudotime_tradeseq_op', pattern = "tseq_obj.*_M.*DS$", full.names = T) %>% 
-  str_sort(., numeric = T)  %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/.*obj_|\\.RDS') %>% str_replace_all(., c( 'StrainDon'='StrainsDE')) )) %>%
-  map(., ~readRDS(.x))
-```
-
-```{r}
-# de_order <- c(paste0("FieldVlab_", m_stgs[1:8]), paste0("lf_StrainsDE_", m_stgs[9:28]))
-# # ts_sce_ub_de_k7 <- ts_sce_ub_de_k7[c(de_order, paste0(de_order[1:10], '_unbal'))]
-# ts_sce_ub_de_k7 <- ts_sce_ub_de_k7[c(de_order)]
+asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+  map(readRDS)
 
 ```
 
 Read in tradeseq condition DE files from local
 ```{r}
-condRes_de_k7 <- list.files('data/processed/Pf/pseudotime_tradeseq_op', pattern = "tseq_cond_obj.*_M.*DS$", full.names = T) %>% str_sort(., numeric = T)  %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/.*obj_|\\.RDS') %>% str_replace_all(., c( 'StrainDon'='StrainsDE')) )) %>%
-  map(., ~readRDS(.x))
+asex_bal_de <- list.files('data/processed/Pf', pattern = "m2_asex_bal_de.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+  map(readRDS)
+```
+
+
+```{r}
+# asex_bal_ts <- list.files('data/processed/Pf/pseudotime_tradeseq_op', pattern = "tseq_obj.*_M.*DS$", full.names = T) %>% 
+#   str_sort(., numeric = T)  %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/.*obj_|\\.RDS') %>% str_replace_all(., c( 'StrainDon'='StrainsDE')) )) %>%
+#   map(., ~readRDS(.x))
 ```
 
 ```{r}
-# condRes_de_k7 <- condRes_de_k7[c(de_order)]
-condRes_de_k7 <- condRes_de_k7[!is.na(names(condRes_de_k7))]
-ts_sce_ub_de_k7 <- ts_sce_ub_de_k7[names(condRes_de_k7)]
+# de_order <- c(paste0("FieldVlab_", m_stgs[1:8]), paste0("lf_StrainsDE_", m_stgs[9:28]))
+# # asex_bal_ts <- asex_bal_ts[c(de_order, paste0(de_order[1:10], '_unbal'))]
+# asex_bal_ts <- asex_bal_ts[c(de_order)]
+
+```
+
+Read in tradeseq condition DE files from local
+```{r}
+# asex_bal_de <- list.files('data/processed/Pf/pseudotime_tradeseq_op', pattern = "tseq_cond_obj.*_M.*DS$", full.names = T) %>% str_sort(., numeric = T)  %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/.*obj_|\\.RDS') %>% str_replace_all(., c( 'StrainDon'='StrainsDE')) )) %>%
+#   map(., ~readRDS(.x))
+```
+
+```{r}
+# asex_bal_de <- asex_bal_de[c(de_order)]
+asex_bal_de <- asex_bal_de[!is.na(names(asex_bal_de))]
+asex_bal_ts <- asex_bal_ts[names(asex_bal_de)]
 
 ```
 
 Read in tradeseq files from local
 ```{r}
-# msc_y21_ref_ts_sce_ub_de <- readRDS('data/processed/Pf/pseudotime_tradeseq/msc_y21_ref_ts_sce_ub_de.RDS') %>% 
+# msc_y21_ref_asex_bal_ts_de <- readRDS('data/processed/Pf/pseudotime_tradeseq/msc_y21_ref_asex_bal_ts_de.RDS') %>% 
 #   set_names(paste0(names(.), '_', c(rep('FieldVlab', 5), rep('StrainsDE', 5))))
 ```
 
@@ -623,7 +806,7 @@ Read in tradeseq files from local
 ```{r}
 ##NOTE!!! replace the conditional test file with the newly generated one which applied 7 clusters
 ##Ajusting the global and pairwise pvalues - old p values discarded
-m2_asex_condRes_ub_de <- map(condRes_de_k7, ~.x %>%
+asex_bal_de_adj <- map(asex_bal_de, ~.x %>%
                              mutate(across(starts_with('pvalue'), ~p.adjust(., "fdr"))) %>%
                              arrange(desc(waldStat)) %>%
                              rownames_to_column('gene_id'))
@@ -634,18 +817,18 @@ m2_asex_condRes_ub_de <- map(condRes_de_k7, ~.x %>%
 
 ```{r}
 ##save condition results for GSEA
-saveRDS(m2_asex_condRes_ub_de, 'data/processed/Pf/m2_asex_condRes_ub_de.RDS')
+saveRDS(asex_bal_de_adj, 'data/processed/Pf/asex_bal_de_adj.RDS')
 ```
 
 ```{r}
-m2_asex_ref_ts_sce_ub_de <- ts_sce_ub_de_k7
+# asex_bal_ts <- asex_bal_ts
 ```
 
 
 ```{r}
 ### based on mean smoother
 ### All these genes are in the top 22 with waldstat > 20
-cond_gns_005_ub_de <- pmap(list(m2_asex_condRes_ub_de, m2_asex_ref_ts_sce_ub_de),~{
+cond_gns_005_ub_de <- pmap(list(asex_bal_de_adj, asex_bal_ts),~{
   
   b = levels(..2$tradeSeq$conditions)
   
@@ -692,7 +875,7 @@ cond_gns_005_ub_de <- c(cond_gns_005_ub_de) %>%
 
 
 ```{r}
-# msc_y21_ref_ts_sce_ub_de <- msc_y21_ref_ts_sce_ub_de[c(1:15)]
+# msc_y21_ref_asex_bal_ts_de <- msc_y21_ref_asex_bal_ts_de[c(1:15)]
 # cond_gns_005_ub_de <- cond_gns_005_ub_de[c(1:15)]
 ```
 
@@ -701,20 +884,23 @@ cond_gns_005_ub_de <- c(cond_gns_005_ub_de) %>%
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-tde_smooth_plt <- function(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[1],
+tde_smooth_plt <- function(tde_obj_lst = asex_bal_ts[1],
                            cond_obj_lst = cond_gns_005_ub_de[1],
-                           pw_comp= 'waldStat_M60_SC3_vs_M60_SC7', 
+                           pw_comp= 'waldStat_M33_SC5vM33_SC7', 
                            n_gns = c(1:5),
-                           lege_pos = "bottom"
+                           lege_pos = "bottom",
+                           wstat = 20,
+                           pval_cond = "pvalue",
+                           pval = 0.05
 )
 {
   
   list(tde_obj_lst, cond_obj_lst) %>% 
     pmap(.,possibly(~{
       
-      gns = ..2 %>% filter(!!rlang::sym(pw_comp) > 20) %>% filter(!is.na(gene_id)) %>%  arrange(desc(!!rlang::sym(pw_comp)))  %>% pull(gene_id) %>% .[n_gns]
+      gns = ..2 %>% filter(!!rlang::sym(pw_comp) > wstat & !!rlang::sym(pval_cond)  < pval) %>% filter(!is.na(gene_id)) %>%  arrange(desc(!!rlang::sym(pw_comp)))  %>% pull(gene_id) %>% .[n_gns]
       
-      gn_names = ..2 %>% filter(!!rlang::sym(pw_comp) > 20) %>% filter(!is.na(gene_id))  %>% arrange(desc(!!rlang::sym(pw_comp))) %>% pull(Gene) %>% .[n_gns]
+      gn_names = ..2 %>% filter(!!rlang::sym(pw_comp) > wstat & !!rlang::sym(pval_cond)  < pval) %>% filter(!is.na(gene_id))  %>% arrange(desc(!!rlang::sym(pw_comp))) %>% pull(Gene) %>% .[n_gns]
       print(gn_names)
       
       tde = ..1
@@ -745,9 +931,9 @@ cond_gns_005_ub_de[[1]] %>% arrange(pvalue)
 
 ```{r, results='asis', warning=F, message=F, fig.width=5.5, fig.height=4}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC33")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC33")],
                cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC33")],
-               pw_comp= 'waldStat_M33_SC6vM33_SC7',
+               pw_comp= 'waldStat_M33_SC5vM33_SC7',
                n_gns = c(1:10),
                lege_pos = "right"
 )
@@ -756,7 +942,7 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```{r, results='asis', warning=F, message=F, fig.width=3, fig.height=4}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC60")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC60")],
                cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC60")],
                pw_comp= 'waldStat_M60_SC3_vs_M60_SC7',
                n_gns = c(1:20)
@@ -767,7 +953,50 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```{r, results='asis', warning=F, message=F, fig.width=3, fig.height=4}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC49")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC49")],
+               cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC49")],
+               pw_comp= 'waldStat_M49_SC1_vs_M49_SC5',
+               n_gns = c(1:20)
+)
+
+```
+
+
+```{r, results='asis', warning=F, message=F, fig.width=3, fig.height=4}
+## var genes
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC49")],
+               cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC49")][[1]] %>% filter(str_detect(Gene, "VAR")) %>% list(),
+               pw_comp= 'waldStat_M49_SC1_vs_M49_SC5',
+               n_gns = c(1:20),
+               wstat = 10,
+               pval = 0.05
+)
+
+```
+
+```{r, fig.width=7.5, fig.height=2}
+## Direction of upregulation
+# strain_up <- c('PF3D7-0400400' ='SC1', "PF3D7-0412400" ='SC1', 'PF3D7-0421300' ='SC5', "PF3D7-0412700" ='SC5', 'PF3D7-0712900' ='SC5', 'PF3D7-1041300' ='SC5', "PF3D7-0632800" ='SC5', 'PF3D7-0937800' ='SC5', 'PF3D7-1240600' ='SC5', 'PF3D7-1240400' ='SC5', 'PF3D7-0808700' ='SC5', 'PF3D7-0900100' ='N')
+strain_up <- c('PF3D7-0400400' ='SC1', "PF3D7-0412400" ='SC1', 'PF3D7-0421300' ='SC5', "PF3D7-0412700" ='SC5', 'PF3D7-0712900' ='SC5', 'PF3D7-1041300' ='SC5', "PF3D7-0632800" ='SC5', 'PF3D7-0937800' ='SC5', 'PF3D7-1240600' ='SC5', 'PF3D7-1240400' ='SC5', 'PF3D7-0808700' ='SC5', 'PF3D7-0900100' ='SC1')
+```
+
+ PF3D7_0412700 Expressed at high levels all the time in a clone https://www-ncbi-nlm-nih-gov.ezp.lib.cam.ac.uk/pmc/articles/PMC10151525/
+ PF3D7_0412400 Expressed at high levels all the time in a clone
+PF3D7_0937800 in malaria naive individuals https://pubmed.ncbi.nlm.nih.gov/31295334/
+PF3D7_0900100 in malaria naive individuals https://pubmed.ncbi.nlm.nih.gov/31295334/
+```{r, fig.width=7.5, fig.height=2}
+## Ups group
+
+var_grps <- c('PF3D7-0400400' ='A', "PF3D7-0412400" ='B/C', 'PF3D7-0421300' ='C', "PF3D7-0412700" ='C', 'PF3D7-0712900' ='B', 'PF3D7-1041300' ='B', "PF3D7-0632800" ='B', 'PF3D7-0937800' ='B', 'PF3D7-1240600' ='C', 'PF3D7-1240400' ='B/C', 'PF3D7-0808700' ='B/C', 'PF3D7-0900100' ='B')
+
+var_gn_info <- data.frame(strain_up) %>% 
+  rownames_to_column("gene_id") %>% 
+  left_join(., data.frame(var_grps) %>% rownames_to_column("gene_id"))
+```
+
+```{r, results='asis', warning=F, message=F, fig.width=3, fig.height=4}
+
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC49")],
                cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC49")],
                pw_comp= 'waldStat_M49_SC1_vs_M49_SC5',
                n_gns = c(1:20)
@@ -777,7 +1006,7 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```{r, results='asis', warning=F, message=F, fig.width=5.5, fig.height=4}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC66")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC66")],
                cond_obj_lst = cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC66")],
                pw_comp= 'waldStat_M66_SC7vM66_SC8',
                n_gns = c(1:10),
@@ -786,11 +1015,83 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```
 
+Heatmap plotting function
+```{r}
+### Annotation groups for the header ie column
+tseq_de_hmap <- function(tseq = asex_bal_ts[[1]], de_tbl , pnts = 30, rnames = F, comp_grps, Pv = 0.05){
+  
+  # gns = de_tbl %>% filter(if_any(matches("pvalue.*"), ~. < 0.05)) %>% pull(gene_id)
+  gns = de_tbl %>% filter(pvalue < Pv) %>% pull(gene_id)
+
+  # print(str(gns))
+  ##Edited from the original version to allow the labelling of rows with gene names
+  msc_yhatSmooth_w_annot <- predictSmooth(tseq, gene = gns, nPoints = pnts, tidy = FALSE) %>% 
+        t() %>%scale() %>% t() %>% as.data.frame()%>% 
+        rownames_to_column('gene_id') %>% 
+        left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
+        mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene)) %>% 
+        dplyr::select(-c(gene_id)) %>% 
+        column_to_rownames('Gene')
+  
+  msc_yhatSmooth <- msc_yhatSmooth_w_annot %>% 
+    dplyr::select(-c(Ka_Ks)) 
+  
+  # print(str(msc_yhatSmooth))
+  msc_col_annot <- predictSmooth(tseq, gene = gns, nPoints = pnts, tidy = T)  %>% 
+        mutate(point = paste0("point", rep(rep(1:pnts,length(unique(tseq@colData$tradeSeq$conditions))),length(gns))), 
+               lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
+        rownames_to_column('No')  %>% 
+        dplyr::select(lin_id,time,condition)%>% 
+        distinct()%>% 
+        column_to_rownames('lin_id') %>%
+        rename('Pseudotime' = time, 'Strain' = condition)
+  # print(str(msc_col_annot))
+
+  hmap<- ComplexHeatmap::Heatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix(),
+                         cluster_columns = FALSE,
+                         show_row_names = {{rnames}}, 
+                         show_column_names = F, 
+                         # main = comp_grps,
+                         show_heatmap_legend = T,
+                         # silent = TRUE,
+                         # left_annotation = rowAnnotation(df= msc_yhatSmooth_w_annot %>% select(Ka_Ks)),
+                         top_annotation = HeatmapAnnotation(df= msc_col_annot %>% dplyr::select( Strain,Pseudotime) ,
+                                                            # cols = list(Strain = msc_col_annot %>% mutate(cols = ifelse(Strain == 'M49_SC1') ~ '#e7a06b', '#9cb4cf') %>%  pull(cols) ), 
+                                                            annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                           direction = "horizontal", 
+                                                                                           title_gp = gpar(fontsize = 14), labels_gp = gpar(fontsize = 14)),
+                                                            show_legend = c(TRUE, FALSE) ##https://support.bioconductor.org/p/82447/
+                                                            ),
+                         # fontsize = 14,
+                         # heatmap_legend_param = list(ncol = 1, nrow = 4, legend_direction = "vertical", by_row = T),
+            # heatmap_legend_param = list(direction = "horizontal", legend_gp = gpar(fontsize = lgsize)),
+            heatmap_legend_param = list(title = "Expression",
+                                        title_gp = gpar(fontsize = 14),
+                                        labels_gp = gpar(fontsize = 14),
+                                        direction = "horizontal",
+                                        labels_rot = 90#,
+                                        # grid_width = unit(6, "mm"),
+                                        # legend_width = unit(lg_width, "cm")
+                                        ),
+            row_names_gp = grid::gpar(fontsize = 14)
+                         # 
+      ) %>%
+  ##Merging legends into 1 column. Could be set to F
+  draw(., newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom")
+    
+  return(hmap)
+  # print(hmap)
+  # print(pheatmap::pheatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix()))
+      # cat('\n')
+      # cat("\n")
+    
+}
+```
 
 Heatmap plotting function
 ```{r}
 ### Annotation groups for the header ie column
-tseq_de_hmap <- function(tseq = m2_asex_ref_ts_sce_ub_de[[1]], de_tbl , pnts = 30, rnames = F, comp_grps, Pv = 0.05){
+tseq_de_hmap <- function(tseq = asex_bal_ts[[1]], de_tbl , pnts = 30, rnames = F, comp_grps, Pv = 0.05){
   
   # gns = de_tbl %>% filter(if_any(matches("pvalue.*"), ~. < 0.05)) %>% pull(gene_id)
   gns = de_tbl %>% filter(pvalue < Pv) %>% pull(gene_id)
@@ -827,7 +1128,8 @@ tseq_de_hmap <- function(tseq = m2_asex_ref_ts_sce_ub_de[[1]], de_tbl , pnts = 3
                          legend = T,
                          silent = TRUE,
                          annotation_row = msc_yhatSmooth_w_annot %>% select(Ka_Ks), 
-                         annotation_col = (msc_col_annot %>% dplyr::select(Pseudotime, Condition))
+                         annotation_col = (msc_col_annot %>% dplyr::select(Pseudotime, Condition)),
+                         fontsize = 14
                          # 
       )
   # str(hmap)
@@ -845,19 +1147,19 @@ tseq_de_hmap <- function(tseq = m2_asex_ref_ts_sce_ub_de[[1]], de_tbl , pnts = 3
 
 ```{r, results='asis', warning=F, message=F, fig.width=8, fig.height=10}
 
-hmap_plt<- list(m2_asex_ref_ts_sce_ub_de[1], 
+hmap_plt<- list(asex_bal_ts[1], 
                 # map(cond_gns_005_ub_de, ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)), 
                 cond_gns_005_ub_de[1],
                 rep(30, length(cond_gns_005_ub_de[1])), 
                 rep(T, length(cond_gns_005_ub_de[1])), 
-                names(m2_asex_ref_ts_sce_ub_de[1])) %>% 
+                names(asex_bal_ts[1])) %>% 
   pmap(., #possibly(
     ~{
   tseq_de_hmap(tseq = ..1, de_tbl= ..2, pnts = ..3, rnames = ..4, comp_grps = ..5)
 }#, 'missing genes')
 )
   
-  # tseq_de_hmap(tseq = m2_asex_ref_ts_sce_ub_de[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
+  # tseq_de_hmap(tseq = asex_bal_ts[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
   #                      
 hmap_plt
 
@@ -865,19 +1167,19 @@ hmap_plt
 
 ```{r, results='asis', warning=F, message=F}
 
-hmap_plt<- list(m2_asex_ref_ts_sce_ub_de, 
+hmap_plt<- list(asex_bal_ts, 
                 # map(cond_gns_005_ub_de, ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)), 
                 cond_gns_005_ub_de,
                 rep(30, length(cond_gns_005_ub_de)), 
                 rep(T, length(cond_gns_005_ub_de)), 
-                names(m2_asex_ref_ts_sce_ub_de)) %>% 
+                names(asex_bal_ts)) %>% 
   pmap(., #possibly(
     ~{
   tseq_de_hmap(tseq = ..1, de_tbl= ..2, pnts = ..3, rnames = ..4, comp_grps = ..5)
 }#, 'missing genes')
 )
   
-  # tseq_de_hmap(tseq = m2_asex_ref_ts_sce_ub_de[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
+  # tseq_de_hmap(tseq = asex_bal_ts[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
   #                      
 
 ```
@@ -889,26 +1191,233 @@ hmap_plt
 
 ```
 
-```{r, results='asis', warning=F, message=F}
-# > cond_gns_005_ub_de[[1]] %>% filter(pvalue<0.05 &  gene_id %in% cond_gns_005_ub_de[[2]][cond_gns_005_ub_de[[2]]$pvalue < 0.05,]$gene_id) %>% filter(!is.na(gene_id))
-overlap_gns <- cond_gns_005_ub_de[[1]] %>% filter(pvalue<0.05 & !is.na(gene_id)) %>% inner_join(cond_gns_005_ub_de[[2]][cond_gns_005_ub_de[[2]]$pvalue < 0.05,], by = "gene_id") 
+
+```{r, fig.height=8.9, fig.width=5}
+str_cols = c("#dcbeff", "#008080")
+hmap_plt[2]
+
 ```
 
-```{r, results='asis', warning=F, message=F, eval=FALSE}
 
-hmap_plt<- list(m2_asex_ref_ts_sce_ub_de, 
+Heatmap plotting function
+```{r}
+gene_annot <- var_gn_info %>% mutate(across(strain_up, ~paste0("M49_", .))) %>% rename("Up" = strain_up, VAR = "var_grps") %>% select(-c(Up))
+
+var_cols <- c("A" = "#8343b7" , "B/C" = "#a8253a", "B" =  "#b0921d", "C" = "#fd3a17", "NV" = "lightgrey")
+```
+
+```{r}
+### Annotation groups for the header ie column
+gns = cond_gns_005_ub_de[[2]] %>% filter(pvalue < 0.05) %>% arrange(desc(waldStat)) %>%   mutate(wstat_rank = rank(-waldStat)) %>% filter(., wstat_rank < 20 | str_detect(Gene, "VAR")) %>% pull(gene_id)
+
+# print(str(gns))
+##Edited from the original version to allow the labelling of rows with gene names
+msc_yhatSmooth_w_annot <- predictSmooth(asex_bal_ts[[2]], gene = gns, nPoints = 30, tidy = FALSE) %>% 
+  t() %>%scale() %>% t() %>% as.data.frame()%>% 
+  rownames_to_column('gene_id') %>% 
+  left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
+  left_join(., gene_annot, by = 'gene_id') %>% mutate(across(c("VAR"), ~case_when(is.na(.) ~ "NV", T ~ .))) %>%
+  mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene)) %>% 
+  dplyr::select(-c(gene_id)) %>% 
+  column_to_rownames('Gene')
+
+msc_yhatSmooth <- msc_yhatSmooth_w_annot %>% 
+  dplyr::select(-c(Ka_Ks, VAR)) 
+
+# print(str(msc_yhatSmooth))
+msc_col_annot <- predictSmooth(asex_bal_ts[[2]], gene = gns, nPoints = 30, tidy = T)  %>% 
+  mutate(point = paste0("point", rep(rep(1:30,length(unique(asex_bal_ts[[2]]@colData$tradeSeq$conditions))),length(gns))), 
+         lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
+  rownames_to_column('No')  %>% 
+  dplyr::select(lin_id,time,condition)%>% 
+  distinct()%>% 
+  column_to_rownames('lin_id') %>%
+  rename('Pseudotime' = time, 'Strain' = condition)
+# print(str(msc_col_annot))
+
+hmap<- ComplexHeatmap::Heatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix(),
+                               cluster_columns = FALSE,
+                               show_row_names = T, 
+                               show_column_names = F, 
+                               # main = comp_grps,
+                               show_heatmap_legend = T,
+                               # silent = TRUE,
+                               left_annotation = rowAnnotation(df= msc_yhatSmooth_w_annot %>% select(VAR),
+                                                               col = list(VAR = var_cols ), 
+                                                               annotation_name_gp = gpar(fontsize = 14, fontface = "bold"),
+                                                               annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                               direction = "horizontal", 
+                                                                                               title_gp = gpar(fontsize = 12, fontface = "bold"), 
+                                                                                               labels_gp = gpar(fontsize = 12),
+                                                                                               ncol = 3)),
+                               top_annotation = HeatmapAnnotation(df= msc_col_annot %>% dplyr::select( Strain,Pseudotime) ,
+                                                                  col = list(Strain = strain_don_cols[unique(msc_col_annot[, "Strain"])],
+                                                                             Pseudotime = colorRamp2(c(min(msc_col_annot[,"Pseudotime"]), max(msc_col_annot[,"Pseudotime"])), c("white", "#281e5d"))), 
+                                                                  annotation_name_gp = gpar(fontsize = 14, fontface = "bold"), 
+                                                                  annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                                 direction = "horizontal", 
+                                                                                                 title_gp = gpar(fontsize = 12, fontface = "bold"), 
+                                                                                                 labels_gp = gpar(fontsize = 12)),
+                                                                  show_legend = c(FALSE, FALSE) ##https://support.bioconductor.org/p/82447/
+                               ),
+                               # fontsize = 14,
+                               # heatmap_legend_param = list(ncol = 1, nrow = 4, legend_direction = "vertical", by_row = T),
+                               # heatmap_legend_param = list(direction = "horizontal", legend_gp = gpar(fontsize = lgsize)),
+                               heatmap_legend_param = list(title = "Expression",
+                                                           title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                                           labels_gp = gpar(fontsize = 12),
+                                                           direction = "horizontal"#,
+                                                           # direction = "vertical",
+                                                           # labels_rot = 90#,
+                                                           # grid_width = unit(6, "mm"),
+                                                           # legend_width = unit(lg_width, "cm")
+                               ),
+                               row_names_gp = grid::gpar(fontsize = 14)
+                               # 
+) %>%
+  ##Merging legends into 1 column. Could be set to F
+  draw(., newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom")
+
+
+
+```
+
+```{r, fig.height=5.8, fig.width=4.3}
+hmap
+# c("#b7e577", "#3ce07e")
+```
+
+
+
+```{r}
+### Annotation groups for the header ie column
+gns = cond_gns_005_ub_de[[2]] %>% filter(pvalue < 0.05) %>% arrange(desc(waldStat)) %>%   mutate(wstat_rank = rank(-waldStat)) %>% filter(., wstat_rank < 20 | str_detect(Gene, "VAR")) %>% pull(gene_id)
+
+# print(str(gns))
+##Edited from the original version to allow the labelling of rows with gene names
+msc_yhatSmooth_w_annot <- predictSmooth(asex_bal_ts[[2]], gene = gns, nPoints = 30, tidy = FALSE) %>% 
+  t() %>%scale() %>% t() %>% as.data.frame()%>% 
+  rownames_to_column('gene_id') %>% 
+  left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
+  left_join(., gene_annot, by = 'gene_id') %>% mutate(across(c("VAR"), ~case_when(is.na(.) ~ "NV", T ~ .))) %>%
+  mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene)) %>% 
+  mutate(across(Gene, ~str_remove(., "VAR_"))) %>%
+  dplyr::select(-c(gene_id)) %>% 
+  column_to_rownames('Gene')
+
+msc_yhatSmooth <- msc_yhatSmooth_w_annot %>% 
+  dplyr::select(-c(Ka_Ks, VAR)) 
+
+# print(str(msc_yhatSmooth))
+msc_col_annot <- predictSmooth(asex_bal_ts[[2]], gene = gns, nPoints = 30, tidy = T)  %>% 
+  mutate(point = paste0("point", rep(rep(1:30,length(unique(asex_bal_ts[[2]]@colData$tradeSeq$conditions))),length(gns))), 
+         lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
+  rownames_to_column('No')  %>% 
+  dplyr::select(lin_id,time,condition)%>% 
+  distinct()%>% 
+  column_to_rownames('lin_id') %>%
+  rename('Pseudotime' = time, 'Strain' = condition)
+# print(str(msc_col_annot))
+
+hmap_t<- ComplexHeatmap::Heatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix() %>% t(),
+                               cluster_rows = FALSE,
+                               show_row_names = F, 
+                               # main = comp_grps,
+                               show_heatmap_legend = T,
+                               # silent = TRUE,
+                               bottom_annotation = HeatmapAnnotation(df= msc_yhatSmooth_w_annot %>% select(VAR),
+                                                               col = list(VAR = var_cols ), 
+                                                               annotation_name_gp = gpar(fontsize = 15, fontface = "bold"),
+                                                               annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                               direction = "horizontal",
+                                                                                               title_position = "lefttop", 
+                                                                                               title_gp = gpar(fontsize = 12, fontface = "bold"), 
+                                                                                               labels_gp = gpar(fontsize = 12),
+                                                                                               ncol = 5)),
+                               column_names_rot = 90,
+                               column_names_gp = grid::gpar(fontsize = 15),
+                               left_annotation = rowAnnotation(df= msc_col_annot %>% dplyr::select( Strain,Pseudotime) ,
+                                                                  col = list(Strain = strain_don_cols[unique(msc_col_annot[, "Strain"])],
+                                                                             Pseudotime = colorRamp2(c(min(msc_col_annot[,"Pseudotime"]), max(msc_col_annot[,"Pseudotime"])), c("white", "#281e5d"))), 
+                                                                  annotation_name_gp = gpar(fontsize = 15, fontface = "bold"), 
+                                                                  annotation_name_rot = 90,
+                                                                  annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                                 direction = "horizontal", 
+                                                                                                 title_gp = gpar(fontsize = 12, fontface = "bold"), 
+                                                                                                 labels_gp = gpar(fontsize = 12)),
+                                                                  show_legend = c(FALSE, FALSE) ##https://support.bioconductor.org/p/82447/
+                               ),
+                               # fontsize = 14,
+                               # heatmap_legend_param = list(ncol = 1, nrow = 4, legend_direction = "vertical", by_row = T),
+                               # heatmap_legend_param = list(direction = "horizontal", legend_gp = gpar(fontsize = lgsize)),
+                               heatmap_legend_param = list(title = "Expression",
+                                                           title_gp = gpar(fontsize = 12, fontface = "bold"),
+                                                           labels_gp = gpar(fontsize = 12),
+                                                           direction = "horizontal",
+                                                           title_position = "lefttop"#,
+                                                           # direction = "vertical",
+                                                           # labels_rot = 90#,
+                                                           # grid_width = unit(6, "mm"),
+                                                           # legend_width = unit(lg_width, "cm")
+                               ),
+                               row_names_gp = grid::gpar(fontsize = 14)
+                               # 
+) %>%
+  ##Merging legends into 1 column. Could be set to F
+  draw(., newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", padding = unit(c(2, 15, 2, 2), "mm"))
+
+
+
+```
+
+```{r, fig.height=3.5, fig.width=6.5}
+hmap_t
+# c("#b7e577", "#3ce07e")
+```
+
+```{r, results="asis", eval=T}
+# gogo()
+```
+
+```{r, results='asis', warning=F, message=F}
+
+hmap_plt<- list(asex_bal_ts, 
                 # map(cond_gns_005_ub_de, ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)), 
-                map(cond_gns_005_ub_de, ~.x %>% filter(gene_id %in% overlap_gns$gene_id)),
+                cond_gns_005_ub_de,
                 rep(30, length(cond_gns_005_ub_de)), 
                 rep(T, length(cond_gns_005_ub_de)), 
-                names(m2_asex_ref_ts_sce_ub_de)) %>% 
+                names(asex_bal_ts)) %>% 
   pmap(., #possibly(
     ~{
   tseq_de_hmap(tseq = ..1, de_tbl= ..2, pnts = ..3, rnames = ..4, comp_grps = ..5)
 }#, 'missing genes')
 )
   
-  # tseq_de_hmap(tseq = m2_asex_ref_ts_sce_ub_de[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
+  # tseq_de_hmap(tseq = asex_bal_ts[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
+  #                      
+
+```
+
+```{r, results='asis', warning=F, message=F}
+# > cond_gns_005_ub_de[[1]] %>% filter(pvalue<0.05 &  gene_id %in% cond_gns_005_ub_de[[2]][cond_gns_005_ub_de[[2]]$pvalue < 0.05,]$gene_id) %>% filter(!is.na(gene_id))
+overlap_gns <- cond_gns_005_ub_de[["MSC49"]] %>% filter(pvalue<0.05 & !is.na(gene_id)) %>% inner_join(cond_gns_005_ub_de[["MSC60"]][cond_gns_005_ub_de[["MSC60"]]$pvalue < 0.05,], by = "gene_id") 
+```
+
+```{r, results='asis', warning=F, message=F, eval=FALSE}
+
+hmap_plt<- list(asex_bal_ts, 
+                # map(cond_gns_005_ub_de, ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)), 
+                map(cond_gns_005_ub_de, ~.x %>% filter(gene_id %in% overlap_gns$gene_id)),
+                rep(30, length(cond_gns_005_ub_de)), 
+                rep(T, length(cond_gns_005_ub_de)), 
+                names(asex_bal_ts)) %>% 
+  pmap(., #possibly(
+    ~{
+  tseq_de_hmap(tseq = ..1, de_tbl= ..2, pnts = ..3, rnames = ..4, comp_grps = ..5)
+}#, 'missing genes')
+)
+  
+  # tseq_de_hmap(tseq = asex_bal_ts[[1]], gns= map(cond_gns_005_ub_de[1], ~.x %>% filter(if_any(matches("pvalue"), ~. < 0.05)) %>% pull(gene_id)) %>% flatten() %>% as.character(), pnts = 30, rnames = F, title = "Strain DE")
   #                      
 hmap_plt
 
@@ -917,7 +1426,7 @@ hmap_plt
 
 ```{r, results='asis', warning=F, message=F}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC49")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC49")],
                cond_obj_lst = map(cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC49")], ~.x %>% filter(gene_id %in% overlap_gns$gene_id)),
                pw_comp= 'waldStat_M49_SC1_vs_M49_SC5',
                n_gns = c(1:4)
@@ -927,7 +1436,7 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```{r, results='asis', warning=F, message=F}
 
-tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_ref_ts_sce_ub_de), "MSC60")],
+tde_smooth_plt(tde_obj_lst = asex_bal_ts[str_detect(names(asex_bal_ts), "MSC60")],
                cond_obj_lst = map(cond_gns_005_ub_de[str_detect(names(cond_gns_005_ub_de), "MSC60")], ~.x %>% filter(gene_id %in% overlap_gns$gene_id)),
                pw_comp= 'waldStat_M60_SC3_vs_M60_SC7',
                n_gns = c(1:4)
@@ -935,6 +1444,60 @@ tde_smooth_plt(tde_obj_lst = m2_asex_ref_ts_sce_ub_de[str_detect(names(m2_asex_r
 
 ```
 
+###### MSC49 strain DE assessing var genes
+
+
+```{r, fig.width=7.5, fig.height=2}
+## convert SCE to seurat
+# m2_asex_bal_seu <- map(m2_asex_bal_sce, as.Seurat)
+```
+
+```{r, fig.width=7.5, fig.height=2}
+# m49_var_gns_exp <- FetchData(object = m2_asex_harmony_tr_pt_sset, vars = c('PF3D7-0400400', "PF3D7-0412400", 'PF3D7-0421300', "PF3D7-0412700", 'PF3D7-0712900', 'PF3D7-1041300', "PF3D7-0632800", 'PF3D7-0937800', 'PF3D7-1240600', 'PF3D7-1240400', 'PF3D7-0808700', 'PF3D7-0900100'), slot = "data") 
+
+m49_var_gns_exp <- map(m2_asex_bal_sce, ~.x@assays@data$normcounts[c('PF3D7-0400400', "PF3D7-0412400", 'PF3D7-0421300', "PF3D7-0412700", 'PF3D7-0712900', 'PF3D7-1041300', "PF3D7-0632800", 'PF3D7-0937800', 'PF3D7-1240600', 'PF3D7-1240400', 'PF3D7-0808700', 'PF3D7-0900100'),] %>% t() %>% as.data.frame() )
+
+```
+
+
+```{r, fig.width=7.5, fig.height=2}
+msc_bal_umap_gns <- map2(m2_asex_bal_sce, m49_var_gns_exp, ~{
+  reducedDims(.x)$UMAP %>% 
+    as.data.frame() %>% 
+    rownames_to_column("bcode") %>% 
+    left_join(., .x@colData[,c("StrainDon", "strain", "donor")] %>% data.frame() %>% rownames_to_column("bcode")) %>%  
+    left_join(., .y %>% rownames_to_column("bcode"))
+  })
+
+```
+
+```{r, fig.height=18, fig.width=2.5}
+# custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
+
+msc_bal_umap_gns[["MSC49"]] %>% 
+  filter(donor == "MSC49") %>%
+  pivot_longer(cols = starts_with("PF"), names_to = "gene_id", values_to = "Expression") %>%
+  left_join(., var_gn_info) %>%
+  mutate(across(donor, ~str_remove(., "SC")),
+         # across(strain, ~factor(.x, levels = c("SC1", "SC2")))
+         ) %>%
+  arrange(gene_id,strain,Expression) %>%
+  # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
+  ggplot(., aes(x = umapharmony_1, y = umapharmony_2, colour = Expression))+
+  geom_point(size = 1.5) +
+  scale_color_distiller( direction = 1) +
+  # ggh4x::facet_nested_wrap(vars(Vars, strain),  nrow = 1, scales = "free_x") +
+  ggh4x::facet_nested(strain_up+gene_id+ var_grps ~  strain) +
+  # ggh4x::facet_grid2(gene_id ~  strain)) +
+  theme_classic()+
+  theme(legend.position = "bottom", 
+        axis.text = element_blank(),
+        strip.text =element_text(size=12,face="bold", colour = 'black'))+
+  # guides(x = "axis_nested") +
+  labs(x = "UMAP_1", y="UMAP_2", title = "Var genes") 
+```
+
+###### END MSC49 strain DE assessing var genes
 
 ```{r, results="asis", eval=T}
 gogo()
@@ -1091,27 +1654,27 @@ saveRDS(m2_asex_sympto_bal_cw[[1]], '/lustre/scratch126/tol/teams/lawniczak/user
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-v3_m2_asex_harmony_ss_res_fld_bal <- v3_m2_asex_harmony_ss_res_fld[,colnames(m2_asex_sympto_bal_sce[[1]])]
-v3_m2_asex_harmony_ss_res_fld_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
-v3_m2_asex_harmony_ss_res_fld_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
+v3_m2_asex_harmony_ss_res_fld_pt_bal <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_sympto_bal_sce[[1]])]
+v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
+v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
 
 ```
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-v3_m2_asex_harmony_ss_res_fld_bal@meta.data$sympto <- ifelse(v3_m2_asex_harmony_ss_res_fld_bal@meta.data$Symptomatic == "Yes", "Symptomatic", "Asymptomatic")
+v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$sympto <- ifelse(v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$Symptomatic == "Yes", "Symptomatic", "Asymptomatic")
 
-FeaturePlot(v3_m2_asex_harmony_ss_res_fld_bal, reduction = "umap.harmony", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "sympto ")
+FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt_bal, reduction = "umap.harmony", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "sympto ")
 
 ```
 
 ```{r}
 ## plot balanced symptomatic vs assymptomatic by pseudotime
-v3_m2_asex_harmony_ss_res_fld_bal <- v3_m2_asex_harmony_ss_res_fld[,colnames(m2_asex_sympto_bal_sce[[1]])]
-v3_m2_asex_harmony_ss_res_fld_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
-v3_m2_asex_harmony_ss_res_fld_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
+v3_m2_asex_harmony_ss_res_fld_pt_bal <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_sympto_bal_sce[[1]])]
+v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce[[1]]$slingPseudotime_1
+v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce[[1]]$ptime_cat
 
-DimPlot(v3_m2_asex_harmony_ss_res_fld_bal, reduction = "umap.harmony", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "Symptomatic")
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_bal, reduction = "umap.harmony", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "Symptomatic")
 
 ```
 
@@ -1211,7 +1774,7 @@ saveRDS(m2_asex_sympto_bal_u_don, '/lustre/scratch126/tol/teams/lawniczak/users/
 
 
 ```{r, results="asis", eval=F}
-# ts_sce_ub_de  <- fitGAM(counts = counts(m2_asex_sympto_bal_sce[[1]]), 
+# asex_bal_ts_de  <- fitGAM(counts = counts(m2_asex_sympto_bal_sce[[1]]), 
 #                     pseudotime = m2_asex_sympto_bal_ptime[[1]], 
 #                     cellWeights = m2_asex_sympto_bal_cw[[1]], 
 #                     nknots =4,
@@ -1368,7 +1931,7 @@ gogogo()
 ```
 
 ```{r}
-m48_wc <- str_remove(colnames(v3_m2_asex_harmony_ss_res_fld[,v3_m2_asex_harmony_ss_res_fld@meta.data$harmony_clusters_asex == "2" & v3_m2_asex_harmony_ss_res_fld@meta.data$donor == "MSC48"]), "M48_")
+m48_wc <- str_remove(colnames(v3_m2_asex_harmony_ss_res_fld_pt[,v3_m2_asex_harmony_ss_res_fld_pt@meta.data$harmony_clusters_asex == "2" & v3_m2_asex_harmony_ss_res_fld_pt@meta.data$donor == "MSC48"]), "M48_")
 ```
 
 ```{r}
@@ -1377,7 +1940,7 @@ DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = m48_wc)
 ```
 
 ```{r}
-m49_wc <- str_remove(colnames(v3_m2_asex_harmony_ss_res_fld[,v3_m2_asex_harmony_ss_res_fld@meta.data$harmony_clusters_asex == "2" & v3_m2_asex_harmony_ss_res_fld@meta.data$donor == "MSC49"]), "M49_")
+m49_wc <- str_remove(colnames(v3_m2_asex_harmony_ss_res_fld_pt[,v3_m2_asex_harmony_ss_res_fld_pt@meta.data$harmony_clusters_asex == "2" & v3_m2_asex_harmony_ss_res_fld_pt@meta.data$donor == "MSC49"]), "M49_")
 
 ```
 
@@ -1715,7 +2278,7 @@ m48_asex <- msc_w_cln_strns[["MSC48"]][,msc_w_cln_strns[["MSC48"]]@meta.data$Sta
 
 ```{r}
 ## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
-FeaturePlot(v3_m2_asex_harmony_ss_res_fld, features = "scf_class_rand_dbt_prop", reduction = "umap.harmony", order = T)
+FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt, features = "scf_class_rand_dbt_prop", reduction = "umap.harmony", order = T)
 
 ```
 
@@ -1729,30 +2292,30 @@ FeaturePlot(harmony_int, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0
 
 ```{r, fig.width=15, fig.height=3}
 ## 
-VlnPlot(v3_m2_asex_harmony_ss_res_fld, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5)
+VlnPlot(v3_m2_asex_harmony_ss_res_fld_pt, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5)
 
 ```
 ```{r, fig.width=6, fig.height=3}
 ## 
-VlnPlot(v3_m2_asex_harmony_ss_res_fld, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "StagePrelim", pt.size = 0)
+VlnPlot(v3_m2_asex_harmony_ss_res_fld_pt, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "StagePrelim", pt.size = 0)
 
 ```
 
 ```{r, fig.width=18, fig.height=3}
 ## 
-VlnPlot(v3_m2_asex_harmony_ss_res_fld, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "StrainDon", pt.size = 0)
+VlnPlot(v3_m2_asex_harmony_ss_res_fld_pt, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "StrainDon", pt.size = 0)
 
 ```
 
 ```{r, fig.width=6, fig.height=3}
 ## 
-DimPlot(v3_m2_asex_harmony_ss_res_fld,  split.by = "dset", reduction = "umap.harmony", dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt,  split.by = "dset", reduction = "umap.harmony", dims = c(2,3))
 
 ```
 
 ```{r, fig.width=6, fig.height=3}
 ## 
-DimPlot(v3_m2_asex_harmony_ss_res_fld,  split.by = "dset", reduction = "umap.harmony", dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt,  split.by = "dset", reduction = "umap.harmony", dims = c(2,3))
 
 ```
 
