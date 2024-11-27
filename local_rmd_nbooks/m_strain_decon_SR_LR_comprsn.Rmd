@@ -87,13 +87,6 @@ clusters_log_likelihoods_lst = map2(sample_name_nms_al, rep(seq_nms, each= lengt
 ```
 
 
-
-```{r, message=FALSE, warning=FALSE}
-## Read in log likelihoods for estimation of number of clusters from elbow plots
-# clusters_log_likelihoods_lst = map2(sample_name_nms_al, rep(seq_nms, each= length(sample_name_nms)), ~read_table(paste0('data/processed/',species,'/', .x,'/', soup_dir, '/',.y,'/clusters_log_likelihoods.txt'), col_names = c('No_of_clusters', 'td1','td2','td3', 'td4','log_likelihood')) %>% select(-(starts_with("td"))) %>% mutate(across(No_of_clusters, ~str_remove_all(., ".*out_dir_k|/clusters.err:best")))) %>% set_names(paste(sample_name_nms_al, rep(seq_nms, each= length(sample_name_nms)), sep ='_'))
-```
-
-
 ```{r} 
 map(clusters_log_likelihoods_lst, ~.x %>%
   mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
@@ -109,59 +102,6 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 ```
 
 
-
-```{r, fig.width = 12, fig.height = 4, message=FALSE, warning=FALSE, eval=FALSE}
-# 
-# ss_bar_plt <-list( strn_c_mdata)  %>% 
-#   purrr::pmap(.,~{
-#   a_tbl <- ..1 %>%
-#       mutate(across(stage_afm, ~factor(., levels=c('Asexual', 'Female', 'Male', 'Developing', 'Unassigned')))) %>%
-#       dplyr::count(Strain_qc, stage_afm, .drop = FALSE) 
-#   
-#   ##get stage_ag labels and counts to add to the Strain_qc+stage_afm counts generated above
-#   stage_ag_cnt <- ..1 %>% 
-#     dplyr::select(Strain_qc, stage_ag, stage_afm) %>% 
-#     add_count(Strain_qc, stage_ag, name = 'stage_ag_n') %>% 
-#     distinct(pick(Strain_qc, stage_afm), .keep_all = T) %>% 
-#     left_join(a_tbl, ., by =c('Strain_qc', 'stage_afm')) %>% 
-#     rename(c('Stage'= stage_afm, 'Counts' =n, 'Strain' = Strain_qc))  
-#   
-#   print(stage_ag_cnt)
-#   
-#     b_plt <- stage_ag_cnt %>%
-#       # ggplot(., aes(x = Stage, y = Counts, fill = Stage, color=stage_ag_n<30)) +
-#       ggplot(., aes(x = Stage, y = Counts, fill = Stage)) +
-#       geom_col(position = position_dodge2()) + #width=0.4, position = position_dodge(width=0.5) 
-#       geom_text(aes(label=Counts), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 7, show.legend = F, fontface ='bold', colour='black')+
-#       scale_fill_manual(values = c_stg_cols) + #'Asexual' = "#FFE5B4", 'Male' = "#BFD7B5", 'Female'="#8ab6d6"
-#       # scale_color_manual(values = c('FALSE' = "white", 'TRUE' = "blue")) +
-#   geom_tile(aes(x = Stage, y = -10, fill = Stage, height = 14)) +
-#   facet_wrap( Strain ~ ., nrow = 1) +
-#       scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
-#       scale_x_discrete(expand = expansion(add = c(1, 1))) +
-#       theme_classic() +
-#   labs( y = 'Counts')+
-#       theme(
-#         axis.text.y  = element_text(size = 22),
-#         axis.title.y  = element_text(size = 22, face = "bold"),
-#         axis.title.x = element_blank(),
-#         # axis.title = element_text(size = 18, face = "bold"),
-#         legend.text = element_text(size = 22),
-#         legend.title = element_text(size = 22, face = "bold"),
-#         legend.position="bottom",
-#         axis.text.x = element_blank(),
-#         axis.ticks.x = element_blank(),
-#         strip.text =element_text(size=20,face="bold", colour = 'black'),
-#         panel.border=element_rect(colour="black",fill='transparent')
-#       )+ 
-#       guides(color = F)
-#     print(b_plt)
-#     return(b_plt)
-# })
-
-
-```
-
 ```{r, fig.width= 7, fig.height=4} 
 clusters_log_likelihoods_lst %>% 
   bind_rows(., .id = "sample_algnr") %>% 
@@ -176,40 +116,10 @@ clusters_log_likelihoods_lst %>%
 facet_grid(sample ~ algnr, scales = "free_y")
 ```
 
-```{r}
-# optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
-
-```
-
-Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
-```{r}
-##Copy souporcell files for the optimum clusters
-
-```
 
 
-Read all the souporcell files for all the iterations. May be excessive but since we have the memory and cpu and we may need to use the files downstream then why not.
-```{r, results='hide', eval=FALSE}
-# list.files(paste0("data/processed/", species,"/"), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
-list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)%>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/|k|/clusters.tsv')) %>% str_replace_all(., '/', '_'))) 
-```
-
-minimap2
-```{r, eval=FALSE}
-soupc_all <- list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)%>%
-  set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/m.*k|/k|/clusters.tsv')) %>% str_replace_all(., '/', '_'))) %>% .[sorted_names] %>%
-  map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k") %>% mutate(across(sample_k, ~str_remove(., "_minmap")))
-
-
-```
-
-hisat2
-```{r, eval=FALSE}
-soupc_all <- list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)%>%
-  set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/h.*k|/k|/clusters.tsv')) %>% str_replace_all(., '/', '_'))) %>% .[sorted_names] %>%
-  map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k") %>% mutate(across(sample_k, ~str_remove(., "_hsat")))
-
-
+```{r, eval=T}
+list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', algn_nm,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_'))
 ```
 
 combi
@@ -220,37 +130,13 @@ soupc_all_al <- list.files(paste0("data/processed/", species), pattern = "cluste
 
 ```
 
-```{r, eval=T}
-# soupc_all_al <- list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)%>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_'))  %>% .[sorted_names_al]%>%
-#   map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k") 
-
-
-```
-
-```{r, eval=FALSE}
-list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_'))
-
-
-```
-
-Select appropriate k  (number of strains) for each MSC sample
-```{r}
-# knee_k <- c()
-```
 
 
 Select only information from clusters.tsv for the best k as determined from the log likelihood plot for each MSC sample
 
 ```{r, eval=T}
-# soupo_kselect <- soupc_all %>% 
-# filter(sample_k %in% knee_k) %>%
-# dplyr::select(sample_k, barcode, status, assignment) %>% 
-#   dplyr::mutate("Strain" = case_when(status == "doublet" ~ "Doublet",
-#                                      status == "unassigned" ~ "Negative",
-#                                      TRUE ~ paste0('Strain ', as.character(assignment)))
-#                 ) 
 
-##Change Strain to G0,G1,G2 for publication figures and enhanced readability
+##Change Strain labels to SC for publication figures and enhanced readability
 # soupo_kselect <- soupc_all %>%
 soupo_kselect_al <- soupc_all_al %>%
   # filter(sample_k %in% knee_k) %>%
@@ -280,13 +166,6 @@ soupo_kselect_al <- soupc_all_al %>%
 
 
 ```{r, eval=T}
-## !!NOTE: LongRead - for long read only - reverse compliment barcodes to make similar to 10X
-# soupo_kselect_al %>% 
-#   mutate("barcodeHMO" = ifelse(str_detect(sample_k, "soupc_lr"), paste0(as.character(reverseComplement(DNAStringSet(str_remove(barcode, "-1")))), "-1"), barcode)) %>% View
-```
-
-
-```{r, eval=T}
 # Compare HISAT and MINIMAP
 soupo_kselect_al_cor <- soupo_kselect_al %>%
   # separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
@@ -301,7 +180,6 @@ soupo_kselect_al_cor <- soupo_kselect_al %>%
 hsat_mnmp_comp = map(soupo_kselect_al_cor, ~pivot_wider(.x, names_from = aligner, values_from = Strain) %>%
   dplyr::select(barcode, all_of(seq_nms)))
 
-## !!NOTE: LongRead
 hsat_mnmp_comp = hsat_mnmp_comp %>% filter(if_all(contains("soupc"), ~!is.na(.x)))
 
 ```
@@ -349,38 +227,15 @@ phmap_lab_transfr <- function(dset_lab, col_labs, row_labs, row_labs_c, col_labs
 
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
 
-
-# imap(hsat_mnmp_comp, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=`hsat`, row_labs_c ='hsat', col_labs_c= 'minmap', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
-## !!NOTE: LongRead
 imap(hsat_mnmp_comp, possibly(~phmap_lab_transfr(.x, col_labs= `soupc`, row_labs=`soupc_lr`, row_labs_c ='soupc', col_labs_c= 'soupc_lr', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
 
 ```
 
-Split the information for each sample into different labels and put into a list named appropriately
-```{r}
-soupo_kselect_list <- soupo_kselect_al %>%
-  # mutate(across(sample_k, ~str_remove(.,paste0("_", algn_nm)))) %>%
-  mutate(across(sample_k, ~str_remove(.,paste0("_", seq_nm)))) %>% 
-  dplyr::group_split(sample_k) %>%
-  purrr::set_names(purrr::map_chr(., ~.x$sample_k[1])) %>%
-  map(. %>% column_to_rownames(., "barcode") %>% dplyr::select(Strain))
-
-soupo_kselect_list <- soupo_kselect_list[as.character(sorted_names)]
-
-
-##Get strain levels for samples with more than one strain and mutate Strain column to reflect this
-# strain_levels <- map(soupo_kselect_list[2:8], ~.x %>% filter(str_detect(Strain, 'Strain')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
-strain_levels <- map(soupo_kselect_list, ~.x %>% dplyr::filter(str_detect(Strain, '^SC')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
-
-soupo_kselect_list <- map2(soupo_kselect_list,strain_levels, ~.x %>% mutate(across(Strain, ~factor(., levels = .y)))) 
-```
 
 Split the information for each sample into different labels and put into a list named appropriately
 ```{r}
 soupo_kselect_list <- soupo_kselect_al %>%
-# filter(str_detect(sample_k, algn_nm)) %>%
-# soupo_kselect_list <- soupo_kselect %>%
   # mutate(across(sample_k, ~str_remove(.,paste0("_", algn_nm)))) %>%
   dplyr::group_split(sample_k) %>%
   purrr::set_names(purrr::map_chr(., ~.x$sample_k[1])) %>%
@@ -390,31 +245,11 @@ soupo_kselect_list <- soupo_kselect_list[as.character(sorted_names_al)]
 
 
 ##Get strain levels for samples with more than one strain and mutate Strain column to reflect this
-# strain_levels <- map(soupo_kselect_list[2:8], ~.x %>% filter(str_detect(Strain, 'Strain')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
 strain_levels <- map(soupo_kselect_list, ~.x %>% dplyr::filter(str_detect(Strain, '^SC')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
 
 soupo_kselect_list <- map2(soupo_kselect_list,strain_levels, ~.x %>% mutate(across(Strain, ~factor(., levels = .y)))) 
 ```
 
-```{r}
-# soupo_kselect_list <- soupo_kselect_list[c(1:32, 33, 36, 39, 40, 42:55)]
-# sortd_names_new <- names(soupo_kselect_list)
-```
-
-```{r, message=FALSE}
-##Copy souporcell files for the optimum clusters investigation on igv - all except negative
-
-# soupo_kmerge <- map(sample_name_nms, ~{
-# soupo_kselect_list[str_detect(names(soupo_kselect_list), paste0(.x, "_"))] %>% 
-#   imap(., ~{
-#     nms = .y
-#     .x %>% rename_with(~paste0(.,'_', nms), everything()) %>% rownames_to_column('bcode')
-#         }) %>% 
-#     purrr::reduce(., left_join, by = 'bcode')
-#   }) %>% 
-#   set_names(sample_name_nms)
-
-```
 
 
 ```{r, message=FALSE}
@@ -435,23 +270,19 @@ soupo_kselect_list[str_detect(names(soupo_kselect_list), paste0(.x, "_"))] %>%
 
 ```{r}
 ##Transfer stage labels and other metadata from farm
-# list.files("data/processed/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) 
 
 all_msc_anotd_preQC_mdata <- readRDS("data/processed/Pf/all_msc_anotd_preQC_mdata.RDS") %>% .[sample_name_nms]
 msc_mdata <- map(all_msc_anotd_preQC_mdata, ~.x %>% rownames_to_column('bcode'))
-# msc_mdata <- map2(all_msc_anotd_preQC_mdata, msc_qcd_anotd_mdata, ~.x  %>% select(StagePrelim) %>% rownames_to_column('bcode') %>% left_join(., .y %>% rownames_to_column('bcode'), by='bcode'))
+
+
 ```
 
 ```{r}
 ##Transfer stage labels and other metadata from farm
-# mdata_all <- list.files("data/processed/Pf/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) %>%
+
 mdata_all <- msc_mdata %>% .[sample_name_nms] %>%
   map(. %>% 
-        # readRDS() %>% 
-        # dplyr::rename('stageHL' = stageHR_msc14) %>%
-        mutate(#across(stageHL, ~str_replace_all(.,c('high count' = 'HE', 'low count' = 'LE'))),
+      mutate(#across(stageHL, ~str_replace_all(.,c('high count' = 'HE', 'low count' = 'LE'))),
                ##Collapse asexuals and gams and number of cells per coarse group & add the number per xluster as a column in metadata
                stage_afm = case_when(str_detect(StagePrelim, 'ring|troph') ~ 'Asexual', 
                                      str_detect(StagePrelim, '\\(male') ~ 'Male', 
@@ -539,12 +370,7 @@ ss_bar_plt <-list( rep(soupo_seu_kmerge, times = opt_clusters_len_aln), rep(name
 
 ```{r, fig.width=4, fig.height=4}
 
-# tbl1 <- soupo_seu_kmerge[[3]] %>% 
-#             mutate("Strain_final" = !!rlang::sym(paste0("Strain_","MSC49","_", 4)),
-#                    "Strain_2nd" = !!rlang::sym(paste0("Strain_","MSC49","_", 3))) %>%
-#             select(bcode, Strain_final, Strain_2nd)
-            
-  
+
 strain_harmonize_fn <- function(strn_tbl = tbl1, strn1 = "Strain_2nd", strn2 = "Strain_final", out_strn = "n_strains") {
   
   strn_tbl %>% group_by(!!rlang::sym(strn1)) %>% 
@@ -682,23 +508,15 @@ snk_pt_fn(..1, strns_2_plt = c(..2[1], ..4[2:length(..4)]), labls = paste0("K=",
 ```
 
 ```{r, eval=T}
-# snk_plts[str_detect(names(snk_plts), "minmap")]
-# snk_plts[str_detect(names(snk_plts), "minmap")] %>% imap(., ~.x + labs(title = .y))
-
 snk_plts[str_detect(names(snk_plts), "soupc$")] %>% imap(., ~.x + labs(title = .y))
 ```
 
 ```{r, eval=T}
-# snk_plts[str_detect(names(snk_plts), "hsat")]
-# snk_plts[str_detect(names(snk_plts), "hsat")] %>% imap(., ~.x + labs(title = .y))
 
 snk_plts[str_detect(names(snk_plts), "soupc_lr")] %>% imap(., ~.x + labs(title = .y))
 ```
 
 
-```{r, eval=FALSE}
-snk_plts[str_detect(names(snk_plts), "lr_ref")]
-```
 
 ```{r}
 ## Select most likely optimum k
@@ -767,7 +585,6 @@ Harmonize minimap and hisat labels for each k - change hisat2 labels to match th
 
 merge minimap and hisat harmonized strain labels for further harmonization between the 2 aligners
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
-# mnmp_hsat_comp_tbl <- list(strn_harmnzd_tbls[str_detect(names(strn_harmnzd_tbls), "minmap")], strn_harmnzd_tbls[str_detect(names(strn_harmnzd_tbls), "hsat")]) %>% 
 ## !!NOTE: LongRead
 mnmp_hsat_comp_tbl <- list(strn_harmnzd_tbls[str_detect(names(strn_harmnzd_tbls), "soupc$")], strn_harmnzd_tbls[str_detect(names(strn_harmnzd_tbls), "soupc_lr$")]) %>% 
 
@@ -779,15 +596,6 @@ mnmp_hsat_comp_tbl[[1]]
 ```
 
 ```{r, fig.width=4, fig.height=4}
-# don_k_names <- imap(opt_clusters_nms, ~paste0('Strain_',.y, '_', .x))
-# don_hmonizd_k_names <- imap(opt_clusters_nms, ~paste0('Strain_hmo_',str_remove(.y, "SC"), '_', .x))
-# don_k_names_minmap <- imap(opt_clusters_nms_aln[str_detect(names(opt_clusters_nms_aln), "minmap")], ~paste0('Strain_hmo_', str_remove(.y, "SC"), '_', .x)) %>% unlist(., recursive = F)
-# don_k_names_hsat <- imap(opt_clusters_nms_aln[str_detect(names(opt_clusters_nms_aln), "hsat")], ~paste0('Strain_hmo_', str_remove(.y, "SC"), '_', .x)) %>% unlist(., recursive = F)
-# 
-# don_hmonizd_minmap_base <- imap(opt_clusters_nms_aln[str_detect(names(opt_clusters_nms_aln), "hsat")], ~paste0('Strain_hmo_', str_replace(str_remove(.y, "SC"), "hsat","hsatHMO"), '_', .x)) %>% unlist(., recursive = F)
-# 
-# mnmp_hsat_comp_tbl_repd <-  map2(mnmp_hsat_comp_tbl, opt_clusters_nms_aln[str_detect(names(strn_harmnzd_tbls), "minmap")],  ~rep(list(.x),  length(.y))) %>% unlist(., recursive=F)
-# mnmp_hsat_comp_tbl_repd <- mnmp_hsat_comp_tbl_repd %>% set_names(map2(names(mnmp_hsat_comp_tbl_repd), unlist(opt_clusters_nms_aln[str_detect(names(strn_harmnzd_tbls), "minmap")]), ~str_replace_all(.x, "minmap.*", paste0("K", .y))))
 
 ## !!NOTE: LongRead
 don_k_names_minmap <- imap(opt_clusters_nms_aln[str_detect(names(opt_clusters_nms_aln), "soupc$")], ~paste0('Strain_hmo_', str_remove(.y, "SC"), '_', .x)) %>% unlist(., recursive = F)
@@ -820,26 +628,15 @@ strn_harmnzd_tbls_mn_hs2 <- pmap(list(strn_harmnzd_tbls_mn_hs, don_k_names_minma
 ```
 
 
-```{r , fig.width = 10, fig.height = 5, warning=FALSE}
-
-
-# strn_harmnzd_tbls_mn_hs2[["MSC60_K9"]] %>%
-#          count(Strain_hmo_M60_minmap_9, Strain_hmo_M60_hsatHMO_9)
-
-```
-
-
 Rechecking the overlap of strain assignments between different mappers after harmonization of hisat strain names to match those of minimap2
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
 aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>% 
-                      # select(bcode, contains("_minmap_"), contains("hsatHMO")) %>%
                       select(bcode, matches("_soupc_[0-9].*"), contains("soupc_lrHMO")) %>%
         pivot_longer(cols = starts_with("Strain_hmo"),
          names_to = c(".value", "K"),
          names_pattern = ".*[0-9]+_(.*)_([0-9]+$)")
         ) 
 
-# imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=`hsatHMO`, row_labs_c ='hsatHMO', col_labs_c= 'minmap', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc`, row_labs=`soupc_lrHMO`, row_labs_c ='soupc_lrHMO', col_labs_c= 'soupc', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
 ```
@@ -847,11 +644,10 @@ imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc`, row_labs=`
 
 
 ```{r, fig.width=6, fig.height=4, eval=T}
-# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+
 snk_plts <- list(strn_harmnzd_tbls_mn_hs2, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
   pmap(~{  
     
-  # snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"))
   snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("soupc", "soupc_lrHMO", "soupc_lr"), bp_face = c("plain"))
     
  })
@@ -864,8 +660,6 @@ snk_plts
 ```
 
 ```{r, eval=T}
-# snk_plts[str_detect(names(snk_plts), "minmap")]
-# snk_plts[str_detect(names(snk_plts), "minmap")] %>% imap(., ~.x + labs(title = .y))
 snk_plts[str_detect(names(snk_plts), "soupc$")] %>% imap(., ~.x + labs(title = .y))
 ```
 
@@ -873,7 +667,6 @@ Rechecking the overlap of strain assignments between different mappers after har
 hisat and hisat harmonized  should be 100% identical to confirm no errors in harmonizing labels 
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
 aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>% 
-                      # select(bcode, contains("_hsat_"), contains("hsatHMO")) %>%
                       select(bcode, contains("_soupc_lr"), contains("soupc_lrHMO")) %>%
         pivot_longer(cols = starts_with("Strain_hmo"),
          names_to = c(".value", "K"),
@@ -881,7 +674,6 @@ aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>%
         filter(if_all(contains("soupc"), ~!is.na(.x)))
         ) 
 
-# imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `hsat`, row_labs=`hsatHMO`, row_labs_c ='hsatHMO', col_labs_c= 'hsat', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc_lr`, row_labs=`soupc_lrHMO`, row_labs_c ='soupc_lrHMO', col_labs_c= 'soupc_lr', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
 
@@ -893,7 +685,6 @@ imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc_lr`, row_lab
 ```{r, fig.width = 16, fig.height = 4, message=FALSE, warning=FALSE}
 iter=2
 
-# ss_bar_plt <-list( rep(soupo_seu_kmerge, times = opt_clusters_len), rep(names(soupo_seu_kmerge), times = opt_clusters_len), opt_clusters_nms[names(soupo_seu_kmerge)] %>% flatten() %>% map(.,max))  %>% 
 ss_bar_plt <-list( rep(soupo_seu_kmerge, times = opt_clusters_len_aln), rep(names(soupo_seu_kmerge), times = opt_clusters_len_aln), opt_clusters_nms_aln[names(soupo_seu_kmerge)] %>% flatten() %>% map(.,max))  %>% 
   purrr::pmap(.,~{
   a_tbl <- ..1 %>%
