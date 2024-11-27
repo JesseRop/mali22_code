@@ -1168,21 +1168,6 @@ opt_narrow_k_tbl <- imap(strn_c_mdata, ~{
 opt_narrow_k_tbl
 ```
 
-```{r}
-## Write out the counts of the pseudobulk groups that have been processed
-# saveRDS(opt_narrow_k_tbl, paste0("data/processed/", species,"/opt_narrow_k_tbl.RDS"))
-```
-
-
-
-```{r}
-# gogogo()
-
-## Run nextflow script for pseubulk genotyping from the sourced header file with dynamic variables - 
-## !!!NOTE - it might be necessary to delete previous pseudobulk output files if running afresh
-
-```
-
 Calculate proportion of variance explained by PC1 and PC2
 ```{r}
 # Assuming your data is stored in a matrix called 'data'
@@ -1290,5 +1275,80 @@ list(strn_c_mdata)  %>%
       ggforce::geom_sina()
       
 })
+```
+
+Ignore below unless proceeding to do pseudobulk genotyping
+
+```{r}
+## Write out the counts of the pseudobulk groups that have been processed
+# saveRDS(opt_narrow_k_tbl, paste0("data/processed/", species,"/opt_narrow_k_tbl.RDS"))
+```
+
+Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk genotyping
+
+
+```{r, eval=F}
+## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
+# sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
+
+for (s in names(strn_c_mdata)) {
+  narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_[a-z]+")]]
+  ## Assign minimap/hsat mapper directory
+  algn_nm = str_extract(s, "hsat|minmap|lr_ref")
+  s_nm = str_remove(s, "_[a-z]+")
+  
+  print(algn_nm)
+  print(s_nm)
+  
+  ## !!!NOTE - Dangerous command - activate only when barcodes are modified
+
+  system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
+  
+  for (k in narrow_k) {
+    for (str_q in c('strain')){
+      
+      # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rownames_to_column('bcode')%>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, bcode) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), bcode) %>% rename('str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+      print(names(ss_qcd_ano[[1]]))
+
+      system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/',str_q,'_k',k,'/'))
+      print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/',str_q,'_k',k,'/'))
+
+      imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/',.y, '.tsv')))
+
+
+      for(stg_c in c('stage_afm', 'stage_ag')){
+        # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
+        ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>% rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+        print(names(ss_qcd_ano[[1]]))
+
+        system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/'))
+
+        imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/',.y, '.tsv')))
+
+      
+      }
+    }
+      system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
+
+      strn_c_mdata[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
+
+
+  }
+
+}
+```
+
+
+
+```{r}
+# gogogo()
+
+## Run nextflow script for pseubulk genotyping from the sourced header file with dynamic variables - 
+## !!!NOTE - it might be necessary to delete previous pseudobulk output files if running afresh
+
 ```
 
