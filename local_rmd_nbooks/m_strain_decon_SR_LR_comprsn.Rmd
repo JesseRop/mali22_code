@@ -66,8 +66,8 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
-source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+# source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+# source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
@@ -119,13 +119,15 @@ facet_grid(sample ~ algnr, scales = "free_y")
 
 
 ```{r, eval=T}
-list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', algn_nm,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_'))
+list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', algn_nm,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_')) %>% .[sorted_names_al]
 ```
 
 combi
 ```{r, eval=T}
 soupc_all_al <- list.files(paste0("data/processed/", species), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T) %>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', algn_nm,'/|k|/clusters.tsv'))) %>% str_replace_all(., '/', '_'))  %>% .[sorted_names_al] %>%
-  map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k")
+  map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k") %>% 
+  ## !!NOTE: LongRead - ADD TO REVERSE COMPLEMENT LONG READ AND MAKE IDENTICAL TO 10X
+  mutate("barcode" = ifelse(str_detect(sample_k, "soupc_lr"), paste0(as.character(reverseComplement(DNAStringSet(str_remove(barcode, "-1")))), "-1"), barcode))
 
 
 ```
@@ -137,7 +139,7 @@ Select only information from clusters.tsv for the best k as determined from the 
 ```{r, eval=T}
 
 ##Change Strain labels to SC for publication figures and enhanced readability
-# soupo_kselect <- soupc_all %>%
+
 soupo_kselect_al <- soupc_all_al %>%
   # filter(sample_k %in% knee_k) %>%
   dplyr::select(sample_k, barcode, status, assignment) %>% 
@@ -159,9 +161,7 @@ soupo_kselect_al <- soupc_all_al %>%
                                      assignment == "13" ~ "SC14",
                                      assignment == "14" ~ "SC15",
                                      assignment == "15" ~ "SC16")
-  ) %>% 
-  ## !!NOTE: LongRead - ADD TO REVERSE COMPLEMENT LONG READ AND MAKE IDENTICAL TO 10X
-  mutate("barcode" = ifelse(str_detect(sample_k, "soupc_lr"), paste0(as.character(reverseComplement(DNAStringSet(str_remove(barcode, "-1")))), "-1"), barcode))
+  ) 
 ```
 
 
@@ -180,7 +180,7 @@ soupo_kselect_al_cor <- soupo_kselect_al %>%
 hsat_mnmp_comp = map(soupo_kselect_al_cor, ~pivot_wider(.x, names_from = aligner, values_from = Strain) %>%
   dplyr::select(barcode, all_of(seq_nms)))
 
-hsat_mnmp_comp = hsat_mnmp_comp %>% filter(if_all(contains("soupc"), ~!is.na(.x)))
+hsat_mnmp_comp = hsat_mnmp_comp %>% map(., ~.x %>% filter(if_all(contains("soupc"), ~!is.na(.x))))
 
 ```
 
@@ -641,6 +641,21 @@ imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc`, row_labs=`
 
 ```
 
+!! NOTE - THIS SHOULD HARMONIZE THE STRAIN NAMES TO BE SIMILAR BETWEEN SHORT READ AND LONG READ OUTPUTS BUT DOESNT WORK FOR SOME REASON - maybe because long read is missing lots of cells
+
+Same as above but retaining only those cells that are in both long read and short read
+```{r , fig.width = 10, fig.height = 5, warning=FALSE}
+aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>%
+        filter(if_all(contains("soupc"), ~!is.na(.x))) %>% 
+                      select(bcode, matches("_soupc_[0-9].*"), contains("soupc_lrHMO")) %>% ## Retain only those present in missing 
+        pivot_longer(cols = starts_with("Strain_hmo"),
+         names_to = c(".value", "K"),
+         names_pattern = ".*[0-9]+_(.*)_([0-9]+$)")
+        ) 
+
+imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `soupc`, row_labs=`soupc_lrHMO`, row_labs_c ='soupc_lrHMO', col_labs_c= 'soupc', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
+
+```
 
 
 ```{r, fig.width=6, fig.height=4, eval=T}
@@ -793,93 +808,11 @@ strn_c_mdata <- list(strn_harmnzd_tbls,
 ```
 
 
-```{r, eval=FALSE} 
-
-map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")] , optimum_k, ~.x %>%
-  mutate(opt_k = .y) %>% head
-)
-```
-
-
-```{r, fig.width=7.5, fig.height= 5.5, eval=FALSE}
-  
-sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
-  pmap(., ~{
-      ..1 %>% 
-  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-  ggplot(., aes(x = No_of_clusters, y = log10(-log_likelihood))) + 
-  scale_y_reverse() +
-  geom_point() +
-  scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
-  geom_vline(xintercept=..2)+
-  geom_vline(xintercept=..3)+
-  geom_vline(xintercept=..4)+
-  geom_line(aes(group = 1)) + 
-  theme_classic() +
-  theme(text = element_text(size=35)) +
-  labs(y= "Log likelihood ( log10(-))", x = "Number of strains")
-    })
-
-sc_ll_knee_p_lst
-# saveRDS(sc_ll_knee_p_lst, "plots/fig_QC_s1/sc_ll_knee_p_lst.RDS")
-```
-
-```{r, eval=FALSE} 
-optimum_kv2 <- c(4,3,3,7,3) %>% set_names(sample_name_nms)
-optimum_kv3 <- c(6,3,3,6,2) %>% set_names(sample_name_nms)
-
-
-sc_ll_knee_p_all <- map2(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")] %>% .[1:4] , optimum_k[1:4], ~.x %>% mutate(opt_k = .y)) %>%
-  bind_rows(., .id = 'donor') %>% 
-  mutate(across(donor, ~factor(str_remove(., '_hsat'), levels = names(optimum_k[1:4])))) %>%
-    mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-    ggplot(., aes(x = No_of_clusters, y = log_likelihood/100000)) + 
-    geom_point() +
-    geom_line(aes(group = 1)) + 
-    geom_vline(aes(xintercept = optimum_k), data.frame(optimum_k[1:4]) %>% set_names("optimum_k") %>% rownames_to_column('donor') %>% mutate(across(donor, ~factor(., levels = sample_name_nms[1:4])))) +
-    scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
-    facet_wrap(donor~., nrow = 1)+
-    theme_classic() +
-    theme(axis.title = element_text(size=20, face = 'bold'),
-          axis.text.y = element_text(size=18),
-          axis.text.x = element_text(size=16),
-          strip.text =element_text(size=24,face="bold", colour = 'black'),
-          panel.border=element_rect(colour="black",fill='transparent')) +
-    labs(y= "Log likelihood ( X1e5)", x = "Number of strains")
-
-sc_ll_knee_p_all
-# saveRDS(sc_ll_knee_p_all, "plots/fig_QC_s1/sc_ll_knee_p_all.RDS")
-```
-
-
-Plot log likelihood
-
-```{r, fig.width=7.5, fig.height= 5.5, eval=FALSE}
-  
-sc_ll_knee_p_lst <- list(clusters_log_likelihoods_lst[str_detect(names(clusters_log_likelihoods_lst), "hsat")], optimum_k, optimum_kv2, optimum_kv3) %>%
-  pmap(., ~{
-      ..1 %>% 
-  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-  ggplot(., aes(x = No_of_clusters, y = log_likelihood/100000)) + 
-  geom_point() +
-  scale_x_discrete(breaks = function(x){x[c(F, T)]}) +
-  geom_vline(xintercept=..2)+
-  geom_vline(xintercept=..3)+
-  geom_vline(xintercept=..4)+
-  geom_line(aes(group = 1)) + 
-  theme_classic() +
-  theme(text = element_text(size=35)) +
-  labs(y= "Log likelihood (X1e5)", x = "Number of strains")
-    })
-
-sc_ll_knee_p_lst
-# saveRDS(sc_ll_knee_p_lst, "plots/fig_QC_s1/sc_ll_knee_p_lst.RDS")
-```
 
 
 ```{r}
 ## visualize top clusters
-# list(strn_c_mdata, sample_name_nms, optimum_k)  %>% 
+
 list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>% 
   purrr::pmap(.,~{
   ..1 %>% dplyr::count(Strn_c, Strain_qc, !!rlang::sym(paste0("Strain_hmo_", str_remove(..2, "SC"), "_", ..3))) %>% arrange(desc(n))
@@ -890,7 +823,7 @@ list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>%
 
 ```{r}
 ## Doublets confirmed removal round 2
-## visualize top clusters
+
 list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>% 
   purrr::pmap(.,~{
   ..1 %>% filter(if_all(starts_with('Strain_hmo_M'), ~ .== "Doublet" | .== "Negative")) %>% dplyr::count(Strn_c, dbt_neg_all, !!rlang::sym(paste0("Strain_hmo_", str_remove(..2, "SC"), "_", ..3))) 
@@ -899,8 +832,8 @@ list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>%
 
 
 ```{r}
-## visualize top clusters
-# list(strn_c_mdata, sample_name_nms, optimum_k)  %>% 
+
+
 list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>% 
   purrr::pmap(.,~{
   ..1 %>% dplyr::count(Strn_c, Strain_qc, !!rlang::sym(paste0("Strain_hmo_", str_remove(..2, "SC"), "_", ..3))) %>% arrange(desc(n))
@@ -912,7 +845,6 @@ list(strn_c_mdata, sm_aln_nms_al, optimum_k_aln)  %>%
 
 ### PCA calculation
 ```{r}
-# soupo_PC_mtx <- soupc_all %>% 
 soupo_PC_mtx <- soupc_all_al %>% 
   dplyr::select(-c(status, assignment, log_prob_singleton, log_prob_doublet)) %>% 
   dplyr::group_split(sample_k) %>%
@@ -924,7 +856,6 @@ soupo_PC_mtx <- soupc_all_al %>%
         as.matrix() %>%
         t())
 
-# soupo_PC_mtx <- soupo_PC_mtx[as.character(sorted_names)]
 soupo_PC_mtx <- soupo_PC_mtx[as.character(sorted_names_al)]
 ```
 
@@ -962,10 +893,9 @@ Calculate proportion of variance explained by PC1 and PC2
 ## visualize top clusters
 list(strn_c_mdata)  %>% 
   purrr::pmap(.,~{
-  # ..1 %>% dplyr::count(Strain_qc, StageMCA) %>% arrange(desc(n))
-  ..1 %>% dplyr::count(Strain_qc, StagePrelim) %>% arrange(desc(n))
-  # ..1 %>% dplyr::count(stageHL) %>% arrange(desc(n))
-  # ..1 %>% dplyr::count(stage_lab) %>% arrange(desc(n))
+
+      ..1 %>% dplyr::count(Strain_qc, StagePrelim) %>% arrange(desc(n))
+    
 })
 ```
 
@@ -1098,20 +1028,6 @@ ss_bar_plt <-list(
 ```
 
 
-```{r}
-
-# specify that we will perform downstream analysis on the corrected data note that the
-# original unmodified data still resides in the 'RNA' assay
-
-# msc_m22_qcd_anotd_strn <- readRDS("data/processed/msc_m22_qcd_anotd_strn.RDS")
-# 
-# list(msc_m22_qcd_anotd_strn, strn_c_mdata) %>%
-#   pmap(.,~{
-#     ..1@meta.data %>% rownames_to_column('bcode') %>% full_join(., ..2, by='bcode') %>% dplyr::count( Strain_qc, strain,stage_ag.y) 
-#   })
-
-```
-
 
 ```{r}
 ## visualize top clusters
@@ -1142,12 +1058,8 @@ strn_c_mdata <- map(strn_c_mdata,
     . %>% 
       mutate(across(stage_afm, ~ifelse(is.na(.), 'Low_n', .)),
              across(stage_ag, ~ifelse(is.na(.), 'Low_n', .))) %>%
-      # add_count(Strain_qc, stage_afm, name = 'strain_afm_n')%>% 
-      # add_count(Strain_qc, stage_ag, name = 'strain_ag_n')%>%
       add_count(Strain_DN, stage_afm, name = 'strain_afm_n')%>% 
       add_count(Strain_DN, stage_ag, name = 'strain_ag_n')%>%
-      # mutate('strain' = case_when(strain_afm_n>=15 ~ Strain_qc))%>%
-      # mutate('strain' = case_when(strain_afm_n>=15 ~ Strain_DN))%>%
       mutate('strain' = case_when(strain_afm_n>20 ~ Strain_DN))
     ) 
 
@@ -1209,13 +1121,6 @@ map(strn_c_mdata,
 
 
 ```
-
-```{r, eval=FALSE}
-  # system(
-  #       paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'data/processed/', species,'/strn_c_new_mdata_m22.RDS jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/')
-  #     )
-```
-
 
 
 ```{r}
@@ -1285,7 +1190,7 @@ for (s in names(strn_c_mdata)) {
   print(s_nm)
   
   ## !!!NOTE - Dangerous command - activate only when barcodes are modified
-  # system(paste0('rm -r /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/*'))
+
   system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
   
   for (k in narrow_k) {
@@ -1303,16 +1208,6 @@ for (s in names(strn_c_mdata)) {
       imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/',.y, '.tsv')))
 
 
-      # system(
-      #   paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
-      # )
-
-      ##Add doublets
-      # system(
-      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/')
-      # )
-
-
       for(stg_c in c('stage_afm', 'stage_ag')){
         # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
         ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>% rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
@@ -1323,39 +1218,23 @@ for (s in names(strn_c_mdata)) {
 
         imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/',.y, '.tsv')))
 
-        # system(
-        #   paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
-        # )
-
-         ##Add doublets
-      #   system(
-      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/')
-      # )
-
+      
       }
     }
       system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
 
       strn_c_mdata[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
 
-      ##Add barcodes after removing of doublets concordant across ks
-      # system(
-      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv ', 'jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/')
-      # )
+
   }
-  # system(
-  #       paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,' && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/')
-  #     )
+
 }
 ```
 
-```{r}
-gogogo()
-```
 
 
 ```{r}
-gogogo()
+# gogogo()
 
 ## Run nextflow script for pseubulk genotyping from the sourced header file with dynamic variables - 
 ## !!!NOTE - it might be necessary to delete previous pseudobulk output files if running afresh
