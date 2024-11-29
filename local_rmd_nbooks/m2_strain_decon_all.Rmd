@@ -54,14 +54,20 @@ suppressPackageStartupMessages({
 
 ## Variable declarations
 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
+```
+
+
 ### Common functions
 
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
 ```{r}
@@ -76,10 +82,6 @@ source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/
 # sv_dir = "pbulk_gtypes_GE_postQC"
 # 
 # strain_levels_univrs <- c(paste0("SC", 1:20), "Doublet", "Negative")
-```
-
-```{r setup}
-knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
 
@@ -147,7 +149,7 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 
 ```{r}
 # source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_strain_decon_all_GE_postQC_header.R')
-source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_strain_decon_all_preQC_header.R')
+source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header_m55.R')
 ```
 
 
@@ -227,7 +229,7 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 
 ```
 
-```{r, fig.width= 13, fig.height=4} 
+```{r, fig.width= 20, fig.height=4} 
 clusters_log_likelihoods_lst %>% 
   bind_rows(., .id = "sample_algnr") %>% 
   separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",algnr = "[a-z].*")) %>%
@@ -723,7 +725,7 @@ strain_harmonize_fn <- function(strn_tbl = tbl1, strn1 = "Strain_2nd", strn2 = "
 
 ```{r, fig.width=4, fig.height=4}
 
-snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), labls = paste0("K=", opt_clusters_nms[[3]][1:2]), bp_face = c("bold", "plain"), ttl = "plot"){
+snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), labls = paste0("K=", opt_clusters_nms[[3]][1:2]), bp_face = c("bold", "plain"), ttl = "plot", strain_colours = strain_cols_n) {
   decod_tbl %>% 
         mutate(across(contains("train"), ~str_replace_all(., c("Doublet" = "Dbt", "Negative" = "Neg")))) %>%
         make_long(all_of(strns_2_plt)) %>% 
@@ -731,7 +733,7 @@ snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), lab
         ggplot(., aes(x = x, next_x = next_x,node = node,next_node = next_node,fill = factor(node),label = paste0(node,": ",n))) +
             geom_sankey() +
         theme_void()+
-        scale_fill_manual(values = strain_cols_n)+
+        scale_fill_manual(values = strain_colours) +
         scale_x_discrete(labels=labls)+
         geom_sankey_label(size = 3.6, color = 1, fill = "white") +
         labs(title = ttl) +
@@ -840,12 +842,11 @@ snk_plts[str_detect(names(snk_plts), "lr_ref")]
 
 ```{r}
 ## Select most likely optimum k
-optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2) %>% .[sample_name_nms]
+optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2, "MSC1" = 5, "MSC3" = 2, "MSC13" = 2, "MSC14" = 8, "MSC12" = 2) %>% .[sample_name_nms]
 
 optimum_k_aln = rep(optimum_k, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 
 ```
-
 
 
 ```{r, fig.width=6, fig.height=4}
@@ -886,7 +887,7 @@ strn_harmnzd_assesmnt
 
 ```{r, fig.width=6, fig.height=4}
 ## !! NOTE - VERY IMPORTANT to verify that the strain renaming to harmonize names for sankey plot function has been done correctly - Detailed assesment - may be time consuming for many donor samples
-bind_rows(strn_harmnzd_assesmnt) %>% view
+bind_rows(strn_harmnzd_assesmnt) #%>% view
 ```
 
 ```{r, fig.width=6, fig.height=4}
@@ -940,8 +941,6 @@ strn_harmnzd_tbls_mn_hs[[1]]
 ```
 
 
-
-
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
 
 ## Select relevant variables
@@ -950,12 +949,11 @@ strn_harmnzd_tbls_mn_hs2 <- pmap(list(strn_harmnzd_tbls_mn_hs, don_k_names_minma
 ```
 
 
-
 ```{r , fig.width = 10, fig.height = 5, warning=FALSE}
 
 
-strn_harmnzd_tbls_mn_hs2[["MSC60_K9"]] %>%
-         count(Strain_hmo_M60_minmap_9, Strain_hmo_M60_hsatHMO_9)
+# strn_harmnzd_tbls_mn_hs2[["MSC60_K9"]] %>%
+#          count(Strain_hmo_M60_minmap_9, Strain_hmo_M60_hsatHMO_9)
 
 ```
 
@@ -971,6 +969,58 @@ aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>%
 
 imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=`hsatHMO`, row_labs_c ='hsatHMO', col_labs_c= 'minmap', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
 
+```
+
+
+
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts <- list(strn_harmnzd_tbls_mn_hs2, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
+  pmap(~{  
+    
+snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"))
+    
+ })
+
+```
+
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts[1:15]
+```
+
+```{r, eval=T}
+# snk_plts[str_detect(names(snk_plts), "minmap")]
+snk_plts[str_detect(names(snk_plts), "minmap")] %>% imap(., ~.x + labs(title = .y))
+```
+
+
+#### Adding stage assignments to the sankey plots to see how they transition across Ks and alignment method
+```{r, eval=T}
+
+strn_harmnzd_tbls_mn_hs2_stg <- list(strn_harmnzd_tbls_mn_hs2, mdata_all[str_remove(names(strn_harmnzd_tbls_mn_hs2), "_K.*")]) %>%
+  pmap(~{
+    ..1 %>% left_join(., ..2[,c("bcode", "stage_ag")] , by = 'bcode') %>% 
+      mutate(across(starts_with("Strain_hmo"), ~paste0(., "_", str_extract(stage_ag, "^.")))) %>%
+      select(-c(stage_ag))
+  })
+
+```
+
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts_stg <- list(strn_harmnzd_tbls_mn_hs2_stg, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
+  pmap(~{  
+    
+snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"), strain_colours = strain_stg_cols_n)
+    
+ })
+
+```
+
+```{r, fig.width=6, fig.height=8, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts_stg[1:15]
 ```
 
 Rechecking the overlap of strain assignments between different mappers after harmonization of strain names
@@ -1019,8 +1069,8 @@ soupo_seu_kmerge[[3]] %>%
         mutate(nro_count = data.table::rleid(Strain_final)) %>% ## Gets the count of distinct items in Strain_final into row numbers within the 'is.na(ty_brakr)' groups
         ungroup()%>%
         mutate(max_sc = as.numeric(str_remove_all(Strain_2nd, "Doublet|Negative|SC")))%>%
-        mutate(n_strains= case_when(is.na(ty_brakr) ~ paste0("SC",(max(max_sc, na.rm = T)+nro_count)), T ~ ty_brakr))%>%
-  view
+        mutate(n_strains= case_when(is.na(ty_brakr) ~ paste0("SC",(max(max_sc, na.rm = T)+nro_count)), T ~ ty_brakr)) #%>%
+  #view
 
 ```
 
@@ -1130,7 +1180,7 @@ Strain_qc_cutoff=0
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2:4), "MSC57" = c(2:4))
 
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3)) %>% .[sample_name_nms]
+opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:9), "MSC12" = c(2:3)) %>% .[sample_name_nms]
 
 
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5))
@@ -1589,9 +1639,9 @@ map(strn_c_mdata,
 ```
 
 ```{r, eval=FALSE}
-  system(
-        paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'data/processed/', species,'/strn_c_new_mdata_m22.RDS jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/')
-      )
+  # system(
+  #       paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'data/processed/', species,'/strn_c_new_mdata_m22.RDS jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/')
+  #     )
 ```
 
 
