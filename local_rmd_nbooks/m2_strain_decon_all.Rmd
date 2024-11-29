@@ -70,82 +70,6 @@ source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
-```{r}
-# sample_set = 'Mali2'
-# algn_nm = 'minmap'
-# species = 'Pf'
-# 
-# # soup_dir = "soupc"
-# # sv_dir = "pbulk_gtypes_preQC"
-# 
-# soup_dir = "soupc_GE_postQC"
-# sv_dir = "pbulk_gtypes_GE_postQC"
-# 
-# strain_levels_univrs <- c(paste0("SC", 1:20), "Doublet", "Negative")
-```
-
-
-## Declare variables
-
-```{r}
-# ##Copy souporcell files for the optimum clusters
-# 
-# ##Sample ID
-# # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
-# ## All sample ids removing "MSC38" which seems to have lots of doublets
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25")
-# 
-# # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
-# # algn_nms = c('minmap', 'hsat', 'lr_ref')
-# algn_nms = c('minmap', 'hsat')
-# 
-# sample_name_nms_al <- rep(sample_name_nms, length(algn_nms))
-# algn_nms_al <- rep(algn_nms, each= length(sample_name_nms))
-# 
-# sm_aln_nms_al <- paste(rep(sample_name_nms, length(algn_nms)), rep(algn_nms, each= length(sample_name_nms)), sep ='_')
-# 
-# ## number of optimum clusters to investigate per sample
-# # opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11))
-# # opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11), "MSC38" = c(2:6), "MSC40" = c(6:10), "MSC50_MACS" = c(2:6), "MSC53" = c(2:6), "MSC57" = c(2:6))
-# 
-# # opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11), "MSC40" = c(6:10), "MSC50_MACS" = c(2:6), "MSC53" = c(2:6), "MSC57" = c(2:6), "MSC24" = c(2:6), "MSC37" = c(5:9), "MSC39" = c(3:7), "MSC45" = c(2:6), "MSC50_SLO" = c(2:6), "MSC54" = c(2:6), "MSC67" = c(2:6), "MSC68" = c(2:6), "MSC70" = c(2:6))
-# opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9), "MSC66" = c(7:11), "MSC38" = c(4:8), "MSC40" = c(6:10), "MSC50_MACS" = c(2:6), "MSC53" = c(1:3), "MSC57" = c(1:3), "MSC24" = c(1:3), "MSC37" = c(5:9), "MSC39" = c(2:6), "MSC45" = c(1:3), "MSC50_SLO" = c(2:6), "MSC54" = c(1:3), "MSC67" = c(1:3), "MSC68" = c(2:6), "MSC70" = c(1:3), "MSC41"= c(2:6), "MSC51"= c(1:5), "MSC25"= c(2:6))
-# 
-# 
-# # opt_clusters_nms <- list("MSC33" = c(6:10),"MSC48" = c(3:7),"MSC49" = c(5:9),"MSC55" = c(4:8),"MSC60" = c(5:9))
-# # opt_clusters_nms <- list("MSC33" = c(3:9),"MSC48" = c(2:3),"MSC49" = c(2:6),"MSC55" = c(4:10),"MSC60" = c(2:7), "MSC66")
-# 
-# opt_clusters_len <- map(opt_clusters_nms, length)
-# 
-# ## number of optimum clusters to investigate per sample factoring the 2 alignments
-# opt_clusters_nms_aln <- rep(opt_clusters_nms, length(algn_nms)) %>% set_names(sm_aln_nms_al)
-# opt_clusters_len_aln <- map(opt_clusters_nms_aln, length)
-# 
-# ##Sample IDs
-# # source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215", "5736STDY13437393") %>% set_names(sample_name_nms)
-# # source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215") %>% set_names(sample_name_nms)
-# 
-# # source_irods <- map2(source_irods_nms, opt_clusters_len[names(source_irods_nms)], ~rep(.x, each = .y))
-# 
-# # source_irods <- unlist(flatten(source_irods))
-# 
-# ##Samples
-# sample_name <- map2(sample_name_nms, opt_clusters_len[sample_name_nms], ~rep(.x, each = .y))
-# 
-# opt_clusters <- unlist(flatten(opt_clusters_nms[sample_name_nms]))
-# 
-# sample_name <- unlist(flatten(sample_name))
-# 
-# ## sorted donor_opt_cluster names
-# sorted_names <- paste0(sample_name, "_", opt_clusters)
-# 
-# ## sorted factoring alignment
-# sorted_names_al <-paste0(sample_name, "_",rep(algn_nms,each=length(sample_name)),"_", opt_clusters)
-# 
-# iter = opt_clusters_len
-
-```
-
 
 ```{r}
 # source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_strain_decon_all_GE_postQC_header.R')
@@ -177,58 +101,6 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 
 
 
-```{r, fig.width = 12, fig.height = 4, message=FALSE, warning=FALSE, eval=FALSE}
-# 
-# ss_bar_plt <-list( strn_c_mdata)  %>% 
-#   purrr::pmap(.,~{
-#   a_tbl <- ..1 %>%
-#       mutate(across(stage_afm, ~factor(., levels=c('Asexual', 'Female', 'Male', 'Developing', 'Unassigned')))) %>%
-#       dplyr::count(Strain_qc, stage_afm, .drop = FALSE) 
-#   
-#   ##get stage_ag labels and counts to add to the Strain_qc+stage_afm counts generated above
-#   stage_ag_cnt <- ..1 %>% 
-#     dplyr::select(Strain_qc, stage_ag, stage_afm) %>% 
-#     add_count(Strain_qc, stage_ag, name = 'stage_ag_n') %>% 
-#     distinct(pick(Strain_qc, stage_afm), .keep_all = T) %>% 
-#     left_join(a_tbl, ., by =c('Strain_qc', 'stage_afm')) %>% 
-#     rename(c('Stage'= stage_afm, 'Counts' =n, 'Strain' = Strain_qc))  
-#   
-#   print(stage_ag_cnt)
-#   
-#     b_plt <- stage_ag_cnt %>%
-#       # ggplot(., aes(x = Stage, y = Counts, fill = Stage, color=stage_ag_n<30)) +
-#       ggplot(., aes(x = Stage, y = Counts, fill = Stage)) +
-#       geom_col(position = position_dodge2()) + #width=0.4, position = position_dodge(width=0.5) 
-#       geom_text(aes(label=Counts), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 7, show.legend = F, fontface ='bold', colour='black')+
-#       scale_fill_manual(values = c_stg_cols) + #'Asexual' = "#FFE5B4", 'Male' = "#BFD7B5", 'Female'="#8ab6d6"
-#       # scale_color_manual(values = c('FALSE' = "white", 'TRUE' = "blue")) +
-#   geom_tile(aes(x = Stage, y = -10, fill = Stage, height = 14)) +
-#   facet_wrap( Strain ~ ., nrow = 1) +
-#       scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
-#       scale_x_discrete(expand = expansion(add = c(1, 1))) +
-#       theme_classic() +
-#   labs( y = 'Counts')+
-#       theme(
-#         axis.text.y  = element_text(size = 22),
-#         axis.title.y  = element_text(size = 22, face = "bold"),
-#         axis.title.x = element_blank(),
-#         # axis.title = element_text(size = 18, face = "bold"),
-#         legend.text = element_text(size = 22),
-#         legend.title = element_text(size = 22, face = "bold"),
-#         legend.position="bottom",
-#         axis.text.x = element_blank(),
-#         axis.ticks.x = element_blank(),
-#         strip.text =element_text(size=20,face="bold", colour = 'black'),
-#         panel.border=element_rect(colour="black",fill='transparent')
-#       )+ 
-#       guides(color = F)
-#     print(b_plt)
-#     return(b_plt)
-# })
-
-
-```
-
 ```{r, fig.width= 20, fig.height=4} 
 clusters_log_likelihoods_lst %>% 
   bind_rows(., .id = "sample_algnr") %>% 
@@ -241,17 +113,8 @@ clusters_log_likelihoods_lst %>%
     geom_line(aes(group = 1)) + facet_grid(algnr ~ sample, scales = "free_y")
 ```
 
-```{r}
-# optimum_k = c(8,6,6,7,7) %>% set_names(sample_name_nms)
-
-```
 
 Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
-```{r}
-##Copy souporcell files for the optimum clusters
-
-```
-
 
 Read all the souporcell files for all the iterations. May be excessive but since we have the memory and cpu and we may need to use the files downstream then why not.
 ```{r, results='hide', eval=FALSE}
@@ -399,43 +262,6 @@ phmap_lab_transfr <- function(dset_lab, col_labs, row_labs, row_labs_c, col_labs
 
 ```
 
-same as above to be deleted
-```{r , fig.width = 10, fig.height = 5, warning=FALSE}
-## Heatmap function for plotting pheatmap for number of cells assigned labels from Clara's and Roser's datasets
-# phmap_lab_transfr <- function(dset_lab, col_labs, row_labs, row_labs_c, col_labs_c, strn_order, ttl){
-#   anno_row = dset_lab %>% dplyr::count({{ col_labs }}, {{ row_labs }}) %>% 
-#     pivot_wider(values_from = n, names_from = {{ col_labs }}) %>% 
-#     column_to_rownames(names(.)[1]) %>% 
-#     mutate({{ row_labs }} := row_labs_c) %>%
-#     dplyr::select({{ row_labs }})
-#   
-#   anno_col = dset_lab %>% dplyr::count({{ col_labs }}, {{ row_labs }}) %>%
-#     pivot_wider(values_from = n, names_from = {{ row_labs }}) %>%
-#     column_to_rownames(names(.)[1]) %>%
-#     mutate({{ col_labs }} := col_labs_c) %>%
-#     dplyr::select({{ col_labs }})
-#   
-#   hm_mtx <- dset_lab %>% dplyr::count({{ col_labs }}, {{ row_labs }}) %>%
-#     arrange({{ col_labs }}, {{ row_labs }}) %>%
-#     # mutate(across(c({{ col_labs }}, {{ row_labs }}), ~droplevels(factor(., levels = strain_levels_univrs)))) %>%
-#     # spread({{ col_labs }},n,fill = 0) %>% ## Using spread instead of pivot_longer since it orders the columns based on factors
-#     pivot_wider(values_from = n, names_from = {{ col_labs }}) %>%
-#     replace(is.na(.), 0) %>%
-#     column_to_rownames(names(.)[1]) #%>% 
-#     # .[,strn_order] %>%
-#   
-#     # print(head(hm_mtx)) 
-#     
-#     hm_mtx %>%
-#     ComplexHeatmap::pheatmap(display_numbers = T,treeheight_row=0, treeheight_col=0, annotation_row = anno_row, annotation_col = anno_col, legend = F, annotation_legend = T, cluster_rows =F, cluster_cols = F, fontsize = 20, annotation_names_row=T, annotation_names_col = T,
-#                        # color = 'white',
-#                        number_format = "%.0f", main = ttl#,
-#                        # annotation_colors = list('minmap' = "green", 'hsat' = "lightblue")
-#                        )
-# 
-# }
-
-```
 
 
 
@@ -482,43 +308,6 @@ imap(mnmp_lr_ref_comp, possibly(~phmap_lab_transfr(.x, col_labs= `lr_ref`, row_l
 ```
 
 
-ComplexHeatmap
-```{r }
-## ComplexHeatmap function for plotting pheatmap for number of cells assigned labels from Clara's and Roser's datasets
-# phmap_lab_transfr <- function(dset_lab, col_labs, row_labs, row_labs_c, col_labs_c){
-#   dset_lab %>% dplyr::count({{ col_labs }}, {{ row_labs }}) %>%
-#     pivot_wider(values_from = n, names_from = {{ col_labs }}) %>%
-#     column_to_rownames(names(.)[1]) %>%
-#     Heatmap(., row_title = row_labs_c, column_title = col_labs_c, cluster_rows =F, cluster_columns =F, 
-#             cell_fun = function(j, i, x, y, width, height, fill) {
-#               grid.text(sprintf("%.1f", .[i, j]), x, y, gp = gpar(fontsize = 10))
-#             }
-#     )
-# }
-# 
-# map(a, ~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=`hsat`, row_labs_c ='minmap', col_labs_c= 'hsat'))
-
-```
-
-Split the information for each sample into different labels and put into a list named appropriately
-```{r}
-soupo_kselect_list <- soupo_kselect_al %>%
-# filter(str_detect(sample_k, algn_nm)) %>%
-# soupo_kselect_list <- soupo_kselect %>%
-  mutate(across(sample_k, ~str_remove(.,paste0("_", algn_nm)))) %>%
-  dplyr::group_split(sample_k) %>%
-  purrr::set_names(purrr::map_chr(., ~.x$sample_k[1])) %>%
-  map(. %>% column_to_rownames(., "barcode") %>% dplyr::select(Strain))
-
-soupo_kselect_list <- soupo_kselect_list[as.character(sorted_names)]
-
-
-##Get strain levels for samples with more than one strain and mutate Strain column to reflect this
-# strain_levels <- map(soupo_kselect_list[2:8], ~.x %>% filter(str_detect(Strain, 'Strain')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
-strain_levels <- map(soupo_kselect_list, ~.x %>% dplyr::filter(str_detect(Strain, '^SC')) %>% pull(Strain) %>% unique() %>% sort() %>% c(.,"Doublet","Negative"))
-
-soupo_kselect_list <- map2(soupo_kselect_list,strain_levels, ~.x %>% mutate(across(Strain, ~factor(., levels = .y)))) 
-```
 
 Split the information for each sample into different labels and put into a list named appropriately
 ```{r}
@@ -540,25 +329,6 @@ strain_levels <- map(soupo_kselect_list, ~.x %>% dplyr::filter(str_detect(Strain
 soupo_kselect_list <- map2(soupo_kselect_list,strain_levels, ~.x %>% mutate(across(Strain, ~factor(., levels = .y)))) 
 ```
 
-```{r}
-# soupo_kselect_list <- soupo_kselect_list[c(1:32, 33, 36, 39, 40, 42:55)]
-# sortd_names_new <- names(soupo_kselect_list)
-```
-
-```{r, message=FALSE}
-##Copy souporcell files for the optimum clusters investigation on igv - all except negative
-
-# soupo_kmerge <- map(sample_name_nms, ~{
-# soupo_kselect_list[str_detect(names(soupo_kselect_list), paste0(.x, "_"))] %>% 
-#   imap(., ~{
-#     nms = .y
-#     .x %>% rename_with(~paste0(.,'_', nms), everything()) %>% rownames_to_column('bcode')
-#         }) %>% 
-#     purrr::reduce(., left_join, by = 'bcode')
-#   }) %>% 
-#   set_names(sample_name_nms)
-
-```
 
 
 ```{r, message=FALSE}
