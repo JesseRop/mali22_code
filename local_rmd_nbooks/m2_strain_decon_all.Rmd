@@ -1570,7 +1570,7 @@ for (s in names(strn_c_mdata_with_ds)) {
         #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/')
         # )
         
-      }
+      } 
     }
     system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
     
