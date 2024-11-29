@@ -1466,6 +1466,42 @@ opt_narrow_k_tbl
 saveRDS(opt_narrow_k_tbl, paste0("data/processed/", species,"/opt_narrow_k_tbl.RDS"))
 ```
 
+#### Adding option to downsample the large clusters for faster running of pseudobulk genotyping pipeline
+
+
+```{r, eval=T}
+## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
+# sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
+
+strn_c_mdata_with_ds <- imap(strn_c_mdata, ~{
+  
+  obj = .x
+  narrow_k <- opt_narrow_clusters_nms[[str_remove(.y, "_[a-z]+")]]
+  
+  ## Assign minimap/hsat mapper directory
+  algn_nm = str_extract(.y, "hsat|minmap|lr_ref")
+  s_nm = str_remove(.y, "_[a-z]+")
+  
+  print(algn_nm)
+  print(s_nm)
+
+  map(narrow_k, ~{
+    k = .x
+    
+    obj %>% 
+      group_by(!!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k)), stage_afm) %>%
+      mutate(samp = sample(n())) %>%
+      mutate(!!paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k,"_ds") := case_when(stage_afm == "Asexual" & samp <= 700 ~ "yes", stage_afm == "Female" & samp <= 250 ~ "yes", stage_afm == "Male" & samp <= 250 ~ "yes" ))  %>%
+      select(-c(samp))
+
+  }) %>% purrr::reduce(left_join, by = c(names(obj)))
+
+})
+
+
+```
+
+
 Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk genotyping
 
 
@@ -1473,7 +1509,9 @@ Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
 
-for (s in names(strn_c_mdata)) {
+downsample_cells = "yes"
+
+for (s in names(strn_c_mdata_with_ds)) {
   narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_[a-z]+")]]
   ## Assign minimap/hsat mapper directory
   algn_nm = str_extract(s, "hsat|minmap|lr_ref")
@@ -1489,9 +1527,9 @@ for (s in names(strn_c_mdata)) {
   for (k in narrow_k) {
     for (str_q in c('strain')){
       
-      # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rownames_to_column('bcode')%>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
-      # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, bcode) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
-      ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), bcode) %>% rename('str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rownames_to_column('bcode')%>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q, bcode) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
+      ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), bcode) %>% rename('str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup()  %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
       names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
       print(names(ss_qcd_ano[[1]]))
 
@@ -1512,8 +1550,8 @@ for (s in names(strn_c_mdata)) {
 
 
       for(stg_c in c('stage_afm', 'stage_ag')){
-        # ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
-        ss_qcd_ano <- map(strn_c_mdata[s], ~.x %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>% rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
+        ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>% rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>%  mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
         names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
         print(names(ss_qcd_ano[[1]]))
 
@@ -1534,7 +1572,7 @@ for (s in names(strn_c_mdata)) {
     }
       system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
 
-      strn_c_mdata[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
+      strn_c_mdata_with_ds[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
 
       ##Add barcodes after removing of doublets concordant across ks
       # system(
