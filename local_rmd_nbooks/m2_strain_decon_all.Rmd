@@ -1509,8 +1509,6 @@ Write out strain_qcd/strain + stage_ag/stage_afm barcodes to farm for pseudobulk
 ## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
 # sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
 
-downsample_cells = "yes"
-
 for (s in names(strn_c_mdata_with_ds)) {
   narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_[a-z]+")]]
   ## Assign minimap/hsat mapper directory
@@ -1527,61 +1525,60 @@ for (s in names(strn_c_mdata_with_ds)) {
   for (k in narrow_k) {
     for (str_q in c('strain')){
       
-      # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rownames_to_column('bcode')%>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
-      # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q, bcode) %>% mutate(across(c(str_q), ~droplevels(factor(.)))) %>% rename('str'=str_q) %>% split(f = ~ str, drop = T))
-      ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), bcode) %>% rename('str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str) %>% filter(n() >= 20) %>% ungroup()  %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% 
+                          {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% 
+                          dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), bcode) %>% 
+                          rename('str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% 
+                          group_by(str) %>% filter(n() >= 20) %>% ungroup()  %>%
+                          mutate(across(c(str), ~droplevels(factor(.)))) %>% 
+                          split(f = ~ str, drop = T))
+      
       names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
       print(names(ss_qcd_ano[[1]]))
-
+      
       system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/',str_q,'_k',k,'/'))
       print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/',str_q,'_k',k,'/'))
-
+      
       imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/',.y, '.tsv')))
-
-
-      # system(
-      #   paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/ && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
-      # )
-
+      
       ##Add doublets
       # system(
       #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',str_q,'_k',k,'/')
       # )
-
-
+      
+      
       for(stg_c in c('stage_afm', 'stage_ag')){
-        # ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% dplyr::select(str_q, stg_c, bcode) %>% mutate(across(c(str_q, stg_c), ~droplevels(factor(.)))) %>% rename('stg'=stg_c, 'str'=str_q) %>% split(f = ~ str+stg, drop = T))
-        ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>% rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% group_by(str, stg) %>% filter(n() >= 20) %>% ungroup() %>%  mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        
+        ss_qcd_ano <- map(strn_c_mdata_with_ds[s], ~.x %>% 
+                            {if (downsample_cells == "yes") filter(., !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k, '_ds')) == "yes") else .} %>% 
+                            dplyr::select(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k), stg_c, bcode) %>%
+                            rename('stg'=stg_c, 'str'= !!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k))) %>% 
+                            group_by(str, stg) %>% filter(n() >= 20) %>%  ungroup() %>% 
+                            mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% 
+                            split(f = ~ str+stg, drop = T))
+        
         names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
         print(names(ss_qcd_ano[[1]]))
-
+        
         system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/'))
-
+        
         imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/',.y, '.tsv')))
-
-        # system(
-        #   paste0('rsync -av --delete /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/')
+        
+        
+        ##Add doublets
+        #   system(
+        #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/')
         # )
-
-         ##Add doublets
-      #   system(
-      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/Doublet.tsv ', '/Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/',stg_c,'_',str_q,'_k',k,'/')
-      # )
-
+        
       }
     }
-      system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
-
-      strn_c_mdata_with_ds[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
-
-      ##Add barcodes after removing of doublets concordant across ks
-      # system(
-      #   paste0('rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv ', 'jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/')
-      # )
+    system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt' ))
+    
+    strn_c_mdata_with_ds[[s]] %>% filter(dbt_neg_all == "LikelySinglet") %>% pull(bcode) %>% write(., paste0('data/processed/',species,'/', s_nm, '/', sv_dir,'/bcodes/',algn_nm, '/bcodes_no_dbt/barcodes.tsv'))
+    
+    
   }
-  # system(
-  #       paste0('rsync -av --delete --rsync-path="mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,' && rsync" /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm, ' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/')
-  #     )
+
 }
 ```
 
