@@ -74,34 +74,6 @@ source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
-```{r, eval=F}
-##Copy souporcell files for the optimum clusters
-
-
-# for (k in c(6,8)) {
-# for (smpl in c('stage_afm_strain_qcd', 'stage_ag_strain_qcd', 'strain_qcd')) {
-for (id in sample_name_nms) {
-    for (smpl in grps) {
-    # for (smpl in c('stage_afm_strain')) {
-      for (a in 1:length(algn_nms)) {
-        # for (p in c(1,2)) {
-        for (p in c(1)) {
-          # for (al in c("multiallelic", "biallelic")) {
-          system(paste0('mkdir -p /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
-            )
-          
-          system(paste0('rsync -av --include=\'*.vcf\' --exclude=\'*\' jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/ /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
-            )
-          
-          system(paste0('rsync -av --delete jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/',sample_set,'/data/processed/',species,'/', id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p, '/vartrix_biallelic /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/',sample_set,'/data/processed/',species,'/',id,'/', gtyp_step, '/',smpl,'_k', optimum_k[id], '_',algn_nms[a],'/p', p)
-            )
-        }
-      }
-    }
-}
-
-```
-
 
 VCF to GDS conversion
 ```{r, warning=FALSE, message=FALSE, eval=T}
@@ -147,7 +119,7 @@ gene_n_pos <- Pf3D7_genes_plasmoDB %>%
 
 
 
-filter pf7 variants
+filter pf7 variantss
 ```{r}
 
 pf7_waf <- read_csv("../../Pf3D7_genomes_gtfs_indexs/pf7_data/pf7_variants/AF-W-freqs.csv")
@@ -174,11 +146,6 @@ pf7_mali_ibd_whitelst <- pf7_mali %>%
 
 filter pf7 all variants
 ```{r}
-
-# pf7_mali_all <- data.table::fread("../../Pf3D7_genomes_gtfs_indexs/pf7_data/pf7_variants/all_variants.txt")
-# 
-# pf7_mali_all_snp_qc <- pf7_mali_all %>% dplyr::select(V1, V2, V10, V11, V12,  V13, V14, V15, V16) %>% rename(c('chrom' = V1, 'pos'=V2, 'filter'=V10, 'type'=V11, 'VQSLOD'=V12, 'CDS'=V13, 'AC'=V14, 'AN'=V15, 'AF'=V16)) %>%  mutate(pf_all = 'yes')
-
 
 pf7_mali_only <- data.table::fread("../../Pf3D7_genomes_gtfs_indexs/pf7_data/pf7_variants/Pf3D7_v3_g_bisplit.txt", na.strings='.')
 pf7_mali_only_snp_qc <- pf7_mali_only %>% dplyr::select(V1, V2,V3,V4, paste0('V', c(11:17))) %>% rename(c('chrom' = V1, 'pos'=V2, 'ref'=V3, 'alt'=V4, 'filter'=V11,'type'=V12, 'VQSLOD'=V13,   'CDS'=V14, 'AC'=V15, 'AN'=V16, 'AF'=V17)) %>%  mutate(pf_all = 'yes')
@@ -209,10 +176,7 @@ msc61_ULI_only_snp_qc <- msc61_ULI_variants %>% dplyr::select(V1, V2,V3,V4,V5,V6
 
 ```
 
-```{r}
-##Write pf7 snps for sekou
-# pf7_mali_only_snp_qc %>% filter(type == "SNP" & filter == "PASS") %>% write_csv(., "/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali/collaborators/sekou_files/pf7_mali_only_snp_qc_pass.csv")
-```
+
 
 ###########k8_raw
 ```{r}
