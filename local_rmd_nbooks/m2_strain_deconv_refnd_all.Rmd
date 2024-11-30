@@ -58,19 +58,20 @@ knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/u
 #### Source variables specific to this run - this pseudobulk strain analysis script is ran several times with different inputs
 ```{r}
 ## Get the necessary variable for the pseudobulking workflow
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
+source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
+source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header_m55.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
 sample_name_nms
 ```
 
 #### Source colours, plotting functions and commonly used tables etc
 ```{r}
 ## Get the necessary variables for common housekeeping
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
 ```{r, eval=F}
