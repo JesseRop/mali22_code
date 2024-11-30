@@ -159,7 +159,7 @@ process VARTRIX_UMI {
     """
     export PATH="\$PATH:/software/team222/jr35/vartrix/vartrix-1.1.22/target/release"
 
-    vartrix --umi --out-variants ${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${strn_stg}_ref.mtx --out-matrix ${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
+    vartrix --umi --out-variants ${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${sample_nm}_${strn_stg}_ref.mtx --out-matrix ${sample_nm}_${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
     
     """
 }
