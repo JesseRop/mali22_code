@@ -5,6 +5,9 @@
 // params.sv_dir = "pbulk_gtypes_GE_postQC"
 params.sv_dir = "pbulk_gtypes_postQC_cln"
 
+// Whether to publish subsetted bam files
+params.save_bam_sset = false
+
 // - 2022 cellranger output
 params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/*/parent/possorted_genome_bam.bam" 
 
@@ -40,13 +43,13 @@ bcodes_ch = Channel
 // bcodes_ch.view()
 
 bcodes_bam_ch = bcodes_ch.combine(bam_ch, by: [0,1])
-// bcodes_bam_ch.view()
+bcodes_bam_ch.view()
 
 // - Processes
 // - Subset minimap bam file from souporcell based on the barcodes in each pseudobulk group using subset bam from 10X
 
 process SUBSET {
-    memory '60 GB'
+    memory '100 GB'
     cpus '5'
 
     tag "Subset ${strn_stg}  reads"
@@ -75,7 +78,8 @@ process TAGBAM {
 
     tag "Tagging ${strn_stg}  reads"
 
-    // publishDir "$params.odir/${sample_nm}/${params.sv_dir}/${grp}_${algn_nm}/nw_bams", mode: 'copy', pattern: "*sset_sorted_rg.bam*"
+    // publish subsetted bam file for IGV etc only for the final output
+    publishDir "$params.odir/${sample_nm}/${params.sv_dir}/${grp}_${algn_nm}/new_bams", mode: 'copy', pattern: "*sset_sorted_rg.bam*", overwrite: true, enabled: params.save_bam_sset
         
     input:
     tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path(bcodes), path(bam), path(bai)
@@ -87,7 +91,7 @@ process TAGBAM {
     """
     module load samtools/1.20--h50ea8bc_0
 
-    samtools addreplacerg -r ID:${strn_stg} -r SM:${strn_stg} $bam -o ${strn_stg}_sset_sorted_rg.bam
+    samtools addreplacerg -r ID:${sample_nm}_${strn_stg} -r SM:${sample_nm}_${strn_stg} $bam -o ${strn_stg}_sset_sorted_rg.bam
     samtools index ${strn_stg}_sset_sorted_rg.bam
     """
 }
@@ -110,7 +114,7 @@ bcf_spec=Channel.value("view --max-alleles 2")
 
 process FREEBAYES {
     memory '100 GB'
-    cpus '8'
+    cpus '16'
 
     errorStrategy 'ignore'
 
@@ -139,7 +143,7 @@ process FREEBAYES {
 
 process VARTRIX_UMI {
     memory '100 GB'
-    cpus '8'
+    cpus '12'
     
     errorStrategy 'ignore'
 
