@@ -38,7 +38,7 @@ print(dbr)
 # prd_db_ls = []
 
 ## Run scrublet
-for mat, gns, dbr in zip(counts_msc, genes_msc, dbr):
+for dnm, mat, gns, dbr in zip(don_nms, counts_msc, genes_msc, dbr):
   counts_matrix = mat.T.tocsc()
   
   # Calculate number of counts and genes per cell
@@ -67,8 +67,19 @@ for mat, gns, dbr in zip(counts_msc, genes_msc, dbr):
   verbose=False
   )
 
-  csv.writer(open('data/processed/Pf/' + dn + '/seu_obj/doublet_scores.csv', 'w', newline='')).writerow(doublet_scores)
-  csv.writer(open('data/processed/Pf/' + dn + '/seu_obj/predicted_doublets.csv', 'w', newline='')).writerow(predicted_doublets)
+  csv.writer(open('data/processed/Pf/' + dnm + '/seu_obj/doublet_scores.csv', 'w', newline='')).writerow(doublet_scores)
+  csv.writer(open('data/processed/Pf/' + dnm + '/seu_obj/predicted_doublets.csv', 'w', newline='')).writerow(predicted_doublets)
+
+  # Save the plots as a PNG file
+  scrub.plot_histogram()
+  plt.savefig('data/processed/Pf/' + dnm + '/seu_obj/scrblt_thresh.png')
+  plt.close()
+
+  # Generate and save UMAP 
+  scrub.set_embedding('UMAP', scr.get_umap(scrub.manifold_obs_, 10, min_dist=0.3))
+  scrub.plot_embedding('UMAP', order_points=True)
+  plt.savefig('data/processed/Pf/' + dnm + '/seu_obj/scrblt_umap.png')
+  plt.close()
   
   
   # db_scores_ls.append(doublet_scores)
