@@ -1,0 +1,1978 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  # library(patchwork)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  # library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(knitr)
+  # library(readxl)
+  # library(SCpubr)
+  # library(ggh4x)
+  # library(htmlwidgets)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  library(ggh4x)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+#  integration of all MSC
+
+
+```{r setup}
+sample_set = "Mali2"
+
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+
+```{r}
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =6, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
+
+optimum_k_qcd_21 <- c("MSC1" =5, "MSC3" =2, "MSC13" =2, "MSC14" =8, "MSC12" =2)
+
+optimum_k_qcd <- c(optimum_k_qcd_21, optimum_k_qcd)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+```
+
+
+```{r}
+msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
+
+```
+
+
+```{r}
+msc_w_cln_strns_mdata <- msc_w_cln_strns %>% 
+  map(., ~.x@meta.data %>% rownames_to_column('bcode')) %>%
+  bind_rows(., .id = "donor") %>% 
+  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(bcode_don = paste0(donor, "_", bcode),
+         stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes"))  
+
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct <- readRDS("data/processed/Pf/m2_all/donor_mdata_slct.RDS")
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct_deets <- donor_mdata_slct %>%
+  mutate(condition_detld = case_when(short_name %in% c("MSC12") ~ "Pf_culture",
+                                     condition == "Symptomatic" ~ "Pf_symptomatic_22", 
+                               condition == "Asymptomatic" ~ "Pf_asymptomatic_22", 
+                               is.na(condition) & short_name %in% c("MSC1", "MSC3", "MSC13", "MSC14") ~ "Pf_asymptomatic_21",  
+                               is.na(condition) & short_name %in% c("MSC25", "MSC41", "MSC51") ~ "Pf_mxd_symptomatic_21"),
+         groups = factor(case_when(str_detect(condition_detld, "_symptomatic") ~ "Symptomatic",
+                            str_detect(condition_detld, "_asymptomatic") ~ "Asymptomatic",
+                            str_detect(condition_detld, "culture") ~ "Culture"), 
+                         levels = c("Asymptomatic", "Symptomatic", "Culture")),
+         Group = str_replace_all(condition_detld, "_symptomatic_|_asymptomatic_", " "),
+         donor_cln = str_remove(short_name, "SC")
+  )
+  
+
+```
+
+
+```{r}
+msc_w_cln_strns_w_don_mdata <- msc_w_cln_strns_mdata  %>% 
+  mutate("donor_cln" = str_remove_all(donor, "SC|_SLO|_MACS")) %>% 
+  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln"))
+
+```
+
+```{r}
+msc_w_cln_strns_w_don_mdata %>% 
+  count(groups, donor, stage) %>% 
+  mutate(Stage = factor(stage, levels = stg_refnd_lvls)) %>% 
+  group_by(donor) %>% 
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")")) %>% 
+  ggplot(., aes(x=Donor, y = Proportion, fill = Stage)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_grid(groups ~ ., scales = "free_y", space = "free") +
+  scale_fill_manual(values = sp_fld_colors) +
+  theme_classic() + 
+  coord_flip()
+
+```
+
+
+```{r, fig.width= 7, fig.height=8}
+msc_w_cln_strns_w_don_mdata %>%
+  filter(donor != "M12") %>%
+  count(condition, donor, stage_ag, stage) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+         across(condition, ~str_extract(., "^."))) %>% 
+  group_by(donor, Stage_ag) %>% 
+  # filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
+  ggplot(., aes(x= `Coarse Stage`, y = Proportion, fill = stage)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
+  scale_fill_manual(values = sp_fld_colors) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360)) +
+  coord_flip()
+
+
+
+```
+
+
+```{r}
+m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
+m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
+
+m2_seu_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony_elbo.RDS")
+m2_seu_norm_harmony_elbo
+```
+
+
+```{r}
+
+m2_seu_norm_harmony <- m2_seu_norm_harmony@meta.data %>% 
+  rownames_to_column("bcode_don") %>%
+  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+  AddMetaData(m2_seu_norm_harmony, .)
+  
+
+```
+
+```{r}
+
+DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r}
+
+DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("donor"), pt.size = 1, dims = c(1,2), raster = F)
+
+```
+
+```{r, fig.width= 10, fig.height=4}
+
+DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+
+```{r}
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+```
+
+
+```{r, fig.width= 10, fig.height=4}
+
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_seu_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= m2_seu_norm_harmony@meta.data$stage,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+START - NO M12
+
+```{r}
+# m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
+m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
+
+m2_seu_no_M12_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony_elbo.RDS")
+m2_seu_no_M12_norm_harmony_elbo
+```
+
+
+```{r}
+
+m2_seu_no_M12_norm_harmony <- m2_seu_no_M12_norm_harmony@meta.data %>% 
+  rownames_to_column("bcode_don") %>%
+  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+  AddMetaData(m2_seu_no_M12_norm_harmony, .)
+  
+
+```
+
+```{r}
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r}
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("donor"), pt.size = 1, dims = c(1,2), raster = F)
+
+```
+
+```{r, fig.width= 8.5, fig.height=4}
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+  theme(text = element_text(size = 20, face ="bold"),
+        title = element_blank())
+
+```
+
+
+
+```{r}
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)+ theme_void() + 
+  theme(text = element_text(size = 20, face ="bold"),
+        title = element_blank())
+
+```
+
+```{r}
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r}
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+  theme(text = element_text(size = 20, face ="bold"),
+        title = element_blank())
+```
+
+
+```{r, fig.width= 8.5, fig.height=4}
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+  theme(text = element_text(size = 20, face ="bold"),
+        title = element_blank())
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_seu_no_M12_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= m2_seu_no_M12_norm_harmony@meta.data$stage,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r}
+m2_seu_no_M12_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm.RDS")
+
+```
+
+```{r}
+m2_seu_no_M12_norm <- m2_seu_no_M12_norm@meta.data %>% 
+  rownames_to_column("bcode_don") %>%
+  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+  AddMetaData(m2_seu_no_M12_norm, .)
+```
+
+```{r}
+
+DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) 
+
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+```
+
+```{r, fig.width=8, fig.height=6}
+# visualize by batch and cell type annotation
+
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+```
+
+```{r, fig.width=16, fig.height=6}
+# visualize by batch and cell type annotation
+
+DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = c("orig.ident", "stage"), label = F, pt.size = 2)
+```
+
+```{r, fig.width= 10, fig.height=4}
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+END - NO M12
+
+Unintegrated object
+
+```{r}
+m2_seu_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm.RDS")
+```
+
+
+
+```{r}
+m2_seu_norm <- m2_seu_norm@meta.data %>% 
+  rownames_to_column("bcode_don") %>%
+  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+  AddMetaData(m2_seu_norm, .)
+```
+
+```{r}
+# visualize by batch and cell type annotation
+
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+```
+
+```{r, fig.width=8, fig.height=6}
+# visualize by batch and cell type annotation
+
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+```
+
+```{r, fig.width=16, fig.height=6}
+# visualize by batch and cell type annotation
+
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = c("orig.ident", "stage"), label = F, pt.size = 2)
+```
+
+```{r, fig.width= 10, fig.height=4}
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+
+
+```{r, fig.width= 5, fig.height=6}
+msc_w_cln_strns_w_don_mdata %>%
+  group_by(donor) %>%
+  filter(n_distinct(strain) > 1) %>%
+  ungroup() %>%
+  count(donor, stage_ag, strain) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual"))) %>% 
+  group_by(donor, Stage_ag) %>% 
+  # filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
+  ggplot(., aes(x=`Coarse Stage`, y = Proportion, fill = strain)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_grid(donor ~ ., scales = "free_y", space = "free") +
+  scale_fill_manual(values = strain_cols_n) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360)) +
+  coord_flip()
+
+
+
+```
+
+
+```{r, fig.width= 6, fig.height=6}
+msc_w_cln_strns_w_don_mdata %>%
+  filter(donor != "M12") %>%
+  group_by(donor) %>%
+  filter(n_distinct(strain) > 1) %>%
+  ungroup() %>%
+  count(condition, donor, stage_ag, strain) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+         across(condition, ~str_extract(., "^."))) %>% 
+  group_by(donor, Stage_ag) %>% 
+  filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
+  ggplot(., aes(x=`Coarse Stage`, y = Proportion, fill = strain)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
+  scale_fill_manual(values = strain_cols_n) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360)) +
+  coord_flip()
+
+
+
+```
+
+
+```{r, fig.width= 6, fig.height=6}
+strain_prop_in_stage_tbl <- msc_w_cln_strns_w_don_mdata %>%
+  filter(donor != "M12") %>%
+  group_by(donor) %>%
+  filter(n_distinct(strain) > 1) %>%
+  ungroup() %>%
+  count(condition, donor, stage_ag, strain) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+         across(condition, ~str_extract(., "^."))) %>% 
+  group_by(donor, Stage_ag) %>% 
+  # filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")"))
+
+strain_prop_in_stage_tbl %>% 
+  ggplot(., aes(x=`Coarse Stage`, y = Proportion, fill = strain)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
+  scale_fill_manual(values = strain_cols_n) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360)) +
+  coord_flip()
+
+
+
+```
+
+
+
+```{r, fig.width= 6, fig.height=6}
+strain_imbalance_in_stage_chsq_tables <- strain_prop_in_stage_tbl %>%
+  select(donor, Stage_ag, strain, n) %>% 
+  ungroup() %>%
+  pivot_wider(names_from = "strain", id_cols = c("donor", "Stage_ag"), values_from = n) %>%
+  mutate(across(starts_with("SC"), ~replace_na(.x, 0))) %>% 
+  group_by(donor) %>%
+  filter(n() >1) 
+
+strn_nms <- strain_imbalance_in_stage_chsq_tables %>% slice_head(n = 1) %>% pull(donor)
+  
+strain_imbalance_in_stage_chsq_tables
+
+
+```
+
+
+
+```{r, fig.width= 6, fig.height=6}
+
+strain_stage_prop_fishers <-strain_imbalance_in_stage_chsq_tables %>% 
+  group_split(.keep = F) %>%
+  set_names(strn_nms) %>%
+  map(., ~.x %>% 
+        column_to_rownames("Stage_ag") %>%
+        as.matrix %>%
+        fisher.test(simulate.p.value = T ))
+
+
+
+
+```
+
+```{r, fig.width= 6, fig.height=6}
+ 
+map(strain_stage_prop_fishers, ~.x$p.value)
+```
+
+```{r, fig.width= 6, fig.height=6}
+ 
+strain_stage_prop_chis <- strain_imbalance_in_stage_chsq_tables %>% 
+  group_split(.keep = F) %>%
+  set_names(strn_nms) %>%
+  map(., ~.x %>% 
+        column_to_rownames("Stage_ag") %>%
+        as.matrix %>%
+        chisq.test())
+
+```
+
+
+```{r, fig.width= 6, fig.height=6}
+ 
+map(strain_stage_prop_chis, ~.x$p.value)
+```
+
+```{r, fig.width= 6, fig.height=6}
+fisher.test(strain_imbalance_in_stage_chsq_tables  %>% filter(donor == "M1") %>% ungroup() %>% select(-c(donor)) %>% column_to_rownames("Stage_ag") %>% as.matrix())
+```
+
+```{r, fig.width= 6, fig.height=6}
+data <- matrix(c(10, 15,  # Counts for 'x' in A and B
+                 20, 25,  # Counts for 'y'
+                 30, 35), # Counts for 'z'
+               nrow = 2, byrow = TRUE)
+
+# Name the rows and columns
+rownames(data) <- c("Category A", "Category B")
+colnames(data) <- c("x", "y", "z")
+
+# View the table
+print(data)
+
+# Perform the chi-square test
+chi_result <- chisq.test(data)
+
+# Print the result
+print(chi_result)
+```
+
+
+```{r, fig.width= 8.2, fig.height=7}
+msc_w_cln_strns_w_don_mdata %>%
+  filter(donor != "M12") %>%
+  group_by(donor) %>%
+  filter(n_distinct(StrainDon) > 1) %>%
+  ungroup() %>%
+  count(condition, donor, stage_ag, StrainDon) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+         across(condition, ~str_extract(., "^."))) %>% 
+  group_by(donor, Stage_ag) %>% 
+  filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
+  ggplot(., aes(x=`Coarse Stage`, y = Proportion, fill = StrainDon)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_nested(vars(condition, donor) , scales = "free_y", space = "free", 
+               # strip = ggh4x::strip_nested(
+               #   text_y = list(
+               #     element_text(size = 10, lineheight = 0.5),  # Smaller height for top strip
+               #     element_text(size = 10, lineheight = 1.5)
+               #   ),
+               #   by_layer_y = T
+               # )
+               ) +
+  scale_fill_manual(values = strain_don_cols) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360)) +
+  coord_flip() +
+  guides(fill = guide_legend(ncol = 3))
+
+
+
+
+```
+
+
+```{r, fig.height = 4, fig.width = 16}
+# options(repr.plot.width=32, repr.plot.height=7)
+fct_theme <- theme(text=element_text(size=14),
+        axis.text=element_text(size=16), 
+            axis.title=element_text(size=16,face="bold"), 
+            legend.text = element_text(size=16), 
+            legend.title = element_text(size=16,face="bold"),
+        strip.text =element_text(size=18,face="plain", colour = 'black'))
+
+
+```
+
+```{r, fig.height = 4, fig.width = 16}
+
+tp_counts_all <- msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  filter(donor != "M12") %>%
+  group_by(donor,  StrainDon) %>%
+  add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  select(donor, StrainDon, mean_gnC, ss_n) %>%
+  ggplot(aes(x = StrainDon, y = mean_gnC/1000, color = StrainDon)) +
+  geom_point(aes(shape = "Mean transcript count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "T")+
+  geom_point(aes(y = ss_n/10, shape = "Parasite count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "P")+
+  # scale_color_manual(values = strain_dset_lvls_don_col, name = "Strain")+
+  scale_y_continuous(
+    name = "Mean transcript\ncount (X1e3)",
+    sec.axis = sec_axis( trans=~.*10, name="Parasite count")
+  ) +
+  facet_wrap(donor ~ ., nrow = 1, scales = "free_x") +
+  labs(x = "Strain") +
+  theme_bw() +
+  fct_theme+
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom",
+        axis.title.x = element_blank(),
+        strip.background.x = element_rect(fill = "white")) +
+  guides(color= "none", shape = guide_legend(title.position = "left", title = "Shape"))
+
+tp_counts_all
+```
+
+
+```{r, fig.height = 6, fig.width = 12}
+
+# dons_de <- c("MSC1_f_don", "MSC1_m_don", "MSC3_f_don", "MSC3_m_don", "MSC13_f_don", "MSC13_m_don", "MSC14_f_don", "MSC14_m_don", "M_NF54_7G8_f", "M_NF54_7G8_m")
+# don_lvls <- str_replace_all( str_remove(dons_de, "_don"), c("M_"="", "NF54_7G8"="Lab"))
+
+# msc_qcd_ds_mdata <- map(msc_gcombi_noLE_sub_sce_bal_fld_f8[dons_de], ~.x@colData[, c('lf_strain', 'stageHL','stageHL_fine_int', 'Strain_DN', 'nCount_RNA', 'nFeature_RNA')] %>% as.data.frame) %>% 
+#   bind_rows(., .id = 'sample') %>% 
+#   mutate(across(sample, ~str_remove(., "_don"))) %>%
+#   mutate(across(sample, ~str_replace_all(., c("M_"="", "NF54_7G8"="Lab")))) %>%
+#   mutate(across(c(sample), ~factor(., levels = don_lvls))) 
+
+tp_counts_gt <- msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  filter(donor != "M12") %>%
+  group_by(donor,  strain) %>%
+  add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nFeature_RNA)) %>% 
+  mutate(mean_tC = mean(nCount_RNA)) %>%
+  select(donor, strain, mean_gnC, mean_tC) %>%
+  ggplot(aes(x = strain, y = mean_gnC/1000, color = donor)) +
+  geom_point(aes(shape = "Mean gene count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "T")+
+  geom_point(aes(y = mean_tC/1000, shape = "Mean transcript count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "P")+
+  scale_color_manual(values = donor_cols, name = "donor")+
+  scale_y_continuous(
+    name = "Mean gene count (X1e3)",
+    sec.axis = sec_axis( trans=~.*1, name="Mean transcript count")
+  ) +
+  facet_grid(.~donor,  scales = "free_x", space = "free_x") +
+  labs(x = "Strain") +
+  theme_bw() + 
+  fct_theme+
+  theme(#axis.text.x = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(angle = 90, vjust = 0.5), 
+        axis.title.x = element_blank(),
+        strip.text.x.top =  element_text(angle = 90),
+        strip.background.x = element_rect(fill = "white")) +
+  guides(color= guide_legend(title.position = "top", title = "Donor", nrow = 3), shape = guide_legend(title.position = "top", title = "Shape", nrow = 2))
+
+tp_counts_gt
+```
+
+
+```{r, fig.height = 6, fig.width = 8}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts_corr1 <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  add_count(name = "ss_n") %>%
+  filter(ss_n <300) %>%
+  # mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  # select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = ss_n, y = sum_gn/1e5, color = donor)) +
+  geom_point(position=position_dodge(width=0.8), size = 2) +
+  geom_text(aes(label = donor), vjust = -1, hjust = 1) 
+
+t_total_counts_corr1
+```
+
+```{r, fig.height = 4, fig.width = 16}
+
+# dons_de <- c("MSC1_f_don", "MSC1_m_don", "MSC3_f_don", "MSC3_m_don", "MSC13_f_don", "MSC13_m_don", "MSC14_f_don", "MSC14_m_don", "M_NF54_7G8_f", "M_NF54_7G8_m")
+# don_lvls <- str_replace_all( str_remove(dons_de, "_don"), c("M_"="", "NF54_7G8"="Lab"))
+
+# msc_qcd_ds_mdata <- map(msc_gcombi_noLE_sub_sce_bal_fld_f8[dons_de], ~.x@colData[, c('lf_strain', 'stageHL','stageHL_fine_int', 'Strain_DN', 'nCount_RNA', 'nFeature_RNA')] %>% as.data.frame) %>% 
+#   bind_rows(., .id = 'sample') %>% 
+#   mutate(across(sample, ~str_remove(., "_don"))) %>%
+#   mutate(across(sample, ~str_replace_all(., c("M_"="", "NF54_7G8"="Lab")))) %>%
+#   mutate(across(c(sample), ~factor(., levels = don_lvls))) 
+
+tp_counts <- msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  filter(donor != "M12") %>%
+  group_by(donor,  StrainDon) %>%
+  add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  select(donor, StrainDon, mean_gnC, ss_n) %>%
+  ggplot(aes(x = StrainDon, y = mean_gnC/1000, color = StrainDon)) +
+  geom_point(aes(shape = "Mean transcript count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "T")+
+  geom_point(aes(y = ss_n/10, shape = "Parasite count"), position=position_dodge(width=0.8), size = 3)+
+  # scale_shape_manual(name = "P")+
+  # scale_color_manual(values = strain_dset_lvls_don_col, name = "Strain")+
+  scale_y_continuous(
+    name = "Mean transcript\ncount (X1e3)",
+    sec.axis = sec_axis( trans=~.*10, name="Parasite count")
+  ) +
+  facet_wrap(donor ~ ., nrow = 1, scales = "free_x") +
+  labs(x = "Strain") +
+  theme_bw() + 
+  fct_theme+
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom",
+        axis.title.x = element_blank(),
+        strip.background.x = element_rect(fill = "white")) +
+  guides(color= "none", shape = guide_legend(title.position = "left", title = "Shape"))
+
+tp_counts
+```
+
+```{r, fig.height = 4, fig.width = 14}
+# options(repr.plot.width=32, repr.plot.height=7)
+msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  # add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  select(donor, StrainDon, mean_gnC, sum_gn) 
+```
+
+```{r, fig.height = 4, fig.width = 14}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  # add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = StrainDon, y = sum_gn/1e5, color = StrainDon)) +
+  geom_point(position=position_dodge(width=0.8), size = 2.5)+
+  # scale_color_manual(values = strain_dset_lvls_don_col)+
+  facet_wrap(donor ~ ., nrow = 1, scales = "free_x") +
+  geom_hline(yintercept = 1) +
+  theme_bw()+
+  fct_theme+
+  labs(x = "Strain", y = "Total transcript\ncount (X1e5)") +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        strip.background.x = element_rect(fill = "white")) +
+  guides(color= guide_legend(title.position = "left", nrow = 1, title = "Strain"), shape = guide_legend(title.position = "top", name = "Shape"))
+
+t_total_counts
+```
+
+
+```{r, fig.height = 6, fig.width = 8}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  add_count(name = "ss_n") %>%
+  filter(ss_n <300) %>%
+  # mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  # select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = ss_n, y = sum_gn/1e5, color = donor)) +
+  geom_point(position=position_dodge(width=0.8), size = 2) +
+  geom_text(aes(label = donor), vjust = -1, hjust = 1) 
+
+t_total_counts_corr
+```
+
+
+```{r, fig.height = 6, fig.width = 8}
+# options(repr.plot.width=32, repr.plot.height=7)
+msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  filter(donor != "M12") %>%
+  group_by(donor,  StrainDon) %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = mean(nCount_RNA)) %>% 
+  add_count(name = "ss_n") %>%
+  filter(ss_n <300) %>%
+  distinct(ss_n, donor,sum_gn)
+```
+
+```{r, fig.height = 6, fig.width = 8}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_tn = mean(nCount_RNA)) %>% 
+  mutate(sum_gn = mean(nFeature_RNA)) %>% 
+  add_count(name = "ss_n") %>%
+  # filter(ss_n <300) %>%
+  # mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  # select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = sum_gn, y = sum_tn, color = donor)) +
+  geom_point(position=position_dodge(width=0.8), size = 2) +
+  geom_text(aes(label = StrainDon), vjust = -1, hjust = 1) 
+
+t_total_counts_corr
+```
+
+```{r, fig.height = 6, fig.width = 8}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  add_count(name = "ss_n") %>%
+  filter(ss_n <300) %>%
+  # mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  # select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = ss_n, y = sum_gn/1e5, color = donor)) +
+  geom_point(position=position_dodge(width=0.8), size = 2) +
+  geom_text(aes(label = donor), vjust = -1, hjust = 1) 
+
+t_total_counts_corr
+```
+
+
+```{r, fig.height = 4, fig.width = 14}
+# options(repr.plot.width=32, repr.plot.height=7)
+t_total_counts <-  msc_w_cln_strns_w_don_mdata %>% 
+  filter(stage_c == "Asexual") %>%
+  group_by(donor,  StrainDon) %>%
+  filter(donor != "M12") %>%
+  # summarise("sum_gn" = sum(nFeature_RNA)) %>%
+  mutate(sum_gn = sum(nCount_RNA)) %>% 
+  # add_count(name = "ss_n") %>%
+  mutate(mean_gnC = mean(nCount_RNA)) %>% 
+  select(donor, StrainDon, mean_gnC, sum_gn) %>%
+  ggplot(aes(x = StrainDon, y = mean_gnC, color = donor)) +
+  geom_point(position=position_dodge(width=0.8), size = 0.5)+
+  # scale_color_manual(values = strain_dset_lvls_don_col)+
+  facet_wrap(donor ~ ., nrow = 1, scales = "free_x") +
+  geom_hline(yintercept = 1) +
+  theme_bw()+
+  fct_theme+
+  labs(x = "Strain", y = "Total transcript\ncount (X1e5)") +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        strip.background.x = element_rect(fill = "white")) +
+  guides(color= guide_legend(title.position = "left", nrow = 1, title = "Strain"), shape = guide_legend(title.position = "top", name = "Shape"))
+
+t_total_counts
+```
+
+```{r, fig.height = 5.5, fig.width = 12}
+# options(repr.plot.width=32, repr.plot.height=7)
+plot_grid(
+  tp_counts,
+  t_total_counts,
+  nrow = 2,
+  labels = c('A','B'),
+  label_size = 24,
+  vjust = 1.5
+)
+```
+
+
+```{r, fig.height = 2.7, fig.width = 13.5}
+# options(repr.plot.width=32, repr.plot.height=7)
+plot_grid(
+  t_total_counts,
+  nrow = 1,
+  labels = c('A'),
+  label_size = 24,
+  vjust = 1.5
+)
+```
+
+
+```{r, fig.width= 4, fig.height=2}
+
+msc_w_cln_strns_mdata %>% group_by(donor) %>% mutate(n_strains = n_distinct(strain), n_strains2 = n_distinct(StrainDon)) %>% distinct(donor, Symptomatic, n_strains, n_strains2) %>% 
+  mutate(condition_detld = case_when(Symptomatic == "Yes" ~ "Pf_symptomatic_22", 
+                               Symptomatic == "No" ~ "Pf_asymptomatic_22", 
+                               is.na(Symptomatic) & donor %in% c("MSC1", "MSC3", "MSC13", "MSC14") ~ "Pf_asymptomatic_21",  
+                               is.na(Symptomatic) & donor %in% c("MSC25", "MSC41", "MSC51") ~ "Pf_mxd_symptomatic_21", 
+                               donor %in% c("MSC12") ~ "Pf_culture" ),
+         groups = factor(case_when(str_detect(condition_detld, "_symptomatic") ~ "Symptomatic",
+                            str_detect(condition_detld, "_asymptomatic") ~ "Asymptomatic",
+                            str_detect(condition_detld, "culture") ~ "Culture"), 
+                         levels = c("Asymptomatic", "Symptomatic", "Culture")),
+         condition = str_replace_all(condition_detld, "_symptomatic_|_asymptomatic_", " ")
+  ) %>% 
+  ggplot(., aes(x = condition, y = n_strains)) +
+  geom_boxplot() +
+  geom_point() +
+  facet_wrap(. ~ groups, scales = "free_x") +
+  theme_classic()#+
+  # theme(axis.text.x = element_text(angle = 20, hjust = 1)) #+
+  # coord_flip()
+
+```
+
+```{r, fig.width= 4, fig.height=2}
+
+msc_w_cln_strns_w_don_mdata %>% 
+  # filter(donor != "M12") %>%
+  count(condition, donor, stage_ag, StrainDon) %>%
+  filter(n>25) %>%
+  group_by(donor, stage_ag) %>% 
+  mutate(n_strains = n_distinct(StrainDon)) %>% 
+  distinct(donor, condition, n_strains) %>% 
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot() +
+  geom_point() +
+  facet_wrap(. ~ condition, scales = "free_x") +
+  theme_classic()
+
+```
+
+
+```{r, fig.width= 4, fig.height=2}
+
+msc_w_cln_strns_w_don_mdata %>% 
+  # filter(donor != "M12") %>%
+  group_by(donor, stage_ag) %>% 
+  mutate(n_strains = n_distinct(strain), n_strains2 = n_distinct(StrainDon)) %>% 
+  distinct(donor, condition, n_strains, n_strains2) %>% 
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot() +
+  geom_point() +
+  facet_wrap(. ~ condition, scales = "free_x") +
+  theme_classic()+
+  labs( y= "Strains No.", x= "Coarse stage")#+
+  # theme(axis.text.x = element_text(angle = 20, hjust = 1)) #+
+  # coord_flip()
+
+```
+
+
+```{r, fig.width= 4, fig.height=2}
+tbl_strn <- msc_w_cln_strns_w_don_mdata %>% 
+  # filter(donor != "M12") %>%
+  group_by(donor, stage_ag, strain) %>% 
+  mutate(n_cells = n()) %>% 
+  group_by(donor, stage_ag) %>% 
+  mutate(n_strains = n_distinct(strain)) %>% 
+  distinct(donor, condition, n_strains, n_cells, strain) 
+
+tbl <- tbl_strn %>% 
+  distinct(donor, condition, n_strains) %>%
+  group_by(donor) %>%
+  filter(n_distinct(stage_ag) > 1)
+
+tbl %>% 
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot() +
+  geom_point() +
+  geom_line(aes(group = donor)) +
+  facet_wrap(. ~ condition, scales = "free_x") +
+  theme_classic()+
+  labs( y= "Strains No.", x= "Coarse stage")#+
+  # theme(axis.text.x = element_text(angle = 20, hjust = 1)) #+
+  # coord_flip()
+
+```
+
+Prepare tables for plots on number of strain between stages and symptomatic status and also for comparing dominant strains between groups
+```{r}
+
+tbl_strn <- msc_w_cln_strns_w_don_mdata %>% 
+  filter(donor != "M12") %>%
+  group_by(donor, stage_ag, strain) %>% 
+  mutate(n_cells = n()) %>% 
+  group_by(donor, stage_ag) %>% 
+  mutate(n_strains = n_distinct(strain),
+         prop_strains = round(n_cells/n(),2),
+         strain_abundance = case_when(any(prop_strains > 0.5) ~ "Dominant",
+                                      T ~ "No dominant")) %>% 
+  distinct(donor, condition, stage_ag, n_strains, n_cells, strain, prop_strains, strain_abundance) %>%
+  # distinct(donor, condition, stage_ag, n_strains) %>% 
+  ungroup()
+
+tbl_strn_all_plus_monoc <- tbl_strn %>%
+  distinct(donor, condition, stage_ag, n_strains, strain_abundance)
+
+tbl_strn_all <- tbl_strn %>%
+  distinct(donor, condition, stage_ag, n_strains, strain_abundance) %>% 
+  group_by(donor) %>%
+  filter(n_distinct(stage_ag) > 1) %>%
+  ungroup
+
+tbl_strn_25 <- tbl_strn %>%
+  filter(n_cells > 25) %>%
+  distinct(donor, condition, stage_ag, n_strains, strain_abundance) %>% 
+  group_by(donor) %>%
+  filter(n_distinct(stage_ag) > 1) %>%
+  ungroup
+
+```
+
+
+
+```{r}
+tbl_strn_list <- list(tbl_strn_all, tbl_strn_25)
+```
+
+```{r}
+
+
+# Perform paired tests and gather p-values
+paired_data <- map(tbl_strn_list, ~{
+  .x %>% select(c(donor, stage_ag, n_strains)) %>%
+  pivot_wider(names_from = stage_ag, values_from = n_strains) %>%
+  filter()
+})
+
+# Perform the paired test
+# Replace 'Stage1' and 'Stage2' with the actual levels of 'stage'
+test_result <- map(paired_data, ~{wilcox.test(.x$Asexual, .x$Gametocytes, paired = TRUE)})
+map(test_result, ~.x$p.value)
+
+
+```
+
+```{r, fig.width= 4, fig.height=5}
+
+thm_box <- theme(text = element_text(size = 23),
+          axis.text.y = element_text(size = 23),
+          axis.text.x = element_text(size = 23, angle = 45, hjust = 1)) 
+
+
+```
+
+
+```{r, fig.width= 3, fig.height=6}
+
+# Plot and add significance
+map2(tbl_strn_list, test_result, ~{.x %>%
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 4) +
+  geom_line(aes(group = donor)) +
+  # facet_wrap(. ~ condition, scales = "free_x")  +
+  scale_y_continuous(expand = expansion(mult = .1),
+                     breaks = seq(0, 12, 3),
+                     labels = scales::number_format(accuracy = 1)) + 
+  theme_classic() + 
+  geom_signif(
+    comparisons = list(c("Asexual", "Gametocytes")),
+    # annotations = paste0(round(.y$statistic, 2), "  p=", round(.y$p.value, 3)),
+    annotations = paste0("p=", round(.y$p.value, 3)),
+    textsize = 8,
+    # y_position = max(tbl$n_strains) + i,  # Adjust y-position for each facet if needed
+    # tip_length = 0.02
+    ) +
+    labs( y= "Strains No.", x= "Coarse stage")+
+    thm_box 
+  })
+
+```
+
+
+```{r}
+test_result2 <- map(tbl_strn_list, ~{.x  %>% 
+    select(c(donor, condition, stage_ag, n_strains))%>% 
+  pivot_wider(names_from = stage_ag, values_from = n_strains)  %>%
+  group_by(condition) %>%
+  summarise(
+    p_value = wilcox.test(
+      Asexual, 
+      Gametocytes, 
+      paired = TRUE
+    )$p.value
+  )
+})
+```
+
+```{r, fig.width= 5, fig.height=6}
+
+# Plot and add significance
+plt <- map(tbl_strn_list, ~{.x  %>%
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 4)+
+  geom_line(aes(group = donor)) +
+  scale_y_continuous(expand = expansion(mult = .1),
+                     breaks = seq(0, 12, 3),
+                     labels = scales::number_format(accuracy = 1)) + 
+  facet_wrap(. ~ condition, scales = "free_x")  +
+  theme_classic() +
+    labs( y= "Strains No.", x= "Coarse stage")
+}) 
+
+plts_lst <- list()
+
+for(p in 1:length(plt)) {
+  
+  pt1 <- plt[[p]]
+  for (i in seq_len(nrow(test_result2[[p]]))) {
+    # print(tbl_strn_list[[p]])
+    pt1 <- pt1 + geom_signif(
+      data = tbl_strn_list[[p]] %>% filter(condition == test_result2[[p]]$condition[i]),  # Filter for each facet
+      comparisons = list(c("Asexual", "Gametocytes")),
+      annotations = round(test_result2[[p]]$p_value[i], 3),
+      y_position = max(tbl_strn_list[[p]]$n_strains) + i,  # Adjust y-position for each facet if needed
+      tip_length = 0.02,
+      textsize = 8
+    )+
+  thm_box
+    pt1
+    
+  }
+  plts_lst[p] <- list(pt1)
+}
+
+plts_lst
+# pt1
+```
+
+
+
+Compare strain abundance - where >50% of stage is one strain
+
+```{r}
+
+
+# tbl_strn_all_plus_monoc <- tbl_strn %>%
+#   distinct(donor, condition, stage_ag, n_strains)
+# 
+# tbl_strn_all <- tbl_strn %>%
+#   distinct(donor, condition, stage_ag, n_strains) %>% 
+#   group_by(donor) %>%
+#   filter(n_distinct(stage_ag) > 1) %>%
+#   ungroup
+# 
+# tbl_strn_25 <- tbl_strn %>%
+#   filter(n_cells > 25) %>%
+#   distinct(donor, condition, stage_ag, n_strains) %>% 
+#   group_by(donor) %>%
+#   filter(n_distinct(stage_ag) > 1) %>%
+#   ungroup
+
+```
+
+
+
+```{r}
+# Chi-squared test for proportions
+tbl_strn_sa_polyc_list <- map(tbl_strn_list, ~{ .x %>%
+    group_by(donor)%>%
+    filter(any(n_strains > 1))
+})
+
+```
+
+
+```{r}
+# Plot the proportions of strains by stage and condition
+tbl_strn_sa_list <- c(tbl_strn_list, tbl_strn_sa_polyc_list)
+```
+
+```{r}
+# Chi-squared test for proportions
+test_results_chi <- map(tbl_strn_sa_list, ~{
+  .x  %>%
+  group_by(condition) %>%
+  summarise(
+    chi_test = list(chisq.test(table(strain_abundance, stage_ag))),
+    p_value = chi_test[[1]]$p.value
+  )
+})
+
+# Fisher's Exact Test for small sample sizes
+test_results_fisher <- map(tbl_strn_sa_list, ~{
+  .x   %>%
+  group_by(condition) %>%
+  summarise(
+    fisher_test = list(fisher.test(table(strain_abundance, stage_ag))),
+    p_value = fisher_test[[1]]$p.value
+  )
+})
+
+```
+
+
+```{r, fig.width= 5, fig.height=6}
+# Plot the proportions of strains by stage and condition
+dom_cols <- c("#ADD8E6", "#BDECB6") %>% set_names(c("Dominant", "No dominant"))
+```
+
+
+```{r, fig.width= 5, fig.height=6}
+# Plot the proportions of strains by stage and condition
+pt_dom <- map2(tbl_strn_sa_list, test_results_fisher, ~{
+  ggplot(.x, aes(x = stage_ag, fill = strain_abundance)) +
+  geom_bar(position = "fill") +  # Use "fill" for proportions
+  facet_wrap(~ condition) +
+  # labs(y = "Proportion", title = "Proportion of Strains by Stage and Condition") +
+  labs(y = "Proportion", x= "Coarse stage") +
+  scale_y_continuous(expand = expansion(mult = .1)) + 
+  scale_fill_manual(values = dom_cols) +
+  # scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+    geom_text(
+    data = .y, 
+    aes(x = 1.5, y = 1.05, label = paste("p =", round(p_value, 3))),
+    inherit.aes = FALSE, 
+    size = 7, 
+    color = "black",
+    vjust = 0
+  ) +
+    thm_box +
+    theme(legend.position = "bottom") +
+    guides(fill = guide_legend(title = "Strain abundance", title.position = "top"))
+})
+
+pt_dom
+```
+
+
+Compare strain abundance - where > 50% of stage is one strain only in polyclonal infections
+
+```{r}
+# Chi-squared test for proportions
+tbl_strn_all_list <- map(tbl_strn_list, ~{ .x %>%
+    group_by(donor)%>%
+    filter(any(n_strains > 1)) %>%
+    select(-c(condition))
+})
+
+```
+
+```{r}
+# Chi-squared test for proportions
+tbl_strn_sa_polyc_all_list <- map(tbl_strn_list, ~{ .x %>%
+    group_by(donor)%>%
+    filter(any(n_strains > 1)) %>%
+    select(-c(condition))
+})
+
+```
+
+
+```{r}
+# Plot the proportions of strains by stage and condition
+tbl_strn_sa_all_list <- c(tbl_strn_all_list, tbl_strn_sa_polyc_all_list)
+```
+
+```{r}
+# Chi-squared test for proportions
+test_results_all_chi <- map(tbl_strn_sa_all_list, ~{
+  .x  %>%
+  ungroup() %>%
+  summarise(
+    chi_test = list(chisq.test(table(strain_abundance, stage_ag))),
+    p_value = chi_test[[1]]$p.value
+  )
+})
+
+# Fisher's Exact Test for small sample sizes
+test_results_all_fisher <- map(tbl_strn_sa_all_list, ~{
+  .x   %>%
+  ungroup() %>%
+  summarise(
+    fisher_test = list(fisher.test(table(strain_abundance, stage_ag))),
+    p_value = fisher_test[[1]]$p.value
+  )
+})
+
+```
+
+
+
+```{r, fig.width= 3, fig.height=6}
+# Plot the proportions of strains by stage and condition
+pt <- map2(tbl_strn_sa_all_list, test_results_all_fisher, ~{
+  ggplot(.x, aes(x = stage_ag, fill = strain_abundance)) +
+  geom_bar(position = "fill") +  
+  # labs(y = "Proportion", title = "Proportion of Strains by Stage and Condition") +
+  labs(y = "Proportion", x= "Coarse stage") +
+  scale_y_continuous(expand = expansion(mult = .1)) + 
+  scale_fill_manual(values = dom_cols) +
+  # scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+    geom_text(
+    data = .y, 
+    aes(x = 1.5, y = 1.05, label = paste("p =", round(p_value, 3))),
+    inherit.aes = FALSE, 
+    size = 7, 
+    color = "black",
+    vjust = 0
+  )+
+    thm_box +
+    theme(legend.position = "bottom") +
+    guides(fill = guide_legend(title = "Strain abundance", title.position = "top"))
+})
+
+pt
+```
+
+
+
+```{r, fig.width= 9, fig.height=5.5}
+list(tbl_strn, tbl_strn %>% filter(n_cells > 25)) %>%
+  map(~{
+    .x %>% distinct(donor, condition, stage_ag, n_strains)  %>% 
+  ggboxplot(., x = "condition", y = "n_strains",
+          # color = "supp", palette = "jco",
+          add = "jitter",
+          facet.by = "stage_ag", short.panel.labs = T)+ 
+  stat_compare_means(label = "p.format", size = 8) +
+  scale_y_continuous(expand = expansion(mult = .1)) + 
+  labs( y= "Strains No.", x= "Coarse stage") +
+  thm_box +
+  theme(axis.text.x = element_text(size = 23, angle = 45, hjust = 1))
+  })
+
+```
+
+
+```{r, fig.width= 10, fig.height=6}
+
+tbl_strn %>%
+  filter(n_cells > 25) %>%
+  distinct(donor, condition, stage_ag, n_strains)  %>% 
+  ggboxplot(., x = "condition", y = "n_strains",
+          # color = "supp", palette = "jco",
+          add = "jitter",
+          facet.by = "stage_ag", short.panel.labs = T)+ 
+  stat_compare_means(label = "p.format", size = 8) +
+  scale_y_continuous(expand = expansion(mult = .1)) + 
+  labs( y= "Strains No.", x= "Coarse stage") +
+  thm_box +
+  theme(axis.text.x = element_text(size = 23, angle = 30, hjust = 1))
+  
+```
+
+```{r, fig.width= 10, fig.height=6}
+
+map(tbl_strn_list, ~.x %>%
+  distinct(donor, condition, stage_ag, n_strains)  %>% 
+  ggboxplot(., x = "condition", y = "n_strains",
+          # color = "supp", palette = "jco",
+          add = "jitter",
+          facet.by = "stage_ag", short.panel.labs = T)+ 
+    scale_y_continuous(expand = expansion(mult = .1)) + 
+  stat_compare_means(label = "p.format", size = 8) +
+  labs( y= "Strains No.", x= "Coarse stage") +
+  thm_box +
+  theme(axis.text.x = element_text(size = 23, angle = 30, hjust = 1))
+)
+
+
+```
+
+```{r, fig.width= 7, fig.height=6}
+
+tbl_strn %>%
+  distinct(donor, condition, stage_ag, n_strains)  %>% 
+  ggboxplot(., x = "condition", y = "n_strains",
+          # color = "supp", palette = "jco",
+          add = "jitter",
+          facet.by = "stage_ag", short.panel.labs = T)+ 
+  stat_compare_means(label = "p.format", size = 8) +
+  labs( y= "Strains No.", x= "Coarse stage") +
+  thm_box
+
+
+```
+
+```{r, fig.width= 4, fig.height=2}
+
+msc_w_cln_strns_w_don_mdata %>% 
+  filter(donor != "M12") %>%
+  count(condition, donor, stage_ag, StrainDon) %>%
+  # filter(n>25) %>%
+  group_by(donor, stage_ag) %>% 
+  mutate(n_strains = n_distinct(StrainDon)) %>% 
+  ungroup() %>%
+  distinct(donor, condition, n_strains, stage_ag) %>% 
+  ggplot(., aes(x = stage_ag, y = n_strains)) +
+  geom_boxplot() +
+  geom_point() +
+  facet_wrap(. ~ condition, scales = "free_x") +
+  theme_classic()
+
+```
+
+```{r}
+
+```
+
+
+###  Plot for integration before subsetting
+
+```{r}
+## subset where field parasites are for slingshot
+v3_m2_asex_harmony_res <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res.RDS")
+```
+
+
+```{r, eval=T}
+v3_m2_asex_harmony_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_ss.RDS")
+```
+
+
+```{r, eval=T}
+# brewer.pal(10,"Set3") %>% set_names(levels(as.factor(v3_m2_asex_harmony_ss$harmony_clusters_ss)))
+```
+
+
+```{r, eval=T}
+# plot(reducedDims(v3_m2_asex_harmony_ss)$UMAP[,1:2], col = brewer.pal(10,"Set3")[as.factor(v3_m2_asex_harmony_ss$harmony_clusters_ss)], pch=16, asp = 0.7)
+
+```
+
+```{r, eval=T}
+##Prepare slingshot dataset (SDS) object 
+v3_m2_asex_harmony_sshot_sds <- SlingshotDataSet(v3_m2_asex_harmony_ss)
+
+plot(reducedDims(v3_m2_asex_harmony_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(v3_m2_asex_harmony_ss$StagePrelim)], pch=16, asp = 0.7)
+lines(v3_m2_asex_harmony_sshot_sds, lwd=2, col="black",dims = 1:2)
+```
+
+
+
+```{r, results="asis"}
+
+v3_m2_asex_umap_meta_df <- reducedDims(v3_m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1",  "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  
+
+# v3_m2_asex_umap_meta_df <- reducedDims(v3_m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1", "slingPseudotime_2",  "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+# mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 22) ,
+        legend.title = element_text(size = 24, face = "bold") )
+
+# map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>% 
+map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>% 
+  ggplot(aes(x = umapharmony_1, y =umapharmony_2, color = !!rlang::sym(.x))) + geom_point(size=0.5) + 
+  scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+  tm)
+
+# v3_m2_asex_umap_meta_df %>% 
+#   ggplot(aes(x = umapharmony_2, y =umapharmony_3, color = slingPseudotime_1)) + geom_point(size=0.5) + 
+#   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+#   tm
+
+
+```
+
+#### Alternative subset for field + lab integrated slingshot with early asexual dataset that is working
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), cells.highlight = colnames(v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res@meta.data$dset == "Field"]))
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters", label = T, dims = c(1,2))
+```
+
+###### Integrate the lab with field asexuals
+```{r}
+##Read MCA V3 blood stage reference dataset
+# EF_V3_ref <- readRDS("../sc_velo/data/raw/RoadtoUMAP/pseudotime/raw_combined_cut_0.4.RDS")
+EF_V3_ref <- readRDS("../Mali/data/raw/mca_v3_ref/raw_combined_cut_0.4_nodoublets_stagenew.RDS")
+EF_V3_ref <- EF_V3_ref@meta.data %>% mutate(StageFL_ND = str_to_sentence(stagenewx)) %>% select(StageFL_ND) %>% AddMetaData(EF_V3_ref, .) 
+
+```
+
+```{r}
+EF_V3_ref_asx <- EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"]
+
+```
+
+
+```{r, fig.width=6, fig.height=3.5}
+DimPlot(EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"], reduction = "umap", group.by = "StageFL_ND", label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r, fig.width=8, fig.height=5}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) + 
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 20))
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) + 
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 20))
+  
+```
+
+
+```{r, fig.width=8, fig.height=3.5}
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 4))) 
+  
+```
+
+```{r, fig.width=6, fig.height=5}
+v3_m2_asex_harmony_res <- v3_m2_asex_harmony_res@meta.data %>% mutate(dsetC = ifelse(donor == "MSC12" & dset == "Field", "FieldC", dset)) %>% select(dsetC) %>% AddMetaData(v3_m2_asex_harmony_res, .)
+
+```
+
+```{r, fig.width=10, fig.height=4}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", split.by = "dsetC", group.by = "harmony_clusters", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
+```
+
+```{r, fig.width=10, fig.height=4}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
+```
+
+
+```{r, fig.width=10, fig.height=4}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
+```
+
+
+```{r, fig.width=10, fig.height=4}
+# visualize by batch and cell type annotation
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,3)) + theme(legend.position = "none") +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
+```
+
+```{r, fig.width=10, fig.height=4}
+# visualize by batch and cell type annotation
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(2,3)) + theme(legend.position = "none") +
+  guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res@reductions[["integrated.harmony"]]@cell.embeddings),
+        x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
+        color= v3_m2_asex_harmony_res@meta.data$dsetC,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r}
+v3_m2_asex_harmony_res@meta.data %>% dplyr::count(harmony_clusters, dset) %>% group_by(harmony_clusters) %>% mutate(prop = round(n/sum(n), 2)) %>% filter(dset == "Field" & prop >0.3)
+
+# v3_m2_asex_harmony_res[, v3_m2_asex_harmony_res$donor != "MSC12" | is.na(v3_m2_asex_harmony_res$donor)]@meta.data %>% dplyr::count(harmony_clusters, dset) %>% group_by(harmony_clusters) %>% mutate(prop = round(n/sum(n), 2)) %>% filter(dset == "Field" & prop >0.1)
+
+```
+
+```{r}
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("6", "3", "0", "2", "7", "11") & v3_m2_asex_harmony_res@reductions$umap.harmony@cell.embeddings[,"umapharmony_1"] < 2.5]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("4", "0", "2", "6") ]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("0", "1", "3", "7", "8") ]
+
+v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters_ss %in% c("0", "1", "5", "12") ]
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
+```
+
+
+```{r, fig.width=6, fig.height=5}
+v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res_fld@meta.data %>% mutate(dsetC = ifelse(donor == "MSC12" & dset == "Field", "FieldC", dset)) %>% select(dsetC) %>% AddMetaData(v3_m2_asex_harmony_res_fld, .)
+
+```
+
+```{r, fig.width=7.5, fig.height=4.5 }
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
+  theme(text = element_text(size = 18),
+        axis.text = element_text(size = 14)
+        )
+
+```
+
+```{r, fig.width=7.5, fig.height=4.5 }
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
+  theme(text = element_text(size = 18),
+        axis.text = element_text(size = 14)
+        )
+
+```
+
+```{r, fig.width=7.5, fig.height=4.5 }
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(2,3), split.by = "dsetC") + 
+  theme(text = element_text(size = 18),
+        axis.text = element_text(size = 14)
+        )
+
+```
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld[,!v3_m2_asex_harmony_res_fld$donor %in% c("MSC12") & !is.na(v3_m2_asex_harmony_res_fld$donor)], pt.size = 0.4, reduction = "umap.harmony", group.by = "donor", label = T, dims = c(1,2))
+```
+
+
+
+### Asex m12 and donor
+
+
+```{r}
+m2_asex_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm_harmony.RDS")
+m2_asex_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm_harmony_elbo.RDS")
+m2_asex_norm_harmony_elbo
+```
+
+
+
+Integrated asexual
+```{r}
+## subset where field parasites are for slingshot
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
+v3_m2_asex_harmony_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+
+```
+
+
+```{r, fig.width=6, fig.height=4.5 }
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c("StageFL_ND"), label = F) + scale_color_manual(values = sp_fld_colors) + 
+  theme(text = element_text(size = 18),
+        axis.text = element_text(size = 14)
+        )
+
+```
+
+
+
+```{r, fig.width=3.75, fig.height=4.5 }
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", features = "pseudotime") + 
+  theme(text = element_text(size = 18),
+        axis.text = element_text(size = 14)
+        )
+
+```
+
+
+```{r, fig.width=6, fig.height=4}
+# visualize by batch and cell type annotation
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL"), label = F)
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", features = "pseudotime", label = F)
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", features = "pseudotime", label = F, dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T)
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T, dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL_ND"), label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["integrated.harmony"]]@cell.embeddings),
+        x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
+        color= v3_m2_asex_harmony_res_fld_pt@meta.data$harmony_clusters_ss,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, fig.width=12, fig.height=4}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "pca", group.by = c("StageFL"), label = F)
+```
+
+```{r, fig.width=12, fig.height=4}
+# visualize by batch and cell type annotation
+
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "pca", group.by = c("dset"), label = F)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["pca"]]@cell.embeddings),
+        x = ~PC_1, y = ~PC_2, z = ~PC_3,
+        color= v3_m2_asex_harmony_res_fld_pt@meta.data$StageFL,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.2, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= v3_m2_asex_harmony_res_fld_pt@meta.data$StageFL,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.2, 
+        type = 'scatter3d'
+)
+
+```
+
+
+
+```{r, fig.width=15, fig.height=5}
+# visualize by batch and cell type annotation
+v3_m2_asex_harmony_res_fld_pt@meta.data %>% filter(str_detect(donor, "MSC")) %>% dplyr::count(donor, Symptomatic, Hb_Type)
+```
+
+
+#### Visualize balanced pseudotime chunks dim1&3 n dim2&3 {.tabset}
+```{r, results='asis', warning=FALSE}
+## Create empty list to save strains considered for DE distribution and  pseudotime plots
+# pts2 <- c(pts, pts)
+
+pts <- rep(c("female_pt",  "male_pt" ), 10)
+pt_chunks<-list()
+pt_chunks_bal<-list()
+svl_dist_lf_strn<-list()
+pt_bal_cols<-list()
+gam_bg_strain <- list()
+don_nm <- str_replace_all(names(msc_gcombi_noLE_sub_sce_bal_fld_f8), c("_m" = " male", "_f" = " female"))
+
+
+## Whole integrated PC coordinates and field_lab metadata
+gam_pc_mdata <- msc_gam_combi_noLE_de[[1]]@reductions$pca@cell.embeddings[,c(1,2)] %>% as.data.frame() %>%rownames_to_column('cell_bc') %>% left_join(., msc_gam_combi_noLE_de[[1]]@meta.data[,c('dset'), drop=F] %>% rownames_to_column('cell_bc'), by = 'cell_bc') 
+
+for (i in 1:length(msc_gcombi_noLE_sub_sce_bal_fld_f8)) {
+  cat('#####', names(msc_gcombi_noLE_sub_sce_bal_fld_f8[i]),'  \n')
+
+  umap_meta_df <- reducedDims(msc_gcombi_noLE_sub_sce_unbal_ptchunks[[i]])$PCA[,c(1,2)] %>% as.data.frame() %>%rownames_to_column('cell_bc') %>% left_join(., msc_gcombi_noLE_sub_sce_unbal_ptchunks[[i]]@colData[,c('ptime_cat','strain_dset', pts[i])] %>% as.data.frame() %>% rownames_to_column('cell_bc'), by = 'cell_bc') 
+  
+  plt <- umap_meta_df %>% 
+    ggplot(aes(x = PC_1, y =PC_2, color = ptime_cat)) + geom_point(size=2) + 
+    scale_color_manual(name = "Condition", values = brewer.pal(n=9, name = "YlOrBr")[c(1,3,4:9)]) +
+    theme_void()+  
+    theme(axis.text=element_blank(), 
+          axis.title=element_blank(),
+          legend.text = element_text(size = 30) ,
+          legend.title = element_text(size = 30, face = "bold") )+
+    guides(colour = guide_legend(override.aes = list(size=3.5)))
+  
+  ##Save plot for cowplot grouping
+  pt_chunks[[i]] =plt
+  
+  print(plt)
+  cat('\n')
+  cat('\n')
+  
+  umap_meta_df <- reducedDims(msc_gcombi_noLE_sub_sce_bal_fld_f8[[i]])$PCA[,c(1,2)] %>% as.data.frame() %>%rownames_to_column('cell_bc') %>% left_join(., msc_gcombi_noLE_sub_sce_bal_fld_f8[[i]]@colData[,c('ptime_cat','lf_strain',pts[i])] %>% as.data.frame() %>% rownames_to_column('cell_bc'), by = 'cell_bc')  #%>% 
+  # mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset)
+
+  plt <- umap_meta_df %>% 
+    ggplot(aes(x = PC_1, y =PC_2, color = ptime_cat)) + geom_point(size=2) + 
+    # scale_color_brewer(name = "Condition", values = brewer.pal(7,"Set1")) +
+    # scale_color_manual(name = "Condition", values = brewer.pal(8,"YlGnBu")) +
+    scale_color_manual(name = "Condition", values = brewer.pal(n=9, name = "YlOrBr")[c(1,3,4:9)]) +
+    theme_void()+  
+    theme(axis.text=element_blank(), 
+          axis.title=element_blank(),
+          legend.text = element_text(size = 30) ,
+          legend.title = element_text(size = 30, face = "bold") )+
+    guides(colour = guide_legend(override.aes = list(size=3.5)))
+  
+  ##Save plot for cowplot grouping
+  pt_chunks_bal[[i]] =plt
+  print(plt)
+  
+  plt <- umap_meta_df %>% 
+    mutate(samp = sample(n()),
+           strn_order = case_when(str_detect(lf_strain, "NF54") ~ 1, str_detect(lf_strain, "7G8") ~ 2, str_detect(lf_strain, "SC") ~ samp+2)) %>%
+    arrange(strn_order) %>%
+    ggplot(aes(x = PC_1, y =PC_2, color = lf_strain)) + 
+    geom_point(size=2) + 
+    scale_color_manual(name = "Condition", values = strain_dset_lvls_don_col) +
+    theme_void()+  
+    theme(axis.text=element_blank(), 
+          axis.title=element_blank(),
+          legend.text = element_text(size = 30) ,
+          legend.title = element_text(size = 30, face = "bold") )+
+    guides(colour = guide_legend(override.aes = list(size=3.5)))
+  
+  ##Save plot for cowplot grouping
+  svl_dist_lf_strn[[i]] =plt
+  print(plt)
+  
+  plt <- umap_meta_df %>% 
+    ggplot(aes(x = PC_1, y =PC_2, color = !!rlang::sym(pts[i]))) + geom_point(size=2) + 
+    scale_color_distiller(name='Pseudotime', direction = 1, palette = 'Greens') + 
+    theme_void()+
+    theme(axis.text=element_blank(), 
+          axis.title=element_blank(),
+          # axis.text=element_text(size=30), 
+          # axis.title=element_text(size=28,face="bold"), 
+          # axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.text = element_text(size = 22) ,
+          legend.title = element_text(size = 24, face = "bold") ) 
+  
+  ##Save plot for cowplot grouping
+  pt_bal_cols[[i]] =plt
+  print(plt)
+  
+   plt<-gam_pc_mdata %>% left_join(., msc_gcombi_noLE_sub_sce_bal_fld_f8[[i]]@colData[,c('lf_strain'), drop = F] %>% as.data.frame() %>% rownames_to_column('cell_bc'), by = 'cell_bc') %>% 
+    mutate(ds_strain = coalesce(lf_strain, dset),
+           across(ds_strain, ~case_when(. == "NF54_A" ~ "Lab", T ~ .)),
+           across(ds_strain, ~droplevels(factor(., levels = strain_dset_lvls))),
+           hl = case_when(is.na(lf_strain) ~ 0.5, !is.na(lf_strain) ~ 1.5)) %>%
+    mutate(samp = sample(n()),
+           strn_order = case_when(is.na(lf_strain) & dset == "Lab" ~ 1, is.na(lf_strain) & dset == "Field" ~ 2, str_detect(lf_strain, "NF54") ~ 3, str_detect(lf_strain, "7G8") ~ 3, is.na(lf_strain) & dset == "Field" ~ 3, str_detect(lf_strain, "SC") ~ samp+3)) %>%
+    arrange(strn_order) %>%
+    ggplot(aes(x = PC_1, y =PC_2, color = ds_strain)) + 
+    geom_point(aes( size = hl)) +
+    scale_size_continuous(range = c(0.5, 2)) +
+    scale_color_manual(name = "Condition", values = c("Lab" = "#e5e5e5", strain_dset_lvls_don_col, "Field" = "#aeaeae")) +
+     labs(title = don_nm[[i]]) + 
+    theme_void()+  
+    theme(axis.text=element_blank(), 
+          axis.title=element_blank(),
+          legend.text = element_text(size = 30) ,
+          legend.title = element_text(size = 30, face = "bold"),
+          plot.title = element_text(size=14, hjust = 0.5, face = "bold"))+
+    guides(colour = guide_legend(override.aes = list(size=3.5)), size = F)
+  
+   gam_bg_strain[[i]] =plt
+   
+  print(plt)
+  cat('\n')
+  cat('\n')
+
+}
+
+```
+
+Marker dotplots
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+stg_mkrs <- readRDS("data/processed/Pf/m2_all/stg_mkrs.RDS")
+
+```
+
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=5}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+# m2_seu_jnd <- JoinLayers(m2_seu)
+
+map(stg_mkrs, ~DotPlot(m2_seu_no_M12_norm, features = as.character(.x), split.by = "stage_c", group.by = "donor",  
+        cols = c("#90bce5", "#ea5bba",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(.x))
+)
+
+
+```
+
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=12}
+Idents(m2_seu_no_M12_norm) <- "stage_c"
+
+DotPlot(m2_seu_no_M12_norm, features = as.character(unlist(stg_mkrs)), split.by = "stage_c", group.by = "donor",  
+        cols = c("#ea5bba", "#90bce5",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(unlist(stg_mkrs)))
+
+
+
+```
+
+Findmarkers for each cluster
+```{r}
+# Idents(msc_w_cln_strns) <- "stage_c"
+msc_w_cln_strns<- map(msc_w_cln_strns,  ~SetIdent(.x, value="stage_c"))
+```
+
+
+```{r}
+all_mrks_afm <- imap(msc_w_cln_strns[!names(msc_w_cln_strns) %in% c("MSC12")], ~{
+  
+  print(.y)
+  seurobj <- .x
+  seurobj[["RNA"]]$data <- as(object = seurobj[["RNA"]]$data, Class = "dgCMatrix")
+  FindAllMarkers(object = seurobj)
+  
+  })
+```
