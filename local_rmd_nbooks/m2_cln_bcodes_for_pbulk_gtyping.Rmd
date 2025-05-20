@@ -1,0 +1,331 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  # library(patchwork)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  # library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(knitr)
+  # library(readxl)
+  # library(SCpubr)
+  # library(ggh4x)
+  # library(htmlwidgets)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+#  integration of all MSC
+
+## setup 
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+
+
+
+```{r}
+msc_w_cln_strns_raw <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns_raw.RDS")
+
+```
+
+
+
+```{r}
+msc_w_cln_strns_raw <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns_raw.RDS")
+msc_w_cln_strns_raw <- msc_w_cln_strns_raw[!names(msc_w_cln_strns_raw) %in% c("MSC12")]
+
+```
+
+
+```{r}
+sample_name_nms <- names(msc_w_cln_strns_raw)
+```
+
+```{r}
+# Get the optimum QCd K
+optimum_k_qcd <-  list(
+  "MSC33" = c(8),
+  "MSC37" = c(5),
+  "MSC38" = c(4),
+  "MSC39" = c(4),
+  "MSC40" = c(8),
+  "MSC48" = c(4),
+  "MSC49" = c(6),
+  "MSC55" = c(6),
+  "MSC60" = c(7),
+  "MSC66" = c(8),
+  "MSC68" = c(3),
+  "MSC50_SLO" = c(2),
+  "MSC50_MACS" = c(1),
+  "MSC53" = c(1),
+  "MSC57" = c(1),
+  "MSC24" = c(1),
+  "MSC45" = c(1),
+  "MSC54" = c(1),
+  "MSC67" = c(1),
+  "MSC70" = c(1),
+  "MSC41" = c(3),
+  "MSC51" = c(1),
+  "MSC25" = c(2),
+  "MSC1" = c(5),
+  "MSC3" = c(2),
+  "MSC13" = c(2),
+  "MSC14" = c(8)
+  
+) %>% .[sample_name_nms]
+
+
+```
+
+```{r}
+optimum_k_qcd <- optimum_k_qcd[sort(names(msc_w_cln_strns_raw))] %>% unlist()
+```
+
+
+```{r}
+imap(msc_w_cln_strns_raw, ~DimPlot(., group.by = "stage") + labs(title = .y))
+
+```
+
+
+```{r, fig.width=16, fig.height=4}
+map(msc_w_cln_strns_raw, ~.x@meta.data %>% 
+      count(stage, StagePrelim)
+    ) 
+  
+
+```
+
+
+```{r, fig.width=16, fig.height=4}
+map(msc_w_cln_strns_raw, ~.x@meta.data %>% 
+      mutate(stage_ag = case_when(stage %in% c("Early trophozoite", "Late trophozoite", "Early ring", "Late ring", "Early schizont", "Late schizont", "Gametocyte (developing)") ~ "Asexual",
+                                   stage %in% c("Male", "Male LE", "Female", "Female LE") ~ "Gametocyte")
+      ) %>%
+      count(stage_ag)
+    ) 
+  
+
+```
+
+
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+stg_strns_cln <- map(msc_w_cln_strns_raw, ~{
+  .x@meta.data %>% 
+      mutate(stage_ag = case_when(stage %in% c("Early trophozoite", "Late trophozoite", "Early ring", "Late ring", "Early schizont", "Late schizont", "Gametocyte (developing)") ~ "Asexual",
+                                   stage %in% c("Male", "Male LE", "Female", "Female LE") ~ "Gametocyte")
+      ) %>%
+    rownames_to_column("bcode") %>%
+    select(bcode, strain, stage_ag, stage) #%>% 
+    # AddMetaData(.x,.)
+})
+
+```
+
+
+```{r, fig.width=16, fig.height=4}
+map(stg_strns_cln, ~.x %>% 
+      count(strain, stage_ag) %>% 
+      arrange(n)
+    ) 
+  
+```
+
+
+## Write out for genotyping
+
+Write out strain_qcd + stage_ag for pseudobulk genotyping
+
+```{r, warning=FALSE, eval=T}
+## Get donors with more than 1 strain
+optimum_k_polyk <- optimum_k_qcd[optimum_k_qcd > 1]
+# optimum_k_polyk <- optimum_k_polyk[!names(optimum_k_polyk) %in% c("MSC37", "MSC38")]
+
+## Genotype also for monoclonal
+optimum_k_polyk <- optimum_k_qcd
+```
+
+
+```{r, warning=FALSE, eval=T}
+## Strain downsampling for faster runs
+set.seed(123)
+
+stg_strns_cln_ds <- map(stg_strns_cln, ~{
+  .x %>% 
+  filter(stage_ag %in% c("Asexual", "Gametocyte")) %>% 
+  group_by(strain, stage_ag) %>% 
+  mutate(samp = sample(n())) %>%
+  mutate(pbulk_cell = case_when(stage_ag == "Asexual" & samp <= 1000 ~ "yes", stage_ag == "Gametocyte" & samp <= 500 ~ "yes" )) %>%
+  filter(pbulk_cell == "yes") 
+})
+```
+
+
+
+```{r, fig.width=16, fig.height=4}
+map(stg_strns_cln_ds, ~.x %>% 
+      count(strain, stage_ag) %>% 
+      arrange(n)
+    ) 
+  
+
+```
+
+
+
+```{r, fig.width=16, fig.height=4}
+Strain_qc_cutoff = 20
+downsample_cells = "yes"
+sv_dir = "pbulk_gtypes_cln_1VCF"
+algn_nm = 'minmap'
+species <- "Pf"
+grps <- c('strain', 'strain_ag')
+```
+
+
+```{r, eval=T}
+## DOUBLETS WRITTEN INTO THE SAME FOLDER IN MSC_PP.rmd - SHOULD BE COMBINED INTO ONE NOTEBOOK
+# sample_ids = map2(sample_name_nms, source_irods_nms, ~paste0(.x, '_', .y))
+# sv_dir = "pbulk_gtypes_postQC_cln"
+
+# for (s in names(stg_strns_cln)) {
+for (s in names(optimum_k_polyk)) {
+  # narrow_k <- opt_narrow_clusters_nms[[str_remove(s, "_[a-z]+")]]
+  narrow_k <- optimum_k_polyk[s]
+  ## Assign minimap/hsat mapper directory
+  # algn_nm = str_extract(s, "hsat|minmap|lr_ref")
+  algn_nm = "minmap"
+  # s_nm = str_remove(s, "_[a-z]+")
+  s_nm = s
+  
+  print(algn_nm)
+  print(s_nm)
+  
+  ## Select between downsampled and full cell barcodes. Downsampled allows faster runtime while maintaining power
+  strn_mdata_tbl <- if (downsample_cells == "yes") { stg_strns_cln_ds } else { stg_strns_cln }
+
+  ## !!!NOTE - Dangerous command - activate only when barcodes are modified
+  system(paste0('rm -r data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/st*'))
+  
+  for (k in narrow_k) {
+    print(narrow_k)
+    # for (str_q in c('strain')){
+      
+      ss_qcd_ano <- map(strn_mdata_tbl[s], ~.x %>% rename("str" = strain) %>% group_by(str) %>% filter(n() >= Strain_qc_cutoff) %>% ungroup() %>% mutate(across(c(str), ~droplevels(factor(.)))) %>% split(f = ~ str, drop = T))
+      
+      names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+      # print(str(ss_qcd_ano[[1]]))
+      print(names(ss_qcd_ano[[1]]))
+
+      system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/strain_k',k,'/'))
+      print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/', algn_nm,'/strain_k',k,'/'))
+
+      # imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/strain_k',k,'/',.y, '.tsv')))
+      
+      ## Change barcode filename to include donor name for harmony with pseudobulk genotyping process
+      imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/strain_k',k,'/', s_nm, '_', .y, '.tsv')))
+
+      # for(stg_c in c('stage_afm', 'stage_ag')){
+      # for(stg_c in c('stage_ag')){
+        
+        ss_qcd_ano <- map(strn_mdata_tbl[s], ~.x %>% rename("str" = strain, "stg" = stage_ag) %>% group_by(str, stg) %>% filter(n() >= Strain_qc_cutoff) %>% ungroup() %>% mutate(across(c(str, stg), ~droplevels(factor(.)))) %>% split(f = ~ str+stg, drop = T))
+        names(ss_qcd_ano[[1]]) <- names(ss_qcd_ano[[1]]) %>% str_replace(., '\\.', '_')
+        print(names(ss_qcd_ano[[1]]))
+
+        system(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/'))
+        print(paste0('mkdir -p data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/'))
+
+        # imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/',.y, '.tsv'))) 
+        
+        ## Change barcode filename to include donor name for harmony with pseudobulk genotyping process
+        imap(ss_qcd_ano[[1]], ~write(.x$bcode, paste0('data/processed/',species,'/',s_nm,'/', sv_dir,'/bcodes/',algn_nm,'/stage_ag_strain_k',k,'/', s_nm, '_', .y, '.tsv')))
+
+    #   }
+    # }
+  
+}
+
+}
+```
+
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+# run first to get the tagged bam files - we run this since we have not done so for this set of barcodes. But for other runs it may have been done already by the pbulk_gtyping.nf script
+
+#NOTE - LATEST RUN
+# nextflow run ../mali22_code_lnk/nf_scripts/pbulk_gtyping_1vcf_no_tag.nf --sv_dir "pbulk_gtypes_cln_1VCF" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_cln_1VCF/st*/new_bams/*_sset_sorted_rg_don.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_cln_1VCF/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta" -resume
+
+# BACKUP
+# nextflow run ../mali22_code_lnk/nf_scripts/pbulk_gtyping_bam_sset.nf --sv_dir "pbulk_gtypes_cln_1VCF" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/pbulk_gtypes_cln_1VCF/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/cr_subset_bam_linux.sh" --save_bam_sset true
+
+# to be deleted if pbulk_gtyping_1vcf_no_tag.nf script works
+ ## vartrix --umi --out-variants ${sample_nm}_${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${sample_nm}_${strn_stg}_ref.mtx --out-matrix ${sample_nm}_${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
+    
+```
+
