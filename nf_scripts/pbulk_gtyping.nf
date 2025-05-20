@@ -49,8 +49,8 @@ bcodes_bam_ch.view()
 // - Subset minimap bam file from souporcell based on the barcodes in each pseudobulk group using subset bam from 10X
 
 process SUBSET {
-    memory '100 GB'
-    cpus '5'
+    memory '50 GB'
+    cpus '3'
 
     tag "Subset ${strn_stg}  reads"
     
@@ -71,7 +71,7 @@ process SUBSET {
 
 // Tag each subsetted bam file using the pseudobulk group ID in preparation for freebayes genotyping
 process TAGBAM {
-    memory '40 GB'
+    memory '10 GB'
     cpus '3'
 
     errorStrategy 'ignore' // Some error coming up "terminated for an unknown reason -- Likely it has been terminated by the external system"
@@ -113,7 +113,7 @@ bcf_spec=Channel.value("view --max-alleles 2")
 // Run FreeBayes with the specified parameters using ploidy of 1 and other parameters specified above
 
 process FREEBAYES {
-    memory '100 GB'
+    memory '120 GB'
     cpus '16'
 
     errorStrategy 'ignore'
@@ -142,7 +142,7 @@ process FREEBAYES {
 }
 
 process VARTRIX_UMI {
-    memory '100 GB'
+    memory '120 GB'
     cpus '12'
     
     errorStrategy 'ignore'
@@ -153,13 +153,13 @@ process VARTRIX_UMI {
     tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path(bcodes), path(bam), path(bai), path(bi_vcf)
     
     output:
-    tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path ("${strn_stg}_*")
+    tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path ("${sample_nm}_${strn_stg}_*")
     
     script:
     """
     export PATH="\$PATH:/software/team222/jr35/vartrix/vartrix-1.1.22/target/release"
 
-    vartrix --umi --out-variants ${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${sample_nm}_${strn_stg}_ref.mtx --out-matrix ${sample_nm}_${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
+    vartrix --umi --out-variants ${sample_nm}_${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${sample_nm}_${strn_stg}_ref.mtx --out-matrix ${sample_nm}_${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
     
     """
 }
@@ -223,6 +223,6 @@ workflow {
 
     vartx_cpy_ch =VARTRIX_COPY(vartx_ch)
 
-    vartx_cpy_ch.view()
+    // vartx_cpy_ch.view()
             
 }
