@@ -11,10 +11,12 @@ params.filt_obj = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/d
 params.spx_obj = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC33/seu_obj/filt_seu_norm_supx.RDS" 
 
 // - output name
-params.o_file = "scdblf_outs.RDS"
+// params.o_file = "scdblf_outs.RDS"
+params.o_sufx = "scdblf"
+
 
 // - compute resources for first process
-ncores="3"
+ncores="4"
 mem="40 GB"
 
 // - Standard scripts for running souporcell
@@ -25,18 +27,18 @@ params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpo
 
 filt_ch = Channel
 				.fromPath(params.filt_obj)
-				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file) }
+				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file.baseName, file) }
 
 spx_ch = Channel
 				.fromPath(params.spx_obj)
-				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file, file.getParent()) }
+				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file.baseName.replaceAll(/_supx/, ""), file, file.getParent(), file.baseName.replaceAll(/.RDS/, "") + "_" + "${params.o_sufx}" + ".RDS") }
 				// .map { file -> tuple( "${file.irods_id}, ${file.sample_nm}" ) } NB - this does not work
 
 // filt_ch.view()
 // spx_ch.view()
 
 all_objs_ch = filt_ch
-                    .combine(spx_ch, by:0)
+                    .combine(spx_ch, by:[0,1])
 
 all_objs_ch.view()
 
@@ -53,16 +55,16 @@ process SCDBLFINDER_RUNS {
     publishDir "${out_p}/", mode: 'copy', overwrite: true
 
     input:
-    tuple val(sample_nm), path(filt), path(spx), val(out_p)
+    tuple val(sample_nm), val(obj_nm), path(filt), path(spx), val(out_p), val(o_file_name)
 	
     output:
-    tuple val(sample_nm), path("${params.o_file}")
+    tuple val(sample_nm), path("${o_file_name}")
 
 	script:
 	"""
     module load HGI/softpack/groups/team222/Pf_scRNAseq/11
 
-    Rscript ${params.scrpt} ${filt} ${spx} ${params.o_file}
+    Rscript ${params.scrpt} ${filt} ${spx} ${o_file_name}
 
     
 	"""			
