@@ -1,0 +1,799 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+
+
+```{r}
+suppressPackageStartupMessages({
+    library(Seurat)
+    library(dplyr) 
+    library(stringr)
+    library(purrr)
+    library(readr)
+    library(tibble)
+    library(ggplot2)
+    library(tidyr)
+    library(cowplot)
+    library(SeuratData)
+    library(SeuratDisk)
+    library(pheatmap)
+    library(plotly)
+    library(rmarkdown)
+    library(RColorBrewer)
+    library(MAST)
+    library(EnhancedVolcano)
+    # library(org.Pf.plasmo.db)
+    library(clusterProfiler) ##github installation newest version https://github.com/YuLab-SMU/clusterProfiler/issues/434#issuecomment-1048633162 remotes::install_github(c("YuLab-SMU/DOSE", "YuLab-SMU/clusterProfiler", "YuLab-SMU/enrichplot" ))
+    # library(Platypus)
+    library(ggvenn)
+    library(tradeSeq)
+    library(MetBrewer)
+    library(ComplexHeatmap)
+    library(fgsea)
+    # library(msigdbr)
+    library(slingshot)
+  library(enrichplot)
+  library(readxl)
+  # library(DT)
+  library(knitr)
+  library(conflicted)
+  library(openxlsx)
+  library(gt)
+  library(ggforce)
+  conflicts_prefer(purrr::map)
+  conflicts_prefer(dplyr::filter)
+  conflicts_prefer(dplyr::rename)
+  conflicts_prefer(dplyr::count)
+  # library(knitr)
+})
+```
+
+## setup
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+# source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+# source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+Read in tradeseq files from local
+```{r}
+mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+# mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_a_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq/m2_mf_bal|_t.*'))) %>%
+  map(readRDS)
+
+```
+
+
+Read in tradeseq files from local
+```{r}
+asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+  map(readRDS)
+
+```
+
+```{r}
+##save condition results for GSEA
+cond_gns_de_gam <- readRDS('data/processed/Pf/cond_gns_de_gam.RDS')
+```
+
+
+```{r}
+##save condition results for GSEA
+cond_gns_de_asx <- readRDS('data/processed/Pf/cond_gns_de_asx.RDS')
+```
+
+
+```{r, results='asis', warning=F, message=F}
+solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
+solo_don2 <- c("MSC49",  "MSC66")
+
+
+# all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
+all_sig_asx_gns <- map(cond_gns_de_asx[solo_don2], ~{
+  .x %>% 
+  select(-c(starts_with("df"))) %>%
+  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
+  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
+                     # names_pattern = "(.*)_(SC._vs.*)",
+                     names_pattern = "(waldStat|pvalue)_(.*)",
+                     names_to = c( ".value", "ts_pw_comp")) %>%
+    filter(waldStat > 20 & pvalue < 0.001)
+}) 
+
+```
+
+```{r, results='asis', warning=F, message=F}
+all_sig_f_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_f")], ~{
+  .x %>% 
+  select(-c(starts_with("df"))) %>%
+  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
+  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
+                     # names_pattern = "(.*)_(SC._vs.*)",
+                     names_pattern = "(waldStat|pvalue)_(.*)",
+                     names_to = c( ".value", "ts_pw_comp")) %>%
+    filter(waldStat > 20 & pvalue < 0.001)
+}) 
+
+```
+
+```{r, results='asis', warning=F, message=F}
+all_sig_m_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_m")], ~{
+  .x %>% 
+  select(-c(starts_with("df"))) %>%
+  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
+  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
+                     # names_pattern = "(.*)_(SC._vs.*)",
+                     names_pattern = "(waldStat|pvalue)_(.*)",
+                     names_to = c( ".value", "ts_pw_comp")) %>%
+    filter(waldStat > 20 & pvalue < 0.001)
+}) 
+
+```
+
+```{r, results='asis', warning=F, message=F}
+# a_af_separator <- c("[0-9]_f$", "[0-9]_a_f$") %>% set_names(c("f", "a_f"))
+stg_nms <- c("f", "m", "asx")
+
+all_sig_gns_df <- map(list(all_sig_f_gns, all_sig_m_gns, all_sig_asx_gns), ~{
+  .x %>%
+  bind_rows(., .id = "donor") %>%
+  group_by(gene_id) %>%
+  mutate("freq_btwn_don" = n_distinct(donor)) %>%
+  group_by(donor, gene_id) %>%
+  mutate("freq_wthn_don" = n_distinct(ts_pw_comp)) %>%
+  ungroup()
+      }) %>% set_names(stg_nms)
+
+```
+
+
+```{r, results='asis', warning=F, message=F}
+map(all_sig_gns_df, ~{.x %>% 
+  arrange(desc(freq_btwn_don), Gene) %>%
+  distinct(donor, gene_id, Gene, freq_btwn_don)}
+)
+```
+
+```{r, results='asis', warning=F, message=F}
+map(all_sig_gns_df, ~{.x %>%
+    count(donor, ts_pw_comp) %>% 
+  arrange(desc(n))  }
+)
+```
+
+
+```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
+map(all_sig_gns_df, ~{.x %>% 
+  arrange(desc(freq_btwn_don), Gene) %>%
+  distinct(donor, gene_id, Gene, freq_btwn_don) %>%
+  mutate(across(freq_btwn_don, factor)) %>% 
+  distinct(gene_id, .keep_all = T) %>%
+  count(freq_btwn_don) 
+})
+```
+```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
+305 +181+86+31+6
+
+192+63+18+7+1
+
+41+2
+```
+
+```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
+map(all_sig_gns_df, ~{.x %>% 
+  arrange(desc(freq_btwn_don), Gene) %>%
+  distinct(donor, gene_id, Gene, freq_btwn_don) %>%
+  mutate(across(freq_btwn_don, factor)) %>% 
+  distinct(gene_id, .keep_all = T) %>%
+  count(freq_btwn_don) %>%
+  ggplot(aes(x = freq_btwn_don, y = n)) +
+  geom_col()+
+  labs(x = "Frequency across donors", y = "DE gene count") +
+  theme_classic() +
+  theme(text = element_text(size = 12))
+})
+```
+
+
+```{r, results='asis', warning=F, message=F, fig.width= 4, fig.height=3}
+map(all_sig_gns_df, ~{.x %>% 
+  arrange(desc(freq_btwn_don), Gene) %>%
+  distinct(donor, gene_id, Gene, freq_btwn_don) %>%
+  mutate(across(freq_btwn_don, factor)) %>% 
+  distinct(gene_id, .keep_all = T) %>%
+  count(freq_btwn_don) %>%
+  ggplot(aes(x = freq_btwn_don, y = n)) +
+  geom_col()+
+  geom_text(aes(label=n), hjust=0.5, vjust= -0.3, size = 5, show.legend = F, fontface = 'bold')+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.1))) +
+  labs(x = "Frequency across donors", y = "DE gene count") +
+  theme_classic() +
+  theme(text = element_text(size = 17),
+        axis.text = element_text(size = 16)) 
+})
+```
+
+```{r, results='asis', warning=F, message=F}
+# fem_gns_don <- map2(all_sig_gns_df,c(4,4,2), ~{.x %>% 
+# fem_gns_don <- map2(c(all_sig_gns_df, all_sig_gns_df["asx"]), c(3,3,2,1), ~{.x %>% 
+fem_gns_don <- map2(c(all_sig_gns_df[1:2], all_sig_gns_df["asx"]), c(3,3,1), ~{.x %>% 
+  filter(freq_btwn_don >= .y) %>%
+  distinct(gene_id, .keep_all = T) 
+})
+
+
+  
+```
+
+```{r, results='asis', warning=F, message=F}
+fem_gns_don[["f"]] %>% 
+  pull(gene_id) %>%
+  str_replace(., "-", "_") %>%
+  dput()
+  
+```
+
+
+```{r}
+fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
+```
+
+
+```{r}
+fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
+```
+
+
+```{r, results='asis', warning=F, message=F}
+de_gns <- map(fem_gns_don, ~{.x %>% pull(gene_id) %>% unique()})
+  
+```
+
+
+```{r, results='asis', warning=F, message=F}
+
+# all_sig_f_gns_df <- readRDS('data/processed/Pf/pseudotime_tradeseq_ip/sympto/all_sig_f_gns_df.RDS')
+# all_sig_m_gns_df <- readRDS('data/processed/Pf/pseudotime_tradeseq_ip/sympto/all_sig_m_gns_df.RDS')
+
+
+```
+
+
+
+```{r}
+## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
+## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
+
+DE_unvrs_gns_f <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_f")], ~{
+  
+  CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
+  rownames()
+}) %>% 
+  unlist() %>%
+  unique()
+
+
+```
+
+
+```{r}
+## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
+## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
+
+DE_unvrs_gns_m <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_m")], ~{
+  
+  CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
+  rownames()
+}) %>% 
+  unlist() %>%
+  unique()
+
+
+```
+
+
+```{r}
+## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
+## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
+
+# DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don], ~{
+DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don2], ~{
+  
+  CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
+  rownames()
+}) %>% 
+  unlist() %>%
+  unique()
+
+
+```
+
+
+```{r}
+# stg_nms2 <- c("f", "m", "asx", "asx2")
+# ## Get the field and lab DE genes
+# DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
+
+```
+
+```{r}
+stg_nms2 <- c("f", "m", "asx2")
+## Get the field and lab DE genes
+DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
+
+```
+
+```{r, message=FALSE}
+## Instrucions on using clusterprofiler with gaf file provided on plasmoDB https://support.bioconductor.org/p/p134523/#p134554 
+## parse_gff function https://github.com/YuLab-SMU/clusterProfiler/issues/421#issuecomment-1019300572
+
+Pf3D7_68_gaf_F <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_F.rds")
+Pf3D7_68_gaf_P <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_P.rds")
+Pf3D7_68_gaf_C <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_C.rds")
+
+# Pf3D7_63_gaf_txt <- read_delim("../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-66_Pfalciparum3D7_GO.gaf", skip = 1, delim = '\t', col_types = paste(rep('c', 17), collapse = ''), col_names = paste0('X', (1:17)))
+# 
+# Pf3D7_63_gaf_terms_cat <- Pf3D7_63_gaf_txt %>% filter(!is.na(X9)) %>% distinct(pick(X5, X9)) %>% rename('go_id' = X5, 'fpc_class' = X9) 
+```
+
+```{r}
+go_e_fun_overrep_only_fcp  <- function(gns, unvrs, t2gn_lst){
+ 
+  map(list(Pf3D7_68_gaf_F, Pf3D7_68_gaf_C, Pf3D7_68_gaf_P), ~enricher(gns, TERM2GENE = .x$TERM2GENE, TERM2NAME=.x$TERM2NAME, universe = unvrs) %>% .@result %>% filter(p.adjust<0.05)) %>%
+            set_names(c('Molecular function', 'Cellular component', 'Biological process')) %>%
+            bind_rows(., .id='Ontology')
+  
+
+}
+
+
+
+```
+
+## GO for the DE genes
+
+```{r, message=FALSE}
+## GO
+strn_DE_go_std_pdb <- list(de_gns, DE_unvrs) %>%
+    pmap(., ~{go_e_fun_overrep_only_fcp(gns = ..1, unvrs = ..2)})
+
+```
+
+
+```{r, message=FALSE}
+## GO
+strn_DE_go_std_pdb
+```
+
+```{r, message=FALSE}
+## GO
+strn_DE_go_std_pdb_p <- strn_DE_go_std_pdb %>% map(., ~.x %>% mutate(P = case_when(round(p.adjust, 3) == 0 ~ "<0.001", 
+                                                           T ~ as.character(round(p.adjust, 3)))))
+```
+
+
+```{r}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+# DE_go_gt_lst <- map(DE_go_std_pdb[c(1,2)],
+strn_DE_go_gt_lst <- map(strn_DE_go_std_pdb_p,
+                 ~.x %>% 
+                   group_by(Ontology) %>% 
+                   arrange(`p.adjust`) %>% 
+                   slice_head(., n=5) %>% 
+                   ungroup()  %>% 
+                   dplyr::select(c('Ontology', 'Description', 'GeneRatio', 'P')) %>% rename(c('Gene\nRatio'= GeneRatio)) %>%  
+                   mutate(Description = str_wrap(Description, width = 40)) %>%  
+                   gt() %>% 
+                   data_color(method = 'factor', columns = 'Ontology', target_columns = c('Description', 'Gene\nRatio', 'P'), palette = 'Pastel2') %>%
+                   cols_hide('Ontology') %>% 
+                   tab_options(table.width = pct(40), column_labels.font.weight = 'bold')
+                 )
+
+```
+
+
+```{r, fig.width=4, fig.height=10}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+strn_DE_go_gt_lst 
+```
+
+
+
+```{r, results='asis', fig.height=16.5, fig.width=12}
+##get gt tables as grob for merging using cowplot from gt github https://github.com/rstudio/gt/issues/961
+
+gt_grob <- function(gt_object, wth = NULL, hgt = NULL, ...){
+  
+  out_name <- file.path(
+    tempfile(pattern = "file", tmpdir = tempdir(), fileext = ".png")
+  )
+  gtsave(gt_object, out_name, ...)
+  gtsave(gt_object, filename = "obj2.png", path = "plots/")
+  in_png <- png::readPNG(out_name)
+  on.exit(file.remove(out_name), add=TRUE)
+  grid::rasterGrob(in_png, width = wth, height = hgt)
+  
+}
+
+# f_gt_plt <- gt_grob(f_go_tbl)
+# m_gt_plt <- gt_grob(m_go_tbl)
+## !!! in case of error "s$close()" check https://stackoverflow.com/questions/73964325/error-in-sclose-attempt-to-apply-non-function-when-calling-gtsave 
+# all_stg_gtpt <- map(go_gt_lst, ~gt_grob(.x))
+# all_stg_gtpt
+```
+
+```{r, results='asis', fig.height=16.5, fig.width=12}
+
+# strn_DE_go_sep_ont_gtpt_m <- map(strn_DE_go_gt_lst, ~gt_grob(.x))
+# saveRDS(strn_DE_go_sep_ont_gtpt_m, "plots/DE_heatmaps/strn_DE_go_sep_ont_gtpt_m.RDS")
+
+# strn_DE_go_sep_ont_gtpt_m
+
+```
+
+
+```{r, fig.height= 8, fig.width=7}
+##Function to create binned windows across genome and compare pairwise strains and generate the plotting details for chromosome painting
+fem_gns_pos <- fem_gns_don[["f"]] %>% 
+  left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Genomic Location (Gene)")]) %>%
+  mutate("chr" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7_|_v3.*"),
+         "start_pos" = str_remove_all(`Genomic Location (Gene)`, "Pf3.*v3:|\\..*|,"), 
+         "end_pos" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7.*\\.|\\(.*|,"),
+         across(ends_with("_pos"), as.numeric)) 
+
+
+fem_gns_pos%>%
+    group_by(chr) %>% 
+    filter(!is.na(chr) & chr != "MIT") %>%
+    mutate(pos_range = cut(start_pos, breaks = c(-Inf,seq(0, max(start_pos), by = 100000),Inf))) %>% 
+    # pivot_longer(., cols = starts_with(strn_regex), names_to = 'comps', values_to = 'sim') %>% 
+  ggplot(aes(x=start_pos)) +
+  geom_histogram(binwidth = 50000) +
+  facet_grid(chr ~ .) +
+  theme_classic()
+```
+
+
+```{r}
+ all_pf_gns <- Pf3D7_genes_plasmoDB[, c("gene_id", "Genomic Location (Gene)", "Gene")] %>%
+  mutate("chr" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7_|_v3.*"),
+         "start_pos" = str_remove_all(`Genomic Location (Gene)`, "Pf3.*v3:|\\..*|,"), 
+         "end_pos" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7.*\\.|\\(.*|,"),
+         across(ends_with("_pos"), as.numeric))
+  
+```
+
+
+```{r}
+library(GenomicRanges)
+pf_chr_size <- read_table("../../Pf3D7_genomes_gtfs_indexs/Pdb66_Genome.size", col_names = F) 
+# Define genome bins (e.g., 100 kb bins)
+
+# chroms_nmd <- pf_chr_size$X2 %>% set_names(paste0("chr_", str_remove_all(pf_chr_size$X1, "Pf3D7|_0|_v3|_")))
+
+chroms_nmd <- pf_chr_size$X2 %>% set_names( str_remove_all(pf_chr_size$X1, "Pf3D7|_v3|_"))
+
+genome_bins <- tileGenome(seqlengths = chroms_nmd,  # Adjust based on genome size
+                          tilewidth = 2e5,                         # 100 kb bins
+                          cut.last.tile.in.chrom = TRUE)
+```
+
+
+
+```{r}
+# Example: Test set of genes
+test_genes <- fem_gns_pos %>% mutate(
+    seqnames = chr,
+    start = start_pos,
+    end = end_pos,
+    gene_id = gene_id,
+) %>% select(seqnames, start, end, gene_id) %>%
+   filter(!is.na(start))
+
+# Example: Background set of genes
+background_genes <- all_pf_gns %>%
+  filter(gene_id %in% DE_unvrs[["f"]]) %>% mutate(
+    seqnames = chr,
+    start = start_pos,
+    end = end_pos,
+    gene_id = gene_id,
+) %>% select(seqnames, start, end, gene_id)
+```
+
+
+```{r}
+# Create GRanges objects
+test_gr <- GRanges(seqnames = test_genes$seqnames,
+                   ranges = IRanges(start = test_genes$start, end = test_genes$end),
+                   gene_id = test_genes$gene_id)
+
+background_gr <- GRanges(seqnames = background_genes$seqnames,
+                         ranges = IRanges(start = background_genes$start, end = background_genes$end),
+                         gene_id = background_genes$gene_id)
+
+```
+
+```{r}
+# Overlap test genes with bins
+test_bin_counts <- countOverlaps(genome_bins, test_gr)
+
+# Overlap background genes with bins
+background_bin_counts <- countOverlaps(genome_bins, background_gr)
+
+# Combine results into a single data frame
+bin_data <- data.frame(
+  bin_id = seq_along(genome_bins),
+  test_genes = test_bin_counts,
+  background_genes = background_bin_counts
+)
+
+# Add genomic coordinates for reference
+bin_data$start <- start(genome_bins)
+bin_data$end <- end(genome_bins)
+bin_data$seqnames <- seqnames(genome_bins)
+
+```
+
+```{r}
+# Avoid division by zero
+bin_data$background_genes[bin_data$background_genes == 0] <- NA
+
+# Calculate enrichment ratio
+bin_data$enrichment <- bin_data$test_genes / bin_data$background_genes
+
+# Replace NaN values (bins with no background genes) with zero
+bin_data$enrichment[is.nan(bin_data$enrichment)] <- 0
+
+```
+
+```{r}
+# Add total counts for test and background genes
+total_test_genes <- sum(test_bin_counts)
+total_background_genes <- sum(background_bin_counts)
+
+# Binomial test for each bin
+bin_data$p_value <- mapply(function(test_count, bg_count) {
+  if (is.na(bg_count) || bg_count == 0) {
+    return(NA)
+  }
+  binom.test(test_count, total_test_genes, p = bg_count / total_background_genes)$p.value
+}, bin_data$test_genes, bin_data$background_genes)
+
+# Adjust p-values for multiple testing
+bin_data$adj_p_value <- p.adjust(bin_data$p_value, method = "BH")
+
+```
+
+```{r}
+# Hypergeometric test for each bin
+bin_data$p_hyper <- mapply(function(test_count, bg_count) {
+  if (is.na(bg_count) || bg_count == 0) {
+    return(NA)
+  }
+  phyper(test_count - 1, total_test_genes, total_background_genes - total_test_genes, bg_count, lower.tail = FALSE)
+}, bin_data$test_genes, bin_data$background_genes)
+
+# Adjust hypergeometric p-values
+bin_data$adj_p_hyper <- p.adjust(bin_data$p_hyper, method = "BH")
+
+```
+
+
+```{r}
+
+bin_data$seqnames <-  as.character(bin_data$seqnames)
+
+```
+
+
+
+```{r, fig.height=7, fig.width=7}
+library(ggplot2)
+
+# Scatterplot of enrichment across genome bins
+ggplot(bin_data, aes(x = start, y = enrichment, color = adj_p_value < 0.05)) +
+  geom_point() +
+  facet_grid(seqnames ~ .) +
+  labs(x = "Genomic Position", y = "Enrichment Ratio",
+       title = "Clustering of Test Genes Across Genome") +
+  scale_color_manual(values = c("black", "red"), labels = c("Not Significant", "Significant")) +
+  theme_minimal()
+
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
+DE_unvrs_gns <- map(msc_gcombi_noLE_sub_sce[c("MSC14_f_don3","MSC3_m_don2","M_NF54_7G8_f", "M_NF54_7G8_m")], ~{
+  
+  # CreateSeuratObject(counts = counts(.x), data = logcounts(.x)) %>% 
+  CreateSeuratObject(counts = counts(.x)) %>% 
+  AverageExpression(., assays = 'RNA') %>% 
+  data.frame() %>% 
+  filter(all > 0) %>%
+  rownames()
+})
+
+
+```
+
+
+```{r}
+## Get the field and lab DE genes
+map(DE_unvrs_gns, str)
+
+```
+
+```{r}
+## Get the field and lab DE genes
+DEgns <- map(mast_tde_corr_tbls[c("lf_StrainsDE_MSC14_f_don3","lf_StrainsDE_MSC3_m_don2","lf_StrainsDE_M_NF54_7G8_f", "lf_StrainsDE_M_NF54_7G8_m")], ~{
+  .x %>% filter(p_val_adj < 0.05) %>% pull(gene_id)
+})
+
+```
+
+
+```{r}
+## Get the field and lab DE genes
+map(mast_tde_corr_tbls[c("lf_StrainsDE_MSC14_f_don3","lf_StrainsDE_MSC3_m_don2","lf_StrainsDE_M_NF54_7G8_f", "lf_StrainsDE_M_NF54_7G8_m")], ~{
+  .x %>% filter(p_val_adj < 0.05 & waldStat <=10) %>% pull(gene_id) %>% length()
+})
+
+```
+
+```{r, message=FALSE}
+## GO
+DE_go_std_pdb <- list(DEgns, DE_unvrs_gns) %>%
+    pmap(., ~{go_e_fun_overrep_only_fcp(gns = ..1, unvrs = ..2)})
+
+```
+
+
+Write the GO terms from above into file
+```{r}
+##!!!! NOTE - GO stage genes and GO table
+##Combine stage genes table and GO results
+
+stg_gns_go_de <- map(DE_go_std_pdb[1:2],
+                  ~.x %>% 
+                    group_by(Ontology) %>%  
+                    arrange(`p.adjust`, .by_group = T)  %>% 
+                    ungroup()  %>%
+                    rename(c('Gene\nRatio'= GeneRatio))) %>% 
+  set_names(c('4.MSC14_female DE GO', '5.MSC3_male DE GO'))
+
+```
+
+
+```{r}
+## Rename the lists for friendly tab names
+fvl_n_powered_mast_tde_de_export_fld <- fvl_n_powered_mast_tde_de_export[c("MSC14_f_don3", "MSC3_m_don2")]
+names(fvl_n_powered_mast_tde_de_export_fld) <- paste0(2:(length(fvl_n_powered_mast_tde_de_export_fld)+1), ".", str_replace_all(names(fvl_n_powered_mast_tde_de_export_fld), c("f_don3" = "female DE", "m_don2" = "male DE")))
+
+fvl_n_powered_mast_tde_de_export_lab <- fvl_n_powered_mast_tde_de_export[c("M_NF54_7G8_f", "M_NF54_7G8_m")]
+names(fvl_n_powered_mast_tde_de_export_lab) <- paste0(6:(length(fvl_n_powered_mast_tde_de_export_lab)+5), ".", str_remove(str_replace_all(names(fvl_n_powered_mast_tde_de_export_lab), c("_f" = "_female DE", "_m" = "_male DE")), "M_"))
+
+```
+
+
+```{r}
+##Export the list of field strain_strain DE dfs with appropriate names to workbook with each stage as a sheet
+createWorksheet(c(fvl_n_powered_mast_tde_de_export_fld, stg_gns_go_de, fvl_n_powered_mast_tde_de_export_lab), "v3_science_manuscript/tables/data S13 - High confidence strains MAST & tradeseq DE & GO.xlsx")
+
+```
+
+```{r}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+# DE_go_gt_lst <- map(DE_go_std_pdb[c(1,2)],
+DE_go_gt_lst <- map(DE_go_std_pdb[c(2)],
+                 ~.x %>% 
+                   group_by(Ontology) %>% 
+                   arrange(`p.adjust`) %>% 
+                   slice_head(., n=4) %>% 
+                   ungroup()  %>% 
+                   dplyr::select(c('Ontology', 'Description', 'GeneRatio')) %>% rename(c('Gene\nRatio'= GeneRatio)) %>%  
+                   mutate(Description = str_wrap(Description, width = 40)) %>%  
+                   gt() %>% 
+                   data_color(method = 'factor', columns = 'Ontology', target_columns = c('Description', 'Gene\nRatio'), palette = 'Pastel2') %>%
+                   cols_hide('Ontology') %>% 
+                   tab_options(table.width = pct(40), column_labels.font.weight = 'bold')
+                 )
+
+```
+
+
+```{r}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+stg_gns_go_de
+DE_go_gt_lst 
+```
+
+
+```{r, results='asis', fig.height=16.5, fig.width=12}
+##get gt tables as grob for merging using cowplot from gt github https://github.com/rstudio/gt/issues/961
+DE_go_gtpt_m <- map(DE_go_gt_lst, ~gt_grob(.x))
+# DE_go_gtpt <- map(DE_go_gt_lst, ~gt_grob(.x))
+
+DE_go_gtpt_m
+```
+
+
+```{r, results='asis', fig.height=16.5, fig.width=12}
+## Save RDS for concatenating to manuscript plot
+saveRDS(DE_go_gtpt_m, "plots/DE_heatmaps/DE_go_gtpt_m.RDS")
+```
+
+```{r}
+##Print the DE GO tables separately for each ontology
+DE_go_gt_lst_sep_ont <- map(DE_go_std_pdb[c(1,2)],
+    ~.x %>% 
+        mutate(across(Ontology, ~factor(., levels = c('Biological process', 'Cellular component', 'Molecular function')))) %>%
+        group_by(Ontology) %>%
+        group_split() %>%
+        setNames(sort(unique(.x$Ontology)))) %>% unlist(., recursive =F) 
+
+##!!! NOTE - manually set the NA description to 'obsolete pathogenesis' - this need to be updated either in the plasmoDB gaf or in the clusterprofiler database. Seems to be an obsolete ID as shown here https://www.ebi.ac.uk/QuickGO/term/GO:0009405 
+DE_go_gt_lst_sep_ont["lf_StrainsDE_MSC3_m_don2.Biological process"] <- DE_go_gt_lst_sep_ont["lf_StrainsDE_MSC3_m_don2.Biological process"] %>% map(~mutate(.x, across(Description, ~if_else(is.na(.), "obsolete pathogenesis", .))))
+      
+DE_go_gt_lst_sep_ont_tbl <- map2(DE_go_gt_lst_sep_ont, c(28,25,15,25,20,15),
+                 ~.x %>% 
+                   # group_by(Ontology) %>% 
+                   arrange(`p.adjust`) %>% 
+                   slice_head(., n=5) %>% 
+                   ungroup()  %>% 
+                   dplyr::select(c('Ontology', 'Description', 'GeneRatio')) %>% rename(c('Gene\nRatio'= GeneRatio)) %>%  
+                   mutate(Description = str_wrap(Description, width = 40)) %>%  
+                   gt() %>% 
+                   data_color(method = 'factor', columns = 'Ontology', target_columns = c('Description', 'Gene\nRatio'), palette = 'Pastel2') %>% cols_hide('Ontology') %>% 
+                   tab_options(table.width = pct(.y), column_labels.font.weight = 'bold')
+                 )
+
+DE_go_gt_lst_sep_ont_tbl
+```
+
+```{r, results='asis', fig.height=16.5, fig.width=12}
+##get gt tables as grob for merging using cowplot from gt github https://github.com/rstudio/gt/issues/961
+# DE_go_sep_ont_gtpt <- map(DE_go_gt_lst_sep_ont_tbl, ~gt_grob(.x))
+# saveRDS(DE_go_sep_ont_gtpt, "plots/DE_heatmaps/DE_go_sep_ont_gtpt.RDS")
+
+DE_go_sep_ont_gtpt_m <- map(DE_go_gt_lst_sep_ont_tbl, ~gt_grob(.x))
+saveRDS(DE_go_sep_ont_gtpt_m, "plots/DE_heatmaps/DE_go_sep_ont_gtpt_m.RDS")
+
+DE_go_sep_ont_gtpt_m
+
+```
