@@ -15,11 +15,14 @@ params.w = 3
 params.cos_sim = 0.5
 
 // - output name
-params.o_file = "prelim_anotd.RDS"
+params.o_sufx = "prelim_anotd"
+
+// - column with the stage labels in the reference
+params.stg_labl = "stageHL_ref"
 
 // - compute resources for first process
-ncores="4"
-mem="50 GB"
+ncores="5"
+mem="30 GB"
 
 // - Standard scripts for running souporcell
 params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/scmap.R"
@@ -28,7 +31,7 @@ params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpo
 
 input_ch = Channel
 				.fromPath(params.input_seu)
-				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file, file.getParent()) }
+				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file, file.getParent(), file.baseName + "_" + "${params.o_sufx}" + ".RDS") }
 
 
 input_ch.view()
@@ -38,7 +41,7 @@ process SCMAP_LABEL_TRANSFER {
     memory "${mem}"
     cpus "${ncores}"
 
-    errorStrategy 'ignore' // MSC66 giving error
+    // errorStrategy 'ignore' // MSC66 giving error
 
     tag "scmap on ${sample_nm}"
 
@@ -46,16 +49,16 @@ process SCMAP_LABEL_TRANSFER {
     publishDir "${out_p}/", mode: 'copy', overwrite: true
 
     input:
-    tuple val(sample_nm), path(seu), val(out_p)
+    tuple val(sample_nm), path(seu), val(out_p), val(o_file)
 	
     output:
-    tuple val(sample_nm), path("${params.o_file}")
+    tuple val(sample_nm), path("${o_file}")
 
 	script:
 	"""
     module load HGI/softpack/groups/team222/Pf_scRNAseq/11
 
-    Rscript ${params.scrpt} ${seu} ${params.sce_ref} ${params.w} ${params.cos_sim} ${params.o_file}
+    Rscript ${params.scrpt} ${seu} ${params.sce_ref} ${params.w} ${params.cos_sim} ${o_file} ${params.stg_labl}
 
     
 	"""			
@@ -68,20 +71,5 @@ workflow {
     seu_out_ch = SCMAP_LABEL_TRANSFER(input_ch)
     seu_out_ch.view()
 
-    // bcodes_bam_soupc_ch = bcodes_bam_al_ch
-    //     .map { file -> tuple(file[0], file[1], file[2], file[3], file[5], file[6]) }
-    //     .combine(soupc1_ch, by:[0,1])
-    // bcodes_bam_soupc_ch.view()
-    
-    // soupc2plus_ch = SOUPC_2PLUS(soupc1_ch, k_ch)
-    // // soupc2plus_ch = SOUPC_2PLUS(bcodes_bam_soupc_ch, k_ch)
-    // // soupc2plus_ch.view()
-    // soupc2plus_ll_ch = soupc2plus_ch
-    //     .map { file -> tuple(file[0], file[1], file[5]) }
-    //     .groupTuple(by: [0,1])
-    
-    // soupc2plus_ll_ch.view()
-
-    // LL_KNEE_PLOT(soupc2plus_ll_ch)
 
 }
