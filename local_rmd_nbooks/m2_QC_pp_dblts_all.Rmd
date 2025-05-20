@@ -68,10 +68,10 @@ suppressPackageStartupMessages({
 
 
 ```{r, setup}
-library(reticulate)
-use_condaenv("/software/team222/jr35/miniconda3/envs/scrublt/", required = TRUE)
-matplotlib <- reticulate::import("matplotlib")
-matplotlib$use("Agg", force = TRUE)
+# library(reticulate)
+# use_condaenv("/software/team222/jr35/miniconda3/envs/scrublt/", required = TRUE)
+# matplotlib <- reticulate::import("matplotlib")
+# matplotlib$use("Agg", force = TRUE)
 
 
 sample_set = "Mali2"
@@ -83,9 +83,9 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
 initialize variable for the sample names
@@ -98,11 +98,11 @@ initialize variable for the sample names
 ##Sample ID
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66") %>% sort()
 
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
+sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25", "MSC1", "MSC3", "MSC13", "MSC14", "MSC12") %>% sort()
 
 ##Samples
-sample_name <- sample_name_nms
-sample_id_lst <- sample_name_nms
+# sample_name <- sample_name_nms
+# sample_name_nms <- sample_name_nms
 
 
 ```
@@ -133,12 +133,6 @@ all_msc_filt %>% map(., ~.x@meta.data %>% mutate(stage_c_ag = case_when(StagePre
 ```
 
 
-
-```{r}
-# Read strain info
-soupo_kselect_list_pp <- readRDS("data/processed/Pf/soupo_kselect_list_pp.RDS")
-```
-
 ## Doublet removal
 
 ### SoupX ambient transcript removal
@@ -146,13 +140,13 @@ soupo_kselect_list_pp <- readRDS("data/processed/Pf/soupo_kselect_list_pp.RDS")
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
 ## Run Soupx in farm
-#gogo()
+gogo()
 
 ## Remove the output files before rerunning since some object it might fail and old object persists
-#map(names(all_msc_filt), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/soupx_filt_seu_norm.RDS')))
+# map(names(all_msc_filt), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/soupx_filt_seu_norm.RDS')))
 
 
-# nextflow run submsn_soupx.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/soupx.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_norm.RDS" --input_raw_mtx "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/raw_feature_bc_matrix.h5" --o_file_name "soupx_filt_seu_norm.RDS" --hvg 500 -resume
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_soupx.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/soupx.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct_norm.RDS" --input_raw_mtx "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/raw_feature_bc_matrix.h5" --o_file_name "soupx_filt_seu_norm.RDS" --hvg 500 -resume
 ```
 
 
@@ -162,7 +156,7 @@ FARM CODE
 ##Read BPcells matrices
 all_msc_nosct_supx_4_dblt_objs <- list.files("data/processed/Pf", pattern = "soupx_filt_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  # .[sample_name] %>%
+  # .[sample_name_nms] %>%
   map(readRDS)
 ```
 
@@ -214,10 +208,10 @@ imap(supx_png, ~{
 Check those that failed soupx automatic detection of soup contaminating fraction due to an issue with marker genes
 ```{r , eval=T}
 failed_supx <- all_msc_nosct_supx_4_dblt %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   names() %>%
   is.na(.) %>%
-  sample_name[.]
+  sample_name_nms[.]
 
 failed_supx
 ```
@@ -232,7 +226,7 @@ Replace with unadjusted object if soupx not successful
 #   all_msc_nosct_supx_4_dblt[failed_supx[i]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[i]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[i]]]@meta.data) %>% NormalizeData(., verbose = F) %>% FindVariableFeatures(., nfeatures = 500, verbose = T) %>% ScaleData(., verbose = F) %>% RunPCA(., verbose = T) %>% list()
 # 
 # }
-# all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name]
+# all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name_nms]
 ```
 
 ```{r ,include=FALSE, message=FALSE, warning=FALSE}
@@ -243,7 +237,7 @@ for (i in 1:length(failed_supx)) {
   all_msc_nosct_supx_4_dblt[failed_supx[i]] <- CreateSeuratObject(counts = all_msc_filt[[failed_supx[i]]][["RNA"]]$counts, meta.data = all_msc_filt[[failed_supx[i]]]@meta.data) %>% seurat_norm_stand(., hvg = 500) %>% list()
 
 }
-all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name]
+all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt %>% .[sample_name_nms]
 ```
 
 
@@ -261,8 +255,9 @@ all_msc_nosct_supx_4_dblt <- list(all_msc_nosct_supx_4_dblt, all_msc_filt) %>%
 
 ```{r, eval=T}
 
-imap(all_msc_nosct_supx_4_dblt, ~DimPlot(.x, group.by = "StagePrelimC") + labs(title = .y))
+imap(all_msc_filt, ~DimPlot(.x, group.by = "StagePrelimC", reduction = "pca") + labs(title = .y))
 ```
+
 
 FARM CODE
 ```{r, eval=T}
@@ -272,16 +267,26 @@ imap(all_msc_nosct_supx_4_dblt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/se
 
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
-#gogo()
+gogo()
+## Remove the output files before rerunning since some object it might fail and old object persists
+# map(names(all_msc_nosct_supx_4_dblt), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/filt_seu_norm_supx.RDS')))
+
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_supx.RDS" --o_file_name "filt_seu_norm_supx.RDS" --umap_name "UMAP_F_S_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_supx" --umap_redctn_nm "umap.f.s.norm" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "filt_seu_norm_supx_elbo.RDS" --findpc_mthd "perpendicular line" --resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_supx.RDS" --normlzn "norm" --umap_name "UMAP_F_S_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_supx" --umap_redctn_nm "umap.f.s.norm" --redctn "pca" --integrtd_pc30 "no" --findpc_mthd "perpendicular line" --pca_redctn_nm "pca_soupx" --resume
+```
+
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+# imap(all_msc_bp, ~system(paste0("rm data/processed/Pf/",.y,"/seu_obj/Rplots.pdf")))
 ```
 
 
 ```{r}
-filt_seu_norm_supx_elbo <-  list.files("data/processed/Pf", pattern = "^filt_seu_norm_supx_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+filt_seu_norm_supx_elbo <-  list.files("data/processed/Pf", pattern = "^filt_seu_supx_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 
 imap(filt_seu_norm_supx_elbo, ~.x + labs(title = .y))
@@ -291,9 +296,9 @@ imap(filt_seu_norm_supx_elbo, ~.x + labs(title = .y))
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc_nosct_supx_4_dblt <- list.files("data/processed/Pf", pattern = "^filt_seu_norm_supx.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_nosct_supx_4_dblt <- list.files("data/processed/Pf", pattern = "^filt_seu_supx_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 ```
 
@@ -316,14 +321,29 @@ imap(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'nFeature_RNA', dims
 #### Mitochondrial percent in soup-corrected objects
 
 ```{r}
+# ## calculate mitochondrial proportions
+# all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
+#   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt'))
+# 
+# all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
+#   map(. %>% PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api'))
+# 
+# ## filter less based on mitochondrial proportions
+```
+
+
+```{r}
 ## calculate mitochondrial proportions
 all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
-  map(. %>% PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt'))
+  map(., ~{
+    
+    mit_fts <- rownames(.x)[str_detect(rownames(.x), "MIT")]
+    api_fts <- rownames(.x)[str_detect(rownames(.x), "API")]
+    
+    .x %>% PercentageFeatureSet(., features = mit_fts, col.name = 'percent.mt') %>%
+    PercentageFeatureSet(., features = api_fts, col.name = 'percent.api') 
+})
 
-all_msc_nosct_supx_4_dblt <- all_msc_nosct_supx_4_dblt%>% 
-  map(. %>% PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api'))
-
-## filter less based on mitochondrial proportions
 ```
 
 ```{r, results='asis'}
@@ -332,24 +352,32 @@ imap(all_msc_nosct_supx_4_dblt, ~FeaturePlot(.x, features = 'percent.mt', dims =
 ```
 
 ```{r, fig.height = 5, fig.width = 15}
-markers <- c("PF3D7-0935900", "PF3D7-0406200", "PF3D7-0109100", "PF3D7-0208900")
+# markers <- c("PF3D7-0935900", "PF3D7-0406200", "PF3D7-0109100", "PF3D7-0208900")
+markers <- c("PF3D7-0935900", "PF3D7-0406200", "PF3D7-0109100", "PF3D7-1325200")
+
 marker_nms <- Pf3D7_genes_plasmoDB %>% filter(gene_id %in% markers)  %>% select(Gene, gene_id) %>% mutate(across(gene_id, ~factor(., levels = markers))) %>% arrange(gene_id)  %>% mutate(across(gene_id, as.character)) %>% deframe
 
-fp_fn <- function(obj = all_msc_nosct_supx_4_dblt[[1]], mks = marker_nms, mk_nms = names(marker_nms)) {
+fp_fn <- function(obj = all_msc_nosct_supx_4_dblt[[1]], mks = marker_nms, mk_nms = names(marker_nms), rdctn = "umap.f.s.norm") {
   list(mks, mk_nms) %>%
   pmap(.,~{
-    FeaturePlot(obj, features = ..1, dims = c(1,2)) + 
+    FeaturePlot(obj, features = ..1, dims = c(1,2), reduction = rdctn) + 
       labs(title = ..2) +
       theme(legend.position = 'none')
     }) %>% 
     plot_grid(plotlist = ., nrow = ceiling(length(markers)/4)) 
 }
 
+```
+
+```{r, fig.height = 5, fig.width = 15}
 imap(all_msc_nosct_supx_4_dblt, ~fp_fn(obj = .x) %>% 
        plot_grid(ggdraw() + draw_label(.y), . ,ncol = 1, rel_heights = c(0.1, 1)))
 ```
 
-
+```{r, fig.height = 5, fig.width = 15}
+imap(all_msc_nosct_supx_4_dblt, ~fp_fn(obj = .x, rdctn = "pca_soupx") %>% 
+       plot_grid(ggdraw() + draw_label(.y), . ,ncol = 1, rel_heights = c(0.1, 1)))
+```
 
 Check the distribution of stages - scdblfinder will give error if only one category in stage - Using StagePrelim instead of StagePrelimC
 ```{r}
@@ -363,9 +391,12 @@ all_msc_filt %>% map(., ~.x@meta.data %>% count(StagePrelim, StagePrelimC))
 
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
-#gogogo()
-## Run sdblfinder on farm
-# nextflow run doubletF.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/scdblfindr.R" --filt_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_norm.RDS" --spx_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_norm_supx.RDS" --o_file_name "scdblf_outs.RDS" --resume
+gogogo()
+## Remove the output files before rerunning since some object it might fail and old object persists
+# map(names(all_msc_filt), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/scdblf_outs.RDS')))
+
+## Run sdblfinder on farm submsn_soupx.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/soupx.R
+# nextflow run ../mali22_code_lnk/nf_scripts/doubletF.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/scdblfindr.R" --filt_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct_norm.RDS" --spx_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_supx_norm.RDS" --o_file_name "scdblf_outs.RDS" --resume
 ```
 
 Read in seurat objects processed in farm
@@ -373,7 +404,7 @@ Read in seurat objects processed in farm
 ##Read BPcells matrices
 scf_outputs <- list.files("data/processed/Pf", pattern = "^scdblf_outs.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 ```
 
@@ -421,6 +452,7 @@ DimPlot(all_msc_nosct_supx_4_dblt[[1]], reduction = 'umap.f.s.norm')
 ## Add UMAP dimensions from the soupx corrected object used to get doublets
 for (i in names(all_msc_w_dblts)) {
   all_msc_w_dblts[[i]]@reductions[["umap.f.s.norm"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions[["umap.f.s.norm"]]
+  all_msc_w_dblts[[i]]@reductions[["pca_soupx"]] <- all_msc_nosct_supx_4_dblt[[i]]@reductions[["pca_soupx"]]
 }
 ```
 
@@ -533,17 +565,18 @@ rm(genes_msc)
 ```
 
 ```{r}
-#gogo()
+gogo()
 ## Run this script in farm
+# cd /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/python_nbooks
+# conda activate scrublt
 # python scrblt.py 
-# python /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/python_nbooks
 ```
 
 ```{r}
 ## Read scrublet output
 scrb_doublet_scores <- list.files("data/processed/Pf", pattern = "doublet_scores.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(., ~read.csv(., header = F) %>% t() %>% .[,1] %>% as.vector)
 ```
 
@@ -551,7 +584,7 @@ scrb_doublet_scores <- list.files("data/processed/Pf", pattern = "doublet_scores
 ## Read scrublet output
 predicted_doublets <- list.files("data/processed/Pf", pattern = "predicted_doublets.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(., ~read.csv(., header = F) %>% t() %>% .[,1] %>% as.vector)
 ```
 
@@ -567,7 +600,7 @@ Visualize scrublet scores
 
 scrb_png <- list.files("data/processed/Pf", pattern = "scrblt_thresh.png$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readPNG)
 
 imap(scrb_png, ~{
@@ -575,12 +608,13 @@ imap(scrb_png, ~{
   rasterImage(.x, 1, 1, 2, 2)
   })
 ```
+
 ```{r}
 ## Read scrublet plots for threshold
 
 scrb_umap_png <- list.files("data/processed/Pf", pattern = "scrblt_umap.png$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readPNG)
 
 imap(scrb_umap_png, ~{
@@ -769,10 +803,10 @@ map(all_msc_w_dblts, ~.x@meta.data %>%
 ```{r, fig.height = 3.5, fig.width = 15}
 dbt_methods_gtyp <- c(dbt_methods, "strain_gt", "hetero_dblts")
 
-scf_fn <- function(obj = all_msc_w_dblts[[1]], mks = dbt_methods_gtyp, mk_nms = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/5)) {
+scf_fn <- function(obj = all_msc_w_dblts[[1]], mks = dbt_methods_gtyp, mk_nms = dbt_methods_gtyp, nrws = ceiling(length(dbt_methods_gtyp)/5), redct = "umap_norm") {
   list(mks, mk_nms) %>%
   pmap(.,~{
-    DimPlot(obj, dims = c(1,2), label = T, pt.size = 0.01, cells.highlight = obj@meta.data %>% filter(!!rlang::sym(..1) == "Doublet") %>% row.names(), sizes.highlight = 0.1) + 
+    DimPlot(obj, dims = c(1,2), label = T, pt.size = 0.01, cells.highlight = obj@meta.data %>% filter(!!rlang::sym(..1) == "Doublet") %>% row.names(), sizes.highlight = 0.1, reduction = redct) + 
       labs(title = ..2) +
       theme(legend.position = 'none')
     }) %>% 
@@ -784,8 +818,15 @@ scf_fn <- function(obj = all_msc_w_dblts[[1]], mks = dbt_methods_gtyp, mk_nms = 
 ```{r, fig.height = 8, fig.width = 15}
 # 
 
-map(all_msc_w_dblts, ~scf_fn(obj = .x, nrws = ceiling(length(dbt_methods_gtyp)/5)))
+map(all_msc_w_dblts, ~scf_fn(obj = .x, nrws = ceiling(length(dbt_methods_gtyp)/5), redct = "umap_norm"))
 ```
+
+
+```{r, fig.height = 8, fig.width = 15}
+# 
+map(all_msc_w_dblts, ~scf_fn(obj = .x, nrws = ceiling(length(dbt_methods_gtyp)/5), redct = "pca_soupx"))
+```
+
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
@@ -1269,7 +1310,7 @@ saveRDS(all_msc_w_dblts, "data/processed/Pf/m2_all/all_msc_w_dblts.RDS")
 ```{r, eval=F}
 
 ##Remove souporcell doublet
-# all_msc_w_dblts <- readRDS("data/processed/Pf/all_msc_w_dblts.RDS")
+# all_msc_w_dblts <- readRDS("data/processed/Pf/m2_all/all_msc_w_dblts.RDS")
 
 ```
 
@@ -1398,6 +1439,7 @@ imap(all_msc_w_dblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "S
 imap(all_msc_w_dblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop", "scf_class_norm_dbt_prop"), reduction = "pca") + labs(title =.y))
 
 ```
+
 ```{r, message=FALSE}
 # thogoo()
 ```
@@ -1419,7 +1461,7 @@ imap(all_msc_w_dblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "S
 ##Seurat object
 ##Remove stage doublets
 
-all_msc_filt_no_StgDblts <- all_msc_w_dblts %>%
+all_msc_filt_no_ScfStgDblts <- all_msc_w_dblts %>%
     # map(. %>% subset(., subset = scf_class_norm == "Singlet" & scf_class_norm_dbt_prop < 0.1 & scf_class_rand_dbt_prop < 0.1)) %>%
     map(. %>% subset(., subset = scf_class_norm == "Singlet")) %>%
     map(. %>% subset(., subset = scf_class_norm_dbt_prop < 0.20 & scf_class_rand_dbt_prop < 0.20)) #%>%
@@ -1428,14 +1470,39 @@ all_msc_filt_no_StgDblts <- all_msc_w_dblts %>%
   # map(. %>% subset(., subset = scf_class_supx_rand == "Singlet" & scrub_doublet == 'Singlet'))
 
 ## Table of removal of stage doublets by scdblfinder
-map(all_msc_w_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
+scf_stg_dblt_rm <- map(all_msc_w_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_ScfStgDblts, dim) %>% as.data.frame() %>% .[2,]) 
+scf_stg_dblt_rm %>% t()
+```
+
+
+```{r}
+imap(all_msc_filt_no_ScfStgDblts, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x@meta.data$scf_class_rand == "Doublet"]), reduction = "pca") + labs(title = .y)))
+```
+
+
+```{r}
+imap(all_msc_filt_no_ScfStgDblts, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x@meta.data$scf_class_rand == "Doublet"]), reduction = "pca_soupx") + labs(title = .y)))
+```
+
+```{r}
+map(all_msc_filt_no_ScfStgDblts, ~.x@meta.data %>% count(scf_class_rand))
 ```
 
 ```{r, fig.width=15, fig.height=4}
 ##Seurat object
 ##Remove doublets
 
-imap(all_msc_filt_no_StgDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop")) + labs(title =.y))
+imap(all_msc_filt_no_ScfStgDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_doublet", "StagePrelim", "scrub_doublet_dbt_prop")) + labs(title =.y))
+
+```
+
+```{r}
+map(all_msc_filt_no_ScfStgDblts, ~.x@meta.data %>% count(scrub_doublet))
+```
+
+```{r}
+
+map(all_msc_filt_no_ScfStgDblts, ~.x@meta.data %>% count(scrub_doublet_dbt_prop, scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scrub_doublet_dbt_prop>0.3 ))
 
 ```
 
@@ -1443,35 +1510,15 @@ imap(all_msc_filt_no_StgDblts["MSC50_SLO"], ~DimPlot(.x, group.by = c("scrub_dou
 ##Seurat object
 ##Remove doublets
 
-map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% count(scrub_doublet))
-
-```
-
-```{r}
-
-map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% count(scrub_doublet_dbt_prop, scf_class_norm_dbt_prop, scf_class_rand_dbt_prop) %>% filter(scrub_doublet_dbt_prop>0.2 ))
-
-```
-
-```{r}
-##Seurat object
-##Remove doublets
-
-all_msc_filt_no_StgDblts <- all_msc_filt_no_StgDblts %>%
+all_msc_filt_no_StgDblts <- all_msc_filt_no_ScfStgDblts %>%
     map(. %>% subset(., subset = scrub_doublet == "Singlet")) %>%
-    map(. %>% subset(., subset = scrub_doublet_dbt_prop < 0.5))  ## !!NOTE - was 0.1 but MSC50_SLO has high number of doublets - maybe SLO lysed many gams and soup content high
+    map(. %>% subset(., subset = scrub_doublet_dbt_prop < 0.3))  ## !!NOTE - was 0.1 but MSC50_SLO has high number of doublets - maybe SLO lysed many gams and soup content high
 
 ## Table of removal of stage doublets by scdblfinder
-map(all_msc_w_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,]) %>% t()
+scrblt_stg_dblt_rm <- map(all_msc_filt_no_ScfStgDblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,])
+scrblt_stg_dblt_rm %>% t()
 ```
 
-
-
-```{r, results='asis'}
-
-map(all_msc_filt_no_StgDblts, dim)
-
-```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4, eval=FALSE}
 
@@ -1490,6 +1537,111 @@ map(all_msc_w_dblts, ~{
 
 ```
 
+#### Remove unassigned cells and schizonts
+!! NOTE - Are unassigned cells entire cluster of cells ?
+```{r}
+imap(all_msc_filt_no_StgDblts, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x@meta.data$StagePrelim == "Unassigned"])) + labs(title = .y)))
+```
+
+!! NOTE - Are unassigned cells commited asexuals? Check Ap2-g (PF3D7_1222600), surfin 1.2 (PF3D7_0113600), and surfin 13.1 (PF3D7_1301800)
+
+```{r}
+imap(all_msc_filt_no_StgDblts, ~DotPlot(., features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1301800"), group.by = "StagePrelim") + labs(title = .y))
+```
+
+```{r}
+## MSC39 with 44 unassigned has issues
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% filter(StagePrelim == "Unassigned") %>% select(StagePrelim, contains("_lab")))
+```
+
+!!! NOTE - RESCUING SOME UNASSIGNED CELLS - NOW INCLUDING MSC12 AND ALSO SEE IF COMMITED RINGS EXIST
+
+```{r}
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% filter(StagePrelim == "Unassigned") %>% select(StagePrelim, contains("_lab")))
+```
+
+
+```{r}
+# map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% filter(StagePrelim == "Unassigned") %>% select(StagePrelim, contains("_lab")))
+
+all_msc_filt_no_StgDblts_msc12C <- pmap(
+  list(all_msc_filt_no_StgDblts["MSC12"], 
+       rep(0.4,length(all_msc_filt_no_StgDblts["MSC12"])), 
+       c(rep('ring|trophozoite|developing|schizont', length(all_msc_filt_no_StgDblts["MSC12"]))), 
+       c(rep('female|developing|Female|ring|trophozoite|schizont', length(all_msc_filt_no_StgDblts["MSC12"]))), 
+       c(rep('male|developing|Male|ring|trophozoite|schizont', length(all_msc_filt_no_StgDblts["MSC12"])))), ~{
+         ..1@meta.data %>%
+           mutate(across(StagePrelim, as.character)) %>%
+           mutate(StagePrelim_rescue = case_when(
+             StagePrelim == "Unassigned" & (sim_lab1 > 0.4 | sim_lab2 > 0.4  | sim_lab3 > 0.4) & str_detect(stage_lab1, ..3) & str_detect(stage_lab2, ..3) & str_detect(stage_lab3, ..3) ~ stage_lab1, ## lower cos sim of 0.35 for asexuals instead of 0.4
+             StagePrelim == "Unassigned" & (sim_lab1 > 0.4 | sim_lab2 > 0.4  | sim_lab3 > 0.4) & str_detect(stage_lab1, ..4) & str_detect(stage_lab2, ..4) & str_detect(stage_lab3, ..4) ~ "Female developing",
+             StagePrelim == "Unassigned" & (sim_lab1 > 0.4 | sim_lab2 > 0.4  | sim_lab3 > 0.4) & str_detect(stage_lab1, ..5) & str_detect(stage_lab2, ..5) & str_detect(stage_lab3, ..5) ~ "Male developing",
+             TRUE ~ StagePrelim)) %>%
+           mutate(StagePrelim_HMO = case_when(
+             StagePrelim_rescue == "Female developing" | StagePrelim_rescue == "Male developing" ~ "Gametocyte (developing)",
+             TRUE ~ StagePrelim_rescue),
+             StagePrelim = str_to_sentence(StagePrelim_HMO),
+             StagePrelimC = case_when(
+               str_detect(StagePrelim, "ring|trophozoite|developing|schizont") ~ "Asexual",
+               TRUE ~ StagePrelim)) %>%
+           dplyr::select(StagePrelim, StagePrelim_rescue, StagePrelimC) %>%
+           AddMetaData(..1, .)
+       })
+
+```
+
+
+```{r}
+map(all_msc_filt_no_StgDblts_msc12C, ~.x@meta.data %>% count(StagePrelim,StagePrelim_rescue, stage_lab1))
+```
+
+```{r}
+map(all_msc_filt_no_StgDblts_msc12C, ~.x@meta.data %>% filter(StagePrelim_rescue == "Unassigned") %>% select(StagePrelim_rescue, StagePrelim, contains("_lab")))
+```
+
+
+```{r}
+all_msc_filt_no_StgDblts["MSC12"] <- all_msc_filt_no_StgDblts_msc12C
+```
+
+
+```{r}
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% filter(StagePrelim == "Unassigned") %>% select(StagePrelim, contains("_lab")))
+```
+
+```{r}
+imap(all_msc_filt_no_StgDblts, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x@meta.data$StagePrelim == "Unassigned"])) + labs(title = .y)))
+```
+
+
+```{r}
+map(all_msc_filt_no_StgDblts, ~.x@meta.data %>% filter(str_detect(StagePrelim, "schizont")) %>% select(contains("_lab")))
+```
+
+Remove unassigned 
+Retain schizonts since theres MSC12 culture - these can be removed in future from the other datasets if troublesome
+```{r}
+##Remove schizonts and unassigned
+all_msc_qcd_snglt_stgd <- all_msc_filt_no_StgDblts %>%
+  map(. %>% subset(., subset = StagePrelim == "Unassigned" , invert = TRUE))
+  # map(. %>% subset(., subset = str_detect(StagePrelim, "schizont") | StagePrelim == "Unassigned" , invert = TRUE))
+
+## Table of removal of schizonts and unassigned
+unstgd_rm <- map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_qcd_snglt_stgd, dim) %>% as.data.frame() %>% .[2,])# %>% t()
+unstgd_rm
+
+# unstgd_schznt_rm <- map(all_msc_filt_no_StgDblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_qcd_snglt_stgd, dim) %>% as.data.frame() %>% .[2,])# %>% t()
+# unstgd_schznt_rm
+```
+
+Table of removed cells in this notebook
+```{r}
+## Track cell removal
+list(scf_stg_dblt_rm, scrblt_stg_dblt_rm, unstgd_rm) %>% set_names("scDblFinder", "Scrublet", "Unassigned") %>% bind_rows(., .id = 'set')
+# list(scf_stg_dblt_rm, scrblt_stg_dblt_rm, unstgd_schznt_rm) %>% set_names("scDblFinder", "Scrublet", "Unassigned_Schizont") %>% bind_rows(., .id = 'set')
+
+```
+
 ## Visualization of QCd cells -End of QC
 
 ### Start of re-normalizing and re-clustering QCd cells for annotation with scmap
@@ -1498,8 +1650,8 @@ map(all_msc_w_dblts, ~{
 ```{r}
 ## Change the default assay
 
-for (i in names(all_msc_filt_no_StgDblts)) {
-  DefaultAssay(all_msc_filt_no_StgDblts[[i]]) <- "RNA"
+for (i in names(all_msc_qcd_snglt_stgd)) {
+  DefaultAssay(all_msc_qcd_snglt_stgd[[i]]) <- "RNA"
 }
 
 ```
@@ -1507,13 +1659,13 @@ FARM CODE
 ```{r, eval=T}
 ##write out for normalization processing in farm
 
-for (i in 1:length(sample_name)) {
+for (i in 1:length(sample_name_nms)) {
 # for (i in 32:33) {
   
   ##Transfers
   ##souporcell genotyping files
-  saveRDS(all_msc_filt_no_StgDblts[[sample_name[i]]],
-    paste0('data/processed/Pf/', sample_name[i], '/seu_obj/all_msc_filt_no_StgDblts.RDS')
+  saveRDS(all_msc_qcd_snglt_stgd[[sample_name_nms[i]]],
+    paste0('data/processed/Pf/', sample_name_nms[i], '/seu_obj/msc_qcd_snglt_stgd.RDS')
     )
   
 }
@@ -1523,64 +1675,90 @@ for (i in 1:length(sample_name)) {
 
 ```{r, eval=T}
 gogo()
+## Remove the output files before rerunning since some object it might fail and old object persists
+# map(names(all_msc_qcd_snglt_stgd), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/msc_stg_qcd.RDS')))
+
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_filt_no_StgDblts.RDS" --o_file_name "msc_filt_no_dblts.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "msc_filt_no_dblts_elbo.RDS" --findpc_mthd "perpendicular line" --resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/msc_qcd_snglt_stgd.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --findpc_mthd "perpendicular line" --ncores "2" --mem "50 GB"  
+
 
 ```
+
+
 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
-all_msc_filt_no_dblts <- list.files("data/processed/Pf", pattern = "msc_filt_no_dblts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_stg_qcd <- list.files("data/processed/Pf", pattern = "msc_qcd_snglt_stgd_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 ```
 
 
-```{r}
-imap(all_msc_filt_no_dblts, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x@meta.data$StagePrelim == "Unassigned"])) + labs(title = .y)))
+```{r, fig.height = 5, fig.width = 15}
+
+imap(all_msc_stg_qcd, ~fp_fn(obj = .x, rdctn = "umap") %>% 
+       plot_grid(ggdraw() + draw_label(.y), . ,ncol = 1, rel_heights = c(0.1, 1)))
+```
+
+
+```{r, fig.height = 5, fig.width = 15}
+
+imap(all_msc_stg_qcd, ~fp_fn(obj = .x, rdctn = "pca_soupx") %>% 
+       plot_grid(ggdraw() + draw_label(.y), . ,ncol = 1, rel_heights = c(0.1, 1)))
 ```
 
 
 ```{r}
-map(all_msc_filt_no_dblts, ~.x@meta.data %>% filter(StagePrelim == "Unassigned") %>% select(StagePrelim, contains("_lab")))
-```
-
-```{r}
-map(all_msc_filt_no_dblts, ~.x@meta.data %>% filter(str_detect(StagePrelim, "schizont")) %>% select(contains("_lab")))
-```
-
-Remove unassigned and schizonts
-```{r}
-##Remove schizonts and unassigned
-all_msc_qcd_snglt_stgd <- all_msc_filt_no_dblts %>%
-  map(. %>% subset(., subset = str_detect(StagePrelim, "schizont") | StagePrelim == "Unassigned" , invert = TRUE))
-
-## Table of removal of schizonts and unassigned
-map(all_msc_filt_no_dblts, dim) %>% as.data.frame() %>% .[2,] %>% bind_rows(., map(all_msc_qcd_snglt_stgd, dim) %>% as.data.frame() %>% .[2,]) %>% t()
+saveRDS(all_msc_stg_qcd, 'data/processed/Pf/m2_all/all_msc_stg_qcd.RDS')
 ```
 
 
 ```{r}
-saveRDS(all_msc_qcd_snglt_stgd, 'data/processed/Pf/m2_all/all_msc_qcd_snglt_stgd.RDS')
+# Old filtered qcd object
+# gogo()
+all_msc_qcd_snglt_stgd2 <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_snglt_stgd.RDS")
+
+```
+
+```{r}
+# Old filtered qcd object to compare with current one - numbers misteriously not the same
+# gogo()
+a=map(all_msc_stg_qcd, dim)
+b=map(all_msc_qcd_snglt_stgd2, dim)
+a %>% map(., ~.x[2]) %>% as.data.frame() %>% bind_rows(.,(b %>% map(., ~.x[2]) %>% as.data.frame()))
+```
+
+```{r}
+# prev_rm_cells <- map2(all_msc_stg_qcd, all_msc_qcd_snglt_stgd2, ~subset(.x, cells = colnames(.y), invert = T))
+```
+
+```{r}
+# map2(all_msc_stg_qcd, prev_rm_cells, ~DimPlot(.x, cells.highlight = colnames(.y)))
+
 ```
 
 #### Visualize reclustered QCd cells
 
 ```{r, results='asis', message=FALSE, warning=FALSE}
-imap(all_msc_filt_no_dblts, ~VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = c("seurat_clusters"), idents = NULL, pt.size = 0.01) + labs(title = .y))
+imap(all_msc_stg_qcd, ~VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = c("seurat_clusters"), idents = NULL, pt.size = 0.01) + labs(title = .y))
 ```
 
 ```{r, results='asis', message=FALSE, warning=FALSE}
-imap(all_msc_filt_no_dblts, ~VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = c("StagePrelimC"), idents = NULL, pt.size = 0.01) + labs(title = .y))
+imap(all_msc_stg_qcd, ~VlnPlot(., features = c("nCount_RNA", "nFeature_RNA"), group.by = c("StagePrelimC"), idents = NULL, pt.size = 0.01) + labs(title = .y))
 ```
 ```{r, results='asis', message=FALSE, warning=FALSE}
-imap(all_msc_filt_no_dblts, ~DimPlot(., reduction = "umap", label = T, pt.size = 0.5, group.by = "StagePrelim") + labs(title = .y) + scale_color_manual(values = sp_fld_colors))
+imap(all_msc_stg_qcd, ~DimPlot(., reduction = "umap", label = T, pt.size = 0.5, group.by = "StagePrelim") + labs(title = .y) + scale_color_manual(values = sp_fld_colors))
 ```
 
 ```{r, results='asis', message=FALSE, warning=FALSE}
-list(all_msc_filt_no_dblts, sample_id_lst)  %>% 
+imap(all_msc_stg_qcd, ~DimPlot(., reduction = "umap", label = T, pt.size = 0.5, group.by = "StagePrelim", dims = c(1,3)) + labs(title = .y) + scale_color_manual(values = sp_fld_colors))
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+list(all_msc_stg_qcd, sample_name_nms)  %>% 
   purrr::pmap(.,~{
     DimPlot(., reduction = "umap", label = T, pt.size = 0.5)
 
@@ -1590,9 +1768,10 @@ list(all_msc_filt_no_dblts, sample_id_lst)  %>%
 
 ```
 
+
 ```{r,  fig.width = 6, fig.height = 4, results='asis'}
 
-cln_umap_stg <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
+cln_umap_stg <- list(all_msc_stg_qcd, sample_name_nms)  %>%
   purrr::pmap(.,  ~ {
 
     
@@ -1625,7 +1804,7 @@ cln_umap_stg <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
 
 ### Violin plot gene expression levels
 ```{r, fig.height=4.5, fig.width=6}
-cln_vln_stg <- map(all_msc_filt_no_dblts,~.x %>%
+cln_vln_stg <- map(all_msc_stg_qcd,~.x %>%
   VlnPlot(., features = c("nFeature_RNA"), group.by = 'StagePrelimC', pt.size = .001) +
   scale_fill_manual(name= 'Stage', values = sp_fld_colors)+
   scale_y_continuous(label=function(y) y / 1000) +
@@ -1647,7 +1826,7 @@ cln_vln_stg
 
 ```{r,  fig.width = 6, fig.height = 4, results='asis'}
 
-cln_umap <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
+cln_umap <- list(all_msc_stg_qcd, sample_name_nms)  %>%
   purrr::pmap(.,  ~ {
 
     
@@ -1680,7 +1859,7 @@ cln_umap <- list(all_msc_filt_no_dblts, sample_id_lst)  %>%
 
 ### Violin plot gene expression levels
 ```{r, fig.height=4.5, fig.width=6}
-cln_vln <- map(all_msc_filt_no_dblts,~.x %>%
+cln_vln <- map(all_msc_stg_qcd,~.x %>%
   VlnPlot(., features = c("nFeature_RNA"), group.by = 'old_seu_cluster', pt.size = .001) +
   scale_fill_manual(name= 'Cluster', values = cluster_cols)+
   scale_y_continuous(label=function(y) y / 1000) +
@@ -1702,8 +1881,8 @@ cln_vln
 #### Grouping by strain_gt QCd cells
 ```{r, results='asis'}
 
-# list(all_msc_filt_no_dblts[2:5], sample_id_lst[2:5])  %>% 
-all_msc_filt_no_dblts  %>% 
+# list(all_msc_stg_qcd[2:5], sample_name_nms[2:5])  %>% 
+all_msc_stg_qcd  %>% 
   purrr::imap(.,~{
     
     DimPlot(.x, reduction = "umap", label = T, split.by = 'strain_gt', pt.size = 1)
@@ -1720,35 +1899,35 @@ all_msc_filt_no_dblts  %>%
 #### Featureplot reclustered QCd cells
 ```{r, results='asis'}
 
-map(all_msc_filt_no_dblts, ~FeaturePlot(., reduction = "umap", features ='percent.mt', pt.size = .2))
+map(all_msc_stg_qcd, ~FeaturePlot(., reduction = "umap", features ='percent.mt', pt.size = .2))
 
 ```
 
 
 ```{r, results='asis'}
 
-all_msc_filt_no_dbltsmdata <- map(all_msc_filt_no_dblts, ~..1@meta.data) 
+all_msc_stg_qcdmdata <- map(all_msc_stg_qcd, ~..1@meta.data) 
 
 ```
 
 
 ```{r, results='asis'}
 
-map(all_msc_filt_no_dbltsmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(Strain_DN)) 
+map(all_msc_stg_qcdmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(Strain_DN)) 
 
 ```
 
 
 ```{r, results='asis'}
 
-map(all_msc_filt_no_dbltsmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(Strain_DN)) 
+map(all_msc_stg_qcdmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(Strain_DN)) 
 
 ```
 
 
 ```{r, results='asis'}
 
-map(all_msc_filt_no_dbltsmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(StagePrelimC)) 
+map(all_msc_stg_qcdmdata, ~.x %>% filter(!(Strain_DN %in% c("Doublet", "Negative"))) %>% count(StagePrelimC)) 
 
 ```
 
@@ -1760,7 +1939,7 @@ c_stg_shapes = c('Asexual' = 16 , 'Male' = 3,  'Female' = 6)
 c_stg_cols= c('Asexual' = "#D7B7C7", 'Male' = "#C4CAA4", 'Female'="#6289A9", 'Developing' = "#C9F6E1", 'Field unlabelled'="lightgrey")
 
 
-ss_bar_plt <-list(all_msc_filt_no_dbltsmdata, names(all_msc_filt_no_dbltsmdata))  %>% 
+ss_bar_plt <-list(all_msc_stg_qcdmdata, names(all_msc_stg_qcdmdata))  %>% 
   purrr::pmap(.,~{
   a_tbl <- ..1 %>%
     mutate(stage_afm = case_when(str_detect(StagePrelimC, 'ring|troph') ~ 'Asexual', 
@@ -1883,7 +2062,7 @@ ss_bar_plt <-list( strn_c_mdata)  %>%
 write the Qcd barcodes for souporcell
 ```{r, results='asis', eval=T}
 
-imap(all_msc_filt_no_dblts, ~{
+imap(all_msc_stg_qcd, ~{
   system(paste0('mkdir data/processed/Pf/',.y,'/soupc_GE_postQC/'))
   write(colnames(.x), paste0('data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))
   system(paste0('gzip -f data/processed/Pf/',.y,'/soupc_GE_postQC/barcodes.tsv'))

@@ -71,9 +71,9 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
 
@@ -86,6 +86,8 @@ irods_id_sk21_mdata_cln <- read_csv("data/raw/irods_id_sk21_mdata_cln.csv") %>%
 
 smpl_nms <-irods_id_sk21_mdata_cln$sample_nm
 #c("MSC24", "MSC33", "MSC37", "MSC38", "MSC39", "MSC40", "MSC45", "MSC48", "MSC49", "MSC50_MACS", "MSC50_SLO", "MSC53", "MSC54", "MSC55", "MSC57", "MSC60", "MSC66", "MSC67", "MSC68", "MSC70")
+# source_irods <- c("5736STDY11771545", "5736STDY11771544", "5736STDY11771536", "5736STDY11771546", "5736STDY11771535")
+# sample_name <- c("MSC1272", "MSC13", "MSC3", "MSC14", "MSC1")
 ```
 
 
@@ -95,14 +97,14 @@ mrc_sk21_summary <- read_csv("data/raw/MRC_Sample_Analysis_Summary_Summary.csv",
 
 
 ```{r}
-mrc_sk21_summary %>% filter(str_detect(mixed_infection, "pf") & str_detect(shortids, "SetB|SetC") )
+mrc_sk21_summary %>% filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72")) )
 ```
 
 ```{r}
 ## Getting only the jumpcode run where a sample was ran twice (non-jumpcode and jumpcode)
 pf_22_jcode <- mrc_sk21_summary %>% 
-  filter(str_detect(mixed_infection, "pf") & str_detect(shortids, "SetB|SetC") ) %>%
-  mutate(sample_nm = str_remove_all(Sample_Name, "_JC")) %>%
+  filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72") )) %>%
+  mutate(sample_nm = str_remove_all(Sample_Name, "_JC|C72")) %>%
   group_by(sample_nm) %>%
   add_count(name = "runs") %>%
   filter(runs == 1 | runs == 2 & str_detect(Sample_Name, "JC")) 
@@ -295,13 +297,19 @@ gogo()
 ## Run standard normalisation on farm like below
 ## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
 
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --o_file_name "seu_norm.RDS" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "seu_norm_elbo.RDS"
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume 
+```
+
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+# imap(all_msc_bp, ~system(paste0("rm data/processed/Pf/",.y,"/seu_obj/seu_norm_elbo.RDS")))
 ```
 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc <- list.files("data/processed/", pattern = "^seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc <- list.files("data/processed/", pattern = "^bpc_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
   .[sample_name] %>%
   map(readRDS)
@@ -312,7 +320,7 @@ all_msc <- list.files("data/processed/", pattern = "^seu_norm.RDS$", full.names 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read elbo plots
-all_msc_elbo <- list.files("data/processed/", pattern = "^seu_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_elbo <- list.files("data/processed/", pattern = "^bpc_seu_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
   .[sample_name] %>%
   map(readRDS)
@@ -346,7 +354,7 @@ msc_combi@meta.data$stageHL_ref_asx <- ifelse(msc_combi@meta.data$stageHL_ref %i
 msc_combi.sce <- as.SingleCellExperiment(msc_combi)
 
 ##Place counts appropriately into single cell experiment object
-SingleCellExperiment::logcounts(msc_combi.sce) <- log2(SingleCellExperiment::counts(msc_combi.sce) + 1)
+# SingleCellExperiment::logcounts(msc_combi.sce) <- log2(SingleCellExperiment::counts(msc_combi.sce) + 1) !!NOTE This is done by as.SingleCellExperiment - putting lognormalized counts needed by scmap into logcounts https://github.com/hemberg-lab/scmap/issues/9
 rowData(msc_combi.sce)$feature_symbol <- rownames(msc_combi.sce)
 msc_combi.sce <- msc_combi.sce[!duplicated(rownames(msc_combi.sce)), ]
 
@@ -403,7 +411,7 @@ saveRDS(v3labmscs.ref.sce, "data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS")
 ```{r, eval=T}
 gogo()
 ## Run scmap on farm like below
-# nextflow run submsn_scmap.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/scmap.R" --sce_ref "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm.RDS" --w 3 --cos_sim 0.5 --o_file "prelim_anotd.RDS"
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_scmap.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/scmap.R" --sce_ref "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpc_seu_norm.RDS" --w 3 --cos_sim 0.5 --o_file "prelim_anotd.RDS" --stg_labl "stageHL_ref"
 ```
 
 
@@ -697,12 +705,41 @@ map(all_msc_anotd_preQC, ~..1@meta.data %>% dplyr::count(StagePrelim))
 # scm_barpt
 ```
 
+Put all the pf filt barcodes - including from mixed samples in one folder for souporcell
+
+```{r}
+## Get the donor and irods ID for pf only infections
+pf_mix_solo <- pf_solo_mixed_mdata[,c("sample_nm", "mixed_infection2")] %>% deframe()
+```
+
+
+```{r}
+## Write Pf barcodes for mixed species donor for souporcell
+imap(pf_mix_solo, ~{
+  system(paste0("mkdir -p data/raw/Pf/", .y, "/outs/pf_filt_bcodes"))
+  if (.x == "solo"){
+    system(paste0('cp data/raw/Pf/', .y, '/outs/filtered_feature_bc_matrix/barcodes.tsv.gz data/raw/Pf/', .y, '/outs/pf_filt_bcodes/'))
+  }
+  else if(.x == "mixed") {
+    system(paste0('cp data/raw/Pf_mxd/', .y, '/outs/sk21_bcodes_pp/barcodes.tsv.gz data/raw/Pf/', .y, '/outs/pf_filt_bcodes/'))
+  }
+  })
+
+```
+
+Run souporcell like below for the filtered barcodes of all cellranger pf cells in all donor including mixed ones - combines the 2 below
+```{r}
+gogo()
+
+# nextflow run ../mali_code_lnk/nf_scripts/soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf/MSC*/outs/pf_filt_bcodes/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
+```
+
 
 Run souporcell like below for the filtered barcodes of all infections
 ```{r}
 gogo()
 
-# nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf/MSC*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
+# nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY*/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf/MSC*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
 ```
 
 
@@ -711,5 +748,5 @@ Run souporcell like below for the filtered barcodes of pf in mixed infections
 ```{r}
 gogo()
 
-#  nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY134373{63,72,89}/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf_mxd/MSC*/outs/sk21_bcodes_pp/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
+#  nextflow run soupc_v25_m2.nf --id_decode "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv" --bam "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY134373{63,72,89}/outs/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Pf_mxd/MSC*/outs/sk21_bcodes_pp/barcodes.tsv.gz" --o_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --soup_dir "soupc" --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/soupc_v25_mnmap_hsat_310.sh" --ref_file "PlasmoDB-66_Pfalciparum3D7_Genome.fasta" --hsat_ref_file "Pf66" -resume
 ```

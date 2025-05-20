@@ -58,19 +58,21 @@ knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/u
 #### Source variables specific to this run - this pseudobulk strain analysis script is ran several times with different inputs
 ```{r}
 ## Get the necessary variable for the pseudobulking workflow
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
-# source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
+source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header_m55_m60.R")
+
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
 sample_name_nms
 ```
 
 #### Source colours, plotting functions and commonly used tables etc
 ```{r}
 ## Get the necessary variables for common housekeeping
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
 ```{r}
@@ -182,7 +184,7 @@ gtypes_chr_cln_ibs_mtx <- function(gtypes_chr_pos){
 ```{r, fig.height=3.8, fig.width=4.2}
 ##Heatmap function
 
-gtypes_ibs_heatmap_one_don <- function(mtx, dendog = F){
+gtypes_ibs_heatmap_one_don <- function(mtx, dendog = F, ttl = "Heatmap"){
 # gtypes_ibs_heatmap <- function(mtx, dendo = F){
   
   colFun = suppressWarnings(brewer.pal(100, 'Greens'))
@@ -209,12 +211,15 @@ gtypes_ibs_heatmap_one_don <- function(mtx, dendog = F){
 
   hm = Heatmap(mtx, name='IBS', col = colFun, show_row_names = TRUE, 
                  show_column_names = TRUE, show_row_dend = T, 
-                 show_column_dend = T, row_title_rot = 0, cluster_rows = dendog, cluster_columns = dendog)
+                 show_column_dend = T, row_title_rot = 0, column_title = ttl, cluster_rows = dendog, cluster_columns = dendog)
   
   
   hm2<-Heatmap(mtx, name='IBS', col = colFun, show_row_names = TRUE, 
                  show_column_names = TRUE, show_row_dend = T, 
-                 show_column_dend = T, row_title_rot = 0, cluster_rows = dendog, cluster_columns = dendog, column_names_gp = gpar(fontsize = 15), row_names_gp = gpar(fontsize = 15), border='black',   heatmap_legend_param = list(title_gp = gpar(fontsize = 12, fontface = "bold"), labels_gp = gpar(fontsize = 12)),
+                 show_column_dend = T, row_title_rot = 0, column_title = ttl, cluster_rows = dendog, cluster_columns = dendog, 
+               column_names_gp = gpar(fontsize = 15), row_names_gp = gpar(fontsize = 15), border='black',   
+               heatmap_legend_param = list(title_gp = gpar(fontsize = 12, fontface = "bold"), 
+                                           labels_gp = gpar(fontsize = 12)),
                   layer_fun = function(j, i, x, y, width, height, fill) {
                       v = pindex(mtx, i, j)
                       l = v >0.98
@@ -227,15 +232,15 @@ gtypes_ibs_heatmap_one_don <- function(mtx, dendog = F){
 }
 ```
 
-```{r, fig.height=4.1, fig.width=4.5}
+```{r, fig.height=8, fig.width=8}
 
 ss_afm_ibs_mtx<- map(ss_afm_pf7M_cln_gt, possibly(~gtypes_chr_cln_ibs_mtx(gtypes_chr_pos=.x), "only one comparison group"))
-ss_afm_ibs_hmap<- map(ss_afm_ibs_mtx, possibly(~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = F), "only one comparison group"))
+ss_afm_ibs_hmap<- imap(ss_afm_ibs_mtx, possibly(~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = F, ttl = .y), "only one comparison group"))
 ```
 
-```{r, fig.height=5.1, fig.width=5.5}
+```{r, fig.height=6, fig.width=7}
 
-ss_afm_ibs_hmap_clust <- map(ss_afm_ibs_mtx, possibly(~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = T), "NAs cant be clustered"))
+ss_afm_ibs_hmap_clust <- imap(ss_afm_ibs_mtx, possibly(~gtypes_ibs_heatmap_one_don(mtx=.x, dendo = T, ttl = .y), "NAs cant be clustered"))
 # imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x, ttl=.y, lg = "none"), 'No overlapping SNPs between the 2 groups'))
 ss_afm_ibs_hmap_clust
                       
@@ -268,7 +273,8 @@ strn_pw_comps <- function(gtypes_chr_pos, strn_regex){
 
 ```{r}
 ##stage strain pairwise comparison groups
-ss_afm_pf7M_afm_comps <- map(ss_afm_pf7M_cln_gt, possibly(~strn_pw_comps(gtypes_chr_pos = .x, strn_regex = c('SC','N')), "only one comparison group"))
+# ss_afm_pf7M_afm_comps <- map(ss_afm_pf7M_cln_gt, possibly(~strn_pw_comps(gtypes_chr_pos = .x, strn_regex = c('SC','N')), "only one comparison group"))
+ss_afm_pf7M_afm_comps <- map(ss_afm_pf7M_cln_gt, possibly(~strn_pw_comps(gtypes_chr_pos = .x, strn_regex = c('SC','MSC','N')), "only one comparison group"))
 
 ```
 
@@ -279,7 +285,7 @@ b_strn_c_wndw_fn <- function(strn_c_tbl, wndw = 100000) {
     group_by(chr) %>% 
     filter(!is.na(chr)) %>%
     mutate(pos_range = cut(pos, breaks = c(-Inf,seq(0, max(pos), by = wndw),Inf))) %>% 
-    pivot_longer(., cols = starts_with(c('SC','N')), names_to = 'comps', values_to = 'sim') %>% 
+    pivot_longer(., cols = starts_with(c('SC','MSC','N')), names_to = 'comps', values_to = 'sim') %>% 
     dplyr::count(comps, chr, pos_range, sim) %>% 
     group_by(chr, comps, pos_range) %>% 
     mutate(overlap_TF = ifelse(any(is.na(sim)), sum(!is.na(sim)), n_distinct(sim)))%>%
@@ -350,6 +356,7 @@ p_chart_shared_snps <- function(gtypes_comps_tbl = b_strn, ttl, lg = "right") {
 
 ```
 
+
 Pie of snps compared
 ```{r, warning=FALSE}
 # strain stage (afm) chromosome painting
@@ -358,7 +365,7 @@ pp_plts <- imap(ss_afm_wndws, possibly(~p_chart_shared_snps(gtypes_comps_tbl =.x
 
 ```
 
-```{r, warning=FALSE, fig.width=8, fig.height=8}
+```{r, warning=FALSE, fig.width=12, fig.height=12}
 # strain stage (afm) chromosome painting
 pp_plts
 ```
@@ -373,6 +380,10 @@ MSC41 = 3;
 MSC51 = 1;
 
 MSC38 best guess = 4
+
+NOTE - Change the below
+MSC38 best guess = 4 to 5 on 09/10/24
+MSC55 best guess = 6 to 7 on 09/10/24
 ```{r, warning=FALSE, eval=T}
 ## optimum k from above
 # optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
@@ -387,8 +398,8 @@ names(strn_c_new_mdata_m22_min) <-  str_remove(names(strn_c_new_mdata_m22_min), 
 
 
 ##Simpler chromosome plots(no continous gradient) for SS_AG and S
-
-```{r}
+!!!NOTE -SIMILAR TO BELOW BUT WITHOUT PIE CHART. FASTER  - DONT DELETE FOR NOW
+```{r, eval=F}
 ## Function for chromosome painting
 
 chrom_paintr <- function(gtypes_comps_tbl = b_strn_c, ttl, expn=100000, x_font_sz = 13) {
@@ -428,6 +439,83 @@ chrom_paintr <- function(gtypes_comps_tbl = b_strn_c, ttl, expn=100000, x_font_s
 
 ```
 
+!!!NOTE - SIMILAR TO ABOVE BUT WITH PIE CHART. SLOWER  - DONT DELETE FOR NOW
+```{r}
+## Function for chromosome painting
+
+chrom_paintr <- function(gtypes_comps_tbl = b_strn_c, ttl, expn=10000, x_font_sz = 13) {
+
+      gs <-gtypes_comps_tbl %>% mutate(across(start, ~(./expn)),across(end, ~(./expn)), across(size, ~(./expn))) %>%
+      ggplot()+
+      geom_segment(
+    aes(x = 0-(2000/expn), xend = size+(2000/expn), y = chr, yend = chr),
+    linewidth = 3.5, lineend = "round", colour = "black"
+  ) + 
+      geom_segment(
+    aes(x = 0, xend = size, y = chr, yend = chr),
+    linewidth = 2.8, lineend = "round", colour = "white"
+  ) +
+  geom_segment(
+    aes(
+      x = start, xend = end,
+      y =  chr, yend =  chr,
+      colour = rltd
+    ),
+    linewidth = 2.8
+  ) +
+  # scale_color_manual(values = c('Same'= '#D4AF37', 'Different'= '#2C3E50','Both'='lightgrey', 'No SNP'='white'))+      
+  scale_color_manual(values = c('Same'= '#DACB7D', 'Different'= '#2C3E50','Both'='#A9B7C5', 'No SNP'='white'))+ ##prev colours "black" ,"#ffd94d" 
+  # facet_wrap(comps~., ncol = 5) +
+      labs(title = ttl) +
+      labs(colour = "Allele \ncomparison", x = 'Position (bases)', y ="Chromosome") +
+  theme_classic() +
+  theme(#strip.text = element_text(size = 9, face = 'bold'),
+        axis.text.y = element_text(size =  13),
+        axis.text.x = element_text(size =  x_font_sz),
+        # axis.title = element_text(size = 9),
+        axis.title = element_blank(),
+        # legend.title = element_text(size = 9, face = "bold"),
+        # legend.text = element_text(size = 9),
+        title = element_text(size = 12, face = "bold"),
+        legend.position = "none") 
+    
+    pie_bar_tbl <- gtypes_comps_tbl %>% 
+      separate(.,overlap_snps_No, into=(c('same2', 'diff2')), sep=',' ) %>% 
+      pivot_longer(cols = c('same2','diff2'), names_to = 'shared2', values_to = 'shared_n') %>% 
+      filter(!is.na(shared_n)) %>%
+      mutate('Shared' = case_when(rltd == 'Both' & shared2 == 'same2' ~ 'Same', 
+                                  rltd == 'Both' & shared2 == 'diff2' ~ 'Different', 
+                                  rltd == 'Different' & shared2 == 'same2' ~ 'Different', 
+                                  T ~ rltd)) %>%
+      mutate(across(shared_n, as.numeric))
+    
+    pp <- pie_bar_tbl %>% 
+      group_by(Shared) %>% 
+      summarise('snpsNo' = sum(shared_n))%>%
+    arrange(dplyr::desc(snpsNo), .by_group = T) %>%
+    #mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>%
+    ggplot(., aes(x="", y=snpsNo, fill=Shared))+
+    geom_bar(width = 1, stat = "identity") + 
+    coord_polar("y", start=0)+
+    # geom_text(aes(y = snpsNo/2 + c(0, cumsum(snpsNo)[-length(snpsNo)]), 
+    #               label = snpsNo), size=3, colour = "#90c7ff") +
+      geom_label(aes(y = snpsNo/2 + c(0, cumsum(snpsNo)[-length(snpsNo)]), 
+                  label = snpsNo), size=5, label.padding = unit(0.07, "lines"), label.size = 0, color = 'black', fill = 'white') +
+      scale_fill_manual(values = c('Same'= '#DACB7D', 'Different'= '#2C3E50'))+ #'#D4AF37'
+    # labs(title = .y)+
+    theme_void()+
+      theme(legend.position = "none")
+  #theme_minimal_hgrid(11)
+
+    
+    ggdraw(gs ) +
+                draw_plot(pp, x=.5, y=.1, width = .50, height= .50)
+
+  }
+
+```
+
+
 
 strains split by stage Without colour gradients
 ```{r, warning=F}
@@ -442,8 +530,21 @@ CONFIRMATION OF STRAINS
 33=8, 
 ```{r, warning=F}
 # strain stage (afm) chromosome painting
-names(ss_afm_chromp)
+ss_afm_chromp[["MSC55.stage_afm_strain.k9"]]
 
+```
+
+```{r, warning=F}
+# strain stage (afm) chromosome painting
+# ss_afm_chromp[["MSC55.stage_afm_strain.k9"]]
+# ss_afm_chromp[["MSC55.stage_afm_strain.k9"]][str_detect(names(ss_afm_chromp[["MSC55.stage_afm_strain.k9"]]), "[0-9]_A")]
+
+ss_afm_chromp[["MSC55.stage_afm_strain.k9"]][str_detect(names(ss_afm_chromp[["MSC55.stage_afm_strain.k9"]]), "9_A")]
+```
+
+
+```{r, warning=F}
+ss_afm_chromp[["MSC60.stage_afm_strain.k10"]][str_detect(names(ss_afm_chromp[["MSC60.stage_afm_strain.k10"]]), "7_A")]
 ```
 
 ```{r, warning=F}
@@ -676,7 +777,7 @@ for (s in names(optimum_k_polyk)) {
 
 ```{r, warning=FALSE, eval=T}
 gogo()
-# nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC55,MSC50_SLO}/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
+# nextflow pbulk_gtyping.nf --sv_dir "pbulk_gtypes_postQC_cln" --bam "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc_GE_postQC/*/parent/possorted_genome_bam.bam" --bcodes "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC55,MSC50_SLO}/pbulk_gtypes_postQC_cln/bcodes/minmap/st*/*tsv" --odir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/" --mapper "minmap" --scrpt "../multipurpose_scripts_lnk/cr_subset_bam_linux.sh" --ref  "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
 ```
 
 ```{r, eval=FALSE}

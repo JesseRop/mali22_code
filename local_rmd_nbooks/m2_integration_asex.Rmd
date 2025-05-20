@@ -63,25 +63,32 @@ suppressPackageStartupMessages({
 
 #  integration of all MSC
 
+## setup 
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
 ### Common functions
 
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
+
 ```{r setup}
-sample_set = "Mali2"
 
 optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
 
 optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
-
-# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
-knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
 ```
 
 ```{r}
@@ -102,34 +109,82 @@ msc_w_cln_strns_raw_asex <- msc_w_cln_strns_raw_asex[unlist(map(msc_w_cln_strns_
 ```
 
 ```{r}
+imap(msc_w_cln_strns_raw_asex, ~DimPlot(., group.by = "stage") + labs(title = .y))
+
+```
+
+```{r}
+imap(msc_w_cln_strns_raw_asex, ~DimPlot(., group.by = "strain") + labs(title = .y))
+
+```
+
+```{r, fig.width=16, fig.height=4}
+map(msc_w_cln_strns_raw_asex, ~.x@meta.data %>% select(contains("stage"), contains("sim"))) %>%
+  bind_rows(.id = "don") %>%
+  mutate(across(starts_with("stage_lab"), str_to_sentence)) %>%
+  ggplot(aes(x = stage_lab1, y = sim_lab1)) +
+  geom_boxplot() +
+  facet_wrap(don~., nrow = 1, scales = "free_x") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+```
+
+
+```{r, fig.width=16, fig.height=4}
+map(msc_w_cln_strns_raw_asex, ~.x@meta.data) %>%
+  bind_rows(.id = "don") %>%
+  # mutate(across(starts_with("stage_lab"), str_to_sentence)) %>%
+  ggplot(aes(x = stage, y = nFeature_RNA)) +
+  geom_boxplot() +
+  facet_wrap(don~., nrow = 1, scales = "free_x") +
+  geom_hline(yintercept = 300) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+```
+
+```{r}
 ## Making list of objects and renaming before integrating
-m2_asex_list <- merge(x = msc_w_cln_strns_raw_asex[[1]], y = msc_w_cln_strns_raw_asex[2:length(msc_w_cln_strns_raw_asex)], add.cell.ids = str_remove(names(msc_w_cln_strns_raw_asex), "SC"))
+m2_asex <- merge(x = msc_w_cln_strns_raw_asex[[1]], y = msc_w_cln_strns_raw_asex[2:length(msc_w_cln_strns_raw_asex)], add.cell.ids = str_remove(names(msc_w_cln_strns_raw_asex), "SC"))
 ```
 
 
 Write out annotated MCA reference in .h5ad 
 ```{r, message=FALSE, warning=FALSE, eval=T}
 ##Change factor metadata to character as these are not handled properly when converting to h5ad
-m2_asex_list_raw <- m2_asex_list
-m2_asex_list_raw@meta.data <- m2_asex_list_raw@meta.data %>% mutate(across(where(is.factor), as.character))
+m2_asex_raw <- m2_asex
+m2_asex_raw@meta.data <- m2_asex_raw@meta.data %>% mutate(across(where(is.factor), as.character))
 
 ## !!!NB - NEEDS SORTING IN FUTURE UPGRADING TO SEURAT 5 RESULTED IN ERROR AS DESCRIBED https://github.com/mojaveazure/seurat-disk/issues/147#top
-m2_asex_list_raw[["RNA3"]] <- as(object = m2_asex_list_raw[["RNA"]], Class = "Assay")
-DefaultAssay(m2_asex_list_raw) <- "RNA3"
-m2_asex_list_raw[["RNA"]] <- NULL
-m2_asex_list_raw <- RenameAssays(object = m2_asex_list_raw, RNA3 = 'RNA')
+m2_asex_raw[["RNA3"]] <- as(object = m2_asex_raw[["RNA"]], Class = "Assay")
+DefaultAssay(m2_asex_raw) <- "RNA3"
+m2_asex_raw[["RNA"]] <- NULL
+m2_asex_raw <- RenameAssays(object = m2_asex_raw, RNA3 = 'RNA')
 
-# SaveH5Seurat(m2_asex_list_raw, filename =  paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/m2_asex_list_raw.h5Seurat"), overwrite = T)
-SaveH5Seurat(m2_asex_list_raw, filename =  paste0("data/processed/Pf/m2_all/m2_asex_list_raw.h5Seurat"), overwrite = T)
+# SaveH5Seurat(m2_asex_raw, filename =  paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/m2_asex_raw.h5Seurat"), overwrite = T)
+SaveH5Seurat(m2_asex_raw, filename =  paste0("data/processed/Pf/m2_all/m2_asex_raw.h5Seurat"), overwrite = T)
 
-# Convert(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/m2_asex_list_raw.h5Seurat"), dest = "h5ad", overwrite = T)
-Convert(paste0("data/processed/Pf/m2_all/m2_asex_list_raw.h5Seurat"), dest = "h5ad", overwrite = T)
+# Convert(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/m2_asex_raw.h5Seurat"), dest = "h5ad", overwrite = T)
+Convert(paste0("data/processed/Pf/m2_all/m2_asex_raw.h5Seurat"), dest = "h5ad", overwrite = T)
 
+```
+
+
+```{r}
+# m2_asex[["RNA"]] <- split(m2_asex[["RNA"]], f = m2_asex$orig.ident)
+
+
+```
+
+
+## Subset to remove later sexuals
+```{r}
+m2_early_asex <- m2_asex[,!(m2_asex$stage %in% c("Late trophozoite", "Early schizont", "Late schizont", "Gametocyte (developing)"))]
 ```
 
 ```{r, message=FALSE, warning=FALSE}
 ## save for running stdseurat in farm
-saveRDS(m2_asex_list, "data/processed/Pf/m2_all/m2_asex_list.RDS")
+saveRDS(m2_asex, "data/processed/Pf/m2_all/m2_asex.RDS")
+saveRDS(m2_early_asex, "data/processed/Pf/m2_all/m2_early_asex.RDS")
 
 ```
 
@@ -138,38 +193,128 @@ gogo()
 ## Run SNORM on farm like below
 ## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
 
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_list.RDS" --o_file_name "m2_asex_seu_norm.RDS" --umap_name "UMAP_" --hvg 300 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "m2_asex_seu_norm_elbo.RDS" --resume
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --ncores "10" --mem "80 GB" --resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_early_asex.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 350 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --ncores "14" --mem "120 GB" --resume
+
+# --hvg 300
+
 ```
 
+
+```{r}
+m2_early_asex_norm <-  readRDS("data/processed/Pf/m2_all/m2_early_asex_norm.RDS")
+m2_early_asex_norm_elbo <-  readRDS("data/processed/Pf/m2_all/m2_early_asex_norm_elbo.RDS")
+m2_early_asex_norm_elbo
+```
+
+
+```{r}
+m2_asex_norm <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm.RDS")
+m2_asex_norm_elbo <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm_elbo.RDS")
+m2_asex_norm_elbo
+```
+
+
+```{r}
+m2_asex_norm_lst <- list(m2_asex_norm, m2_early_asex_norm)
+```
+
+
+```{r}
+map(m2_asex_norm_lst, ~DimPlot(.x, group.by = "donor", pt.size = 0.4, reduction = "umap.unintegrated"))
+map(m2_asex_norm_lst, ~DimPlot(.x, group.by = "stage", pt.size = 0.4, reduction = "umap.unintegrated"))
+```
+
+```{r}
+map(m2_asex_norm_lst, ~DimPlot(.x, group.by = "donor", pt.size = 0.4, reduction = "umap.unintegrated"))
+map(m2_asex_norm_lst, ~DimPlot(.x, group.by = "stage", pt.size = 0.4, reduction = "umap.unintegrated"))
+```
+
+
+```{r}
+map(m2_asex_norm_lst, ~DimPlot(.x, dims = c(1,3), group.by = "donor", pt.size = 0.8, reduction = "umap.unintegrated"))
+map(m2_asex_norm_lst, ~DimPlot(.x, dims = c(1,3), group.by = "stage", pt.size = 0.8, reduction = "umap.unintegrated"))
+map(m2_asex_norm_lst, ~DimPlot(.x, dims = c(2,3), group.by = "donor", pt.size = 0.4, reduction = "umap.unintegrated"))
+```
 
 ```{r, eval=T}
 gogo()
 ## Run harmony integration with the number of PCs being automatically detected by findPC
 
-# nextflow run submsn_intgrtn_pc.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_seu_norm.RDS" --mthd "HarmonyIntegration" --o_file_name "m2_asex_harmony_int.RDS" --cluster_resoln 1 --cl_nm "harmony_clusters" --umap_redctn_nm "umap.harmony" --new_redctn "integrated.harmony" --intgrtn_pc 30 --integrtd_pc_man "no" --elbo_nm "m2_asex_harmony_int_elbo.RDS"  --findpc_mthd "perpendicular line" --resume
+# nextflow run  ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 5 --integrtd_pc_man "no" --findpc_mthd "perpendicular line" --ncores "10" --mem "80 GB" -resume
+
+# nextflow run  ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_early_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 5 --integrtd_pc_man "no" --findpc_mthd "perpendicular line" --ncores "16" --mem "120 GB" -resume
 
 #"perpendicular line" is 6. kmeans which is 5 was giving very good umap
+
 ```
 
 
 ```{r}
-m2_asex_harmony_int <-  readRDS("data/processed/Pf/m2_all/m2_asex_harmony_int.RDS")
-m2_asex_harmony_int_elbo <-  readRDS("data/processed/Pf/m2_all/m2_asex_harmony_int_elbo.RDS")
-m2_asex_harmony_int_elbo
+m2_asex_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm_harmony.RDS")
+m2_asex_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_asex_norm_harmony_elbo.RDS")
+m2_asex_norm_harmony_elbo
+```
+
+
+```{r}
+m2_early_asex_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_early_asex_norm_harmony.RDS")
+m2_early_asex_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_early_asex_norm_harmony_elbo.RDS")
+m2_early_asex_norm_harmony_elbo
 ```
 
 ```{r}
-DimPlot(m2_asex_harmony_int, group.by = "StagePrelim", pt.size = 0.4, reduction = "umap.harmony")
+m2_asex_harmony_lst <- c(m2_asex_norm_harmony, m2_early_asex_norm_harmony)
 ```
 
 ```{r}
-DimPlot(m2_asex_harmony_int, dims = c(1,3), group.by = "donor", pt.size = 0.8, reduction = "umap.harmony")
-DimPlot(m2_asex_harmony_int, dims = c(2,3), group.by = "donor", pt.size = 0.4, reduction = "umap.harmony")
+map(m2_asex_harmony_lst, ~DimPlot(.x, group.by = "stage", pt.size = 0.4, reduction = "umap.harmony"))
+
 ```
 
+
+
+```{r}
+map(m2_asex_harmony_lst, ~DimPlot(.x, dims = c(1,2), group.by = "donor", pt.size = 0.8, reduction = "umap.harmony"))
+map(m2_asex_harmony_lst, ~DimPlot(.x, dims = c(1,3), group.by = "donor", pt.size = 0.8, reduction = "umap.harmony"))
+map(m2_asex_harmony_lst, ~DimPlot(.x, dims = c(2,3), group.by = "donor", pt.size = 0.4, reduction = "umap.harmony"))
+
+```
+
+
+```{r}
+map(m2_asex_harmony_lst, ~DimPlot(.x, group.by = "stage", pt.size = 0.4, reduction = "integrated.harmony") + scale_color_manual(values = sp_fld_colors2))
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_early_asex_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= m2_early_asex_norm_harmony@meta.data$StagePrelim,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+
+```{r, fig.width=10, fig.height=5}
+
+map(m2_asex_harmony_lst, ~DimPlot(.x, cells.highlight = colnames(.x[, .x$donor == "MSC12"]), reduction = "umap.harmony")) #+ scale_color_manual(values = sp_fld_colors)
+```
+
+```{r}
+m2_asex_norm_harmony@meta.data %>% count(stage)
+```
 
 ```{r, fig.width=12, fig.height=4}
-FeaturePlot(m2_asex_harmony_int, features = c("PF3D7-0301800", "PF3D7-1002000", "PF3D7-0608800"), pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
+map(m2_asex_harmony_lst, ~FeaturePlot(.x, features = c("PF3D7-0301800", "PF3D7-1002000", "PF3D7-0608800", "PF3D7-1222600", " PF3D7-0406200"), pt.size = 0.01, reduction = "umap.harmony", ncol = 5, slot = "data"))
 ```
 
 HRP2-PF3D7_0831800
@@ -183,17 +328,17 @@ MRP1-PF3D7_0112200
 MPC1- PF3D7_1340800
 ```{r, fig.width=12, fig.height=12}
 
-FeaturePlot(m2_asex_harmony_int, features = c("PF3D7-0831800", "PF3D7-1121600", "PF3D7-0501400","PF3D7-1324900","PF3D7-0207600", "PF3D7-0202000","PF3D7-0709000","PF3D7-0112200","PF3D7-1340800"), pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
+map(m2_asex_harmony_lst, ~FeaturePlot(.x, features = c("PF3D7-0831800", "PF3D7-1121600", "PF3D7-0501400","PF3D7-1324900","PF3D7-0207600", "PF3D7-0202000","PF3D7-0709000","PF3D7-0112200","PF3D7-1340800"), pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data"))
 ```
 
 ```{r}
-DimPlot(m2_asex_harmony_int, reduction = "pca", group.by = "stage", pt.size = 1.5)
+map(m2_asex_harmony_lst, ~DimPlot(.x, reduction = "pca", group.by = "stage", pt.size = 1.5))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot 
-plot_ly(data = data.frame(m2_asex_harmony_int@reductions[["umap.harmony"]]@cell.embeddings), x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,  color= m2_asex_harmony_int@meta.data$stage, opacity = 0.8, size = 1,   type = 'scatter3d')
+plot_ly(data = data.frame(m2_asex_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings), x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,  color= m2_asex_norm_harmony@meta.data$stage, opacity = 0.8, size = 1,   type = 'scatter3d')
 
 ```
 
@@ -202,29 +347,47 @@ plot_ly(data = data.frame(m2_asex_harmony_int@reductions[["umap.harmony"]]@cell.
 
 
 ```{r}
-DimPlot(m2_asex_harmony_int, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters")
+map(m2_asex_harmony_lst, ~DimPlot(.x, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters", label = T))
 ```
 
 
 ```{r}
-## 
-m2_asex_harmony_int <- FindClusters(m2_asex_harmony_int, resolution = 0.26, cluster.name = "harmony_clusters_ss")
+# gogo()
+m2_asex_harmony_res <- FindClusters(m2_asex_norm_harmony, resolution = 0.1, cluster.name = "harmony_clusters_ss")
 
 ```
 
 ```{r}
-DimPlot(m2_asex_harmony_int, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss")
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T)
+```
+
+## Subset to remove later parts of the cycle
+```{r}
+m2_asex_harmony_res_subset <- m2_asex_harmony_res[,m2_asex_harmony_res$harmony_clusters_ss %in% c("2", "0", "1", "4")]
+```
+
+```{r}
+DimPlot(m2_asex_harmony_res_subset, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T)
+```
+
+```{r}
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", dims = c(1,3))
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", dims = c(2,3))
+```
+
+```{r}
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", dims = c(1,2))
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", dims = c(2,3))
+```
+
+```{r}
+Idents(m2_asex_harmony_res) <- "harmony_clusters_ss"
 ```
 
 
 ```{r}
-Idents(m2_asex_harmony_int) <- "harmony_clusters_ss"
-```
-
-
-```{r}
-m2_asex_harmony_int_jnd <- JoinLayers(m2_asex_harmony_int)
-asx_devt_mrks <- FindAllMarkers(m2_asex_harmony_int_jnd)
+m2_asex_harmony_res <- JoinLayers(m2_asex_harmony_res)
+asx_devt_mrks <- FindAllMarkers(m2_asex_harmony_res)
 ```
 
 
@@ -256,54 +419,100 @@ top3_fc_gns
 
 ```{r, fig.width=12, fig.height=12}
 
-FeaturePlot(m2_asex_harmony_int, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
+FeaturePlot(m2_asex_harmony_res, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
 ```
 
 ```{r, eval=T}
-Seurat_object <- JoinLayers(m2_asex_harmony_int)
-
-## Convert seurat object to SCE
-sce_obj <- SingleCellExperiment(assays = list(counts = as(Seurat_object[["RNA"]]$counts, Class = "dgCMatrix")), colData = Seurat_object@meta.data)
-    
-# print(sce_obj)
-logcounts(sce_obj) <- log2((counts(sce_obj) + 1))
-normcounts(sce_obj) <- as(Seurat_object[["RNA"]]$data, Class = "dgCMatrix")
-rowData(sce_obj)$feature_symbol <- str_replace(rownames(sce_obj), "-", "_")
-reducedDims(sce_obj) <- SimpleList(PCA = Seurat_object@reductions[["pca"]]@cell.embeddings, UMAP = Seurat_object@reductions[["umap.harmony"]]@cell.embeddings)
-
-
-# print(sce_obj)
-print(colnames(colData(sce_obj)))
-
-## Convert seurat object to SCE
-sce_obj <- slingshot(sce_obj, 
-            clusterLabels = "harmony_clusters_ss", 
-            reducedDim = "PCA", 
-            start.clus = 1,
-            # end.clus = E_CLSTR,
-            shrink =1, 
-            stretch = 1,
-            allow.break = F)
+# gogo()
+# Seurat_object <- m2_asex_harmony_res
+# 
+# ## Convert seurat object to SCE
+# sce_obj <- SingleCellExperiment(assays = list(counts = as(Seurat_object[["RNA"]]$counts, Class = "dgCMatrix")), colData = Seurat_object@meta.data)
+#     
+# # print(sce_obj)
+# logcounts(sce_obj) <- log2((counts(sce_obj) + 1))
+# normcounts(sce_obj) <- as(Seurat_object[["RNA"]]$data, Class = "dgCMatrix")
+# rowData(sce_obj)$feature_symbol <- str_replace(rownames(sce_obj), "-", "_")
+# reducedDims(sce_obj) <- SimpleList(PCA = Seurat_object@reductions[["pca"]]@cell.embeddings, UMAP = Seurat_object@reductions[["umap.harmony"]]@cell.embeddings)
+# 
+# 
+# # print(sce_obj)
+# print(colnames(colData(sce_obj)))
+# 
+# ## Convert seurat object to SCE
+# sce_obj <- slingshot(sce_obj, 
+#             clusterLabels = "harmony_clusters_ss", 
+#             reducedDim = "PCA", 
+#             start.clus = 1,
+#             # end.clus = E_CLSTR,
+#             shrink =1, 
+#             stretch = 1,
+#             allow.break = F)
 
 
 ```
 
 ```{r}
-m2_asex_harmony_sce_ss <- sce_obj
-##Prepare slingshot dataset (SDS) object 
-m2_asex_harmony_sce_ss_sds <- SlingshotDataSet(sce_obj)
-
-plot(reducedDims(m2_asex_harmony_sce_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(m2_asex_harmony_sce_ss$stage)], pch=16, asp = 0.7)
-lines(m2_asex_harmony_sce_ss_sds, lwd=2, col="black",dims = 1:2)
+# m2_asex_harmony_sce_ss <- sce_obj
+# ##Prepare slingshot dataset (SDS) object 
+# m2_asex_harmony_sce_ss_sds <- SlingshotDataSet(sce_obj)
+# 
+# # plot(reducedDims(m2_asex_harmony_sce_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(m2_asex_harmony_sce_ss$stage)], pch=16, asp = 0.7)
+# plot(reducedDims(m2_asex_harmony_sce_ss)$PCA[,1:2], col = brewer.pal(9,"Set1")[as.factor(m2_asex_harmony_sce_ss$stage)], pch=16, asp = 0.7)
+# 
+# lines(m2_asex_harmony_sce_ss_sds, lwd=2, col="black",dims = 1:2)
 ```
 
 
+```{r}
+## subset where field parasites are for slingshot - add starting cluster at end of name
+saveRDS(m2_asex_harmony_res, "data/processed/Pf/m2_all/m2_asex_harmony_res.RDS")
+# saveRDS(m2_asex_harmony_res, "data/processed/Pf/m2_all/m2_asex_harmony_res_2.RDS")
+```
+
+
+```{r}
+DimPlot(m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T)
+```
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_slingshot.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/slingshot.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_harmony_res.RDS" --o_file_name "m2_asex_harmony_ss.RDS" --umap_nm "umap.harmony" --clstr "harmony_clusters_ss" --s_clstr "0" --e_clstr "2" --redctn "UMAP"  --ncores "10" --mem "120 GB" -resume
+
+# DONT USED BACKUP TO BE DELETED
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_slingshot_start_clst.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/slingshot.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_harmony_res_0.RDS" --sufx "ss" --umap_nm "umap.harmony" --clstr "harmony_clusters_ss" --e_clstr "NULL"  --ncores "10" --mem "40 GB" --redctn "UMAP"
+
+```
+
+
+```{r, eval=T}
+# m2_asex_harmony_res_0_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_harmony_res_2_ss.RDS")
+m2_asex_harmony_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_harmony_ss.RDS")
+
+```
+
+
+```{r, eval=T}
+# m2_asex_harmony_ss <- m2_asex_harmony_res_0_ss
+rm(m2_asex_harmony_res_2_ss)
+```
+
+```{r, eval=T}
+##Prepare slingshot dataset (SDS) object 
+m2_asex_harmony_ss_sds <- SlingshotDataSet(m2_asex_harmony_ss)
+
+plot(reducedDims(m2_asex_harmony_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(m2_asex_harmony_ss$StagePrelim)], pch=16, asp = 0.7)
+lines(m2_asex_harmony_ss_sds, lwd=2, col="black",dims = 1:2)
+```
+
 ```{r, results="asis"}
 
-umap_meta_df <- reducedDims(m2_asex_harmony_sce_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_sce_ss@colData[,c("stage", "slingPseudotime_1", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+fld_only_umap_meta_df <- reducedDims(m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
 # mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
 
-# umap_meta_df <- reducedDims(m2_asex_harmony_sce_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_sce_ss@colData[,c("stage", "slingPseudotime_1", "slingPseudotime_2", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+# fld_only_umap_meta_df <- reducedDims(m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1", "slingPseudotime_2", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
 # # mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
 
 
@@ -313,12 +522,12 @@ tm <- theme_classic()+
         legend.text = element_text(size = 22) ,
         legend.title = element_text(size = 24, face = "bold") )
 
-umap_meta_df %>% 
+fld_only_umap_meta_df %>% 
   ggplot(aes(x = umapharmony_1, y =umapharmony_2, color = slingPseudotime_1)) + geom_point(size=0.5) + 
   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
   tm
 
-umap_meta_df %>% 
+fld_only_umap_meta_df %>% 
   ggplot(aes(x = umapharmony_2, y =umapharmony_3, color = slingPseudotime_1)) + geom_point(size=0.5) + 
   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
   tm
@@ -326,97 +535,58 @@ umap_meta_df %>%
 
 ```
 
-```{r, eval=T}
-gogo()
-## Run SNORM on farm like below
-# nextflow run submsn_intgrtn.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_seu_norm.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --resume
-```
-
-
-```{r, eval=T}
-gogo()
-## Run SNORM on farm like below
-# nextflow run submsn_intgrtn_rpca.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_seu_norm.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --k_wt 70 --norm_mthd "LogNormalize" --resume
-```
-
-```{r}
-m2_asex_rpca_int <-  readRDS("data/processed/Pf/m2_all/m2_asex_rpca_int.RDS")
-```
-
-
-```{r}
-DimPlot(m2_asex_rpca_int, group.by = "StagePrelim", pt.size = 0.4, reduction = "umap.rpca")
-DimPlot(m2_asex_rpca_int, dims = c(2,3), group.by = "StagePrelim", pt.size = 0.4, reduction = "umap.rpca")
-```
-
-```{r, eval=FALSE}
-DimPlot(m2_asex_rpca_int, dims = c(1,3), group.by = "donor", pt.size = 0.4, reduction = "umap.rpca")
-DimPlot(m2_asex_rpca_int, dims = c(2,3), group.by = "donor", pt.size = 0.4, reduction = "umap.rpca")
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-# Display the combined datasets as an interactive 3D plot 
-plot_ly(data = data.frame(m2_asex_rpca_int@reductions[["umap.rpca"]]@cell.embeddings), x = ~umaprpca_1, y = ~umaprpca_2, z = ~umaprpca_3,  color= m2_asex_rpca_int@meta.data$stage, opacity = 0.8, size = 1,   type = 'scatter3d')
-
-```
-
-```{r}
-DimPlot(m2_asex_harmony_int, reduction = "pca", group.by = "StagePrelim")
-```
-
-
-```{r, eval=T}
-gogo()
-## Run SNORM on farm like below
-## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
-
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_list.RDS" --o_file_name "m2_asex_seu_sct.RDS" --umap_name "UMAP_" --hvg 250 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "yes" --elbo_nm "m2_asex_seu_sct_elbo.RDS" --resume
-```
-
-
-```{r, eval=T}
-gogo()
-## Run SNORM on farm like below
-# nextflow run submsn_intgrtn_rpca.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_seu_sct.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_sct_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --intgrtn_pc 6 --k_wt 70 --norm_mthd "SCT" --resume
-```
-
-```{r}
-m2_asex_sct_rpca_int <-  readRDS("data/processed/Pf/m2_all/m2_asex_sct_rpca_int.RDS")
-```
-
-
-```{r, fig.width=14, fig.height=5}
-DimPlot(m2_asex_sct_rpca_int, pt.size = 0.4, reduction = "umap.rpca", group.by = c("rpca_clusters", "StagePrelim"), dims = c(2,3))
-```
-
-## Re-intergrate only the asexuals and reumap
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-Convert("data/processed/Pf/m2_all/m2_asex_list_scvi.h5ad", dest = "h5seurat", overwrite = TRUE)
-m2_asex_list_scvi <- LoadH5Seurat("data/processed/Pf/m2_all/m2_asex_list_scvi.h5seurat", assays = "RNA")
-m2_asex_list_scvi
-
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-DimPlot(m2_asex_list_scvi)
-```
-
-
-
+###### Integrate the lab with field asexuals
 ```{r}
 ##Read MCA V3 blood stage reference dataset
 # EF_V3_ref <- readRDS("../sc_velo/data/raw/RoadtoUMAP/pseudotime/raw_combined_cut_0.4.RDS")
 EF_V3_ref <- readRDS("../Mali/data/raw/mca_v3_ref/raw_combined_cut_0.4_nodoublets_stagenew.RDS")
 
-# create seurat from raw counts
+## Subset late rings and early trophs
+EF_V3_ref_ET_LR <- EF_V3_ref[,EF_V3_ref@meta.data$stagenewx %in% c("late ring", "early trophozoite")]
+
+DimPlot(EF_V3_ref, group.by = "stagenewx", dims = c(2,3))
+DimPlot(EF_V3_ref_ET_LR, group.by = "stagenewx", dims = c(2,3))
+DimPlot(EF_V3_ref_ET_LR, group.by = "optionB_assignment", dims = c(2,3))
+DimPlot(EF_V3_ref_ET_LR, group.by = "strain_lab", dims = c(2,3))
+
+```
+
+```{r}
+##Read MCA V3 blood stage reference dataset
+FeaturePlot(EF_V3_ref_ET_LR, features = "pseudo_asex", dims = c(2,3))
+```
+
+```{r}
+##Read MCA V3 blood stage reference dataset
+EF_V3_ref_ET_LR_pt5.5 <- EF_V3_ref_ET_LR[,EF_V3_ref_ET_LR@meta.data[, "pseudo_asex"] < 5.5]
+FeaturePlot(EF_V3_ref_ET_LR_pt5.5, features = "pseudo_asex", dims = c(2,3))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(EF_V3_ref_ET_LR@reductions[["umap"]]@cell.embeddings),
+        x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,
+        color= EF_V3_ref_ET_LR@meta.data$optionB_assignment,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r}
+options(Seurat.object.assay.version = "v5")
+# subset
 EF_V3_ref_asx_cnts <- CreateSeuratObject(counts = EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"][["RNA"]]$counts, meta.data = EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"]@meta.data)
+# EF_V3_ref_asx_cnts <- CreateSeuratObject(counts = EF_V3_ref_ET_LR_pt5.5[["RNA"]]$counts, meta.data = EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"]@meta.data)
 
-# EF_V3_ref_asx_cnts[["RNA5"]] <- as(object = EF_V3_ref_asx_cnts[["RNA"]], Class = "Assay5")
-# DefaultAssay(EF_V3_ref_asx_cnts) <- "RNA5"
-# EF_V3_ref_asx_cnts[["RNA"]] <- NULL
-# EF_V3_ref_asx_cnts <- RenameAssays(object = EF_V3_ref_asx_cnts, RNA5 = 'RNA')
+```
 
+
+```{r}
+DimPlot(EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"])
 ```
 
 ```{r}
@@ -438,13 +608,13 @@ m2_list_asex <- m2_list_asex[unlist(map(m2_list_asex, ~dim(.x)[2] > 100))]
 
 ```{r}
 ## Making list of objects and renaming before integrating
-v3_m2_list_asex <- merge(x = EF_V3_ref_asx_cnts, y = m2_list_asex, add.cell.ids = c("Lab", str_remove(names(m2_list_asex), "SC")))
+v3_m2_asex <- merge(x = EF_V3_ref_asx_cnts, y = m2_list_asex, add.cell.ids = c("Lab", str_remove(names(m2_list_asex), "SC")))
 ```
 
 
 ```{r, fig.width=12, fig.height=4}
 # add stage metadata
-v3_m2_list_asex <- v3_m2_list_asex@meta.data %>% 
+v3_m2_asex <- v3_m2_asex@meta.data %>% 
   rownames_to_column('bcode') %>%
   mutate(dset_labmrg = if_else(str_detect(orig.ident, "MSC"),  str_remove(orig.ident, ".mrna"), "Lab"),
          StageFL = coalesce(stagenewx, stage),
@@ -453,14 +623,20 @@ v3_m2_list_asex <- v3_m2_list_asex@meta.data %>%
          ) %>%
   select(bcode, dset_labmrg, StageFL, StageFL_ND, dset) %>%
   column_to_rownames('bcode') %>% 
-  AddMetaData(v3_m2_list_asex,.)
+  AddMetaData(v3_m2_asex,.)
+
+
+```
+
+```{r}
+# v3_m2_asex[["RNA"]] <- split(v3_m2_asex[["RNA"]], f = v3_m2_asex$dset_labmrg)
 
 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
 ## save for running stdseurat in farm
-saveRDS(v3_m2_list_asex, "data/processed/Pf/m2_all/v3_m2_list_asex.RDS")
+saveRDS(v3_m2_asex, "data/processed/Pf/m2_all/v3_m2_asex.RDS")
 
 ```
 
@@ -468,7 +644,8 @@ saveRDS(v3_m2_list_asex, "data/processed/Pf/m2_all/v3_m2_list_asex.RDS")
 Write out annotated asexual lab+field in .h5ad 
 ```{r, message=FALSE, warning=FALSE, eval=T}
 ##Change factor metadata to character as these are not handled properly when converting to h5ad
-v3_m2_list_asex_raw <- v3_m2_list_asex
+v3_m2_list_asex_raw <- v3_m2_asex
+v3_m2_list_asex_raw@assays$RNA@layers$data.1 <- NULL
 v3_m2_list_asex_raw@meta.data <- v3_m2_list_asex_raw@meta.data %>% mutate(across(where(is.factor), as.character))
 
 ## !!!NB - NEEDS SORTING IN FUTURE UPGRADING TO SEURAT 5 RESULTED IN ERROR AS DESCRIBED https://github.com/mojaveazure/seurat-disk/issues/147#top
@@ -492,64 +669,132 @@ gogo()
 ## Run SNORM on farm like below
 ## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
 
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_list_asex.RDS" --o_file_name "v3_m2_asex_seu_norm.RDS" --umap_name "UMAP_" --hvg 300 --cluster_resoln 1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "v3_m2_asex_seu_norm_elbo.RDS" --resume
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --ncores "14" --mem "100 GB"  --resume
+
+# --hvg 300
 ```
 
 
 ```{r}
-v3_m2_asex_seu_norm <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_seu_norm.RDS")
+v3_m2_asex_norm <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_norm.RDS")
+v3_m2_asex_norm_elbo <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_norm_elbo.RDS")
+v3_m2_asex_norm_elbo
 ```
 
 ```{r, fig.width=10, fig.height=5}
 # visualize by batch and cell type annotation
 # cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_seu_norm, reduction = "umap.unintegrated", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_norm, reduction = "umap.unintegrated", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+```
+```{r, fig.width=10, fig.height=5}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_norm, reduction = "umap.unintegrated", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+```
+
+
+```{r, fig.width=10, fig.height=5}
+
+DimPlot(v3_m2_asex_norm, cells.highlight = colnames(v3_m2_asex_norm[, v3_m2_asex_norm$donor == "MSC12"]), label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
 ```
 
 ```{r, fig.width=12, fig.height=4}
 # visualize by batch and cell type annotation
 # cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_seu_norm, reduction = "umap.unintegrated", group.by = c("orig.ident", "StagePrelim"), label = F)
+DimPlot(v3_m2_asex_norm, reduction = "umap.unintegrated", group.by = c("orig.ident", "stage"), label = F)
 ```
 
 
 ```{r, fig.width=12, fig.height=12}
 
-FeaturePlot(v3_m2_asex_seu_norm, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.unintegrated", ncol = 3, slot = "data")
+FeaturePlot(v3_m2_asex_norm, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.unintegrated", ncol = 3, slot = "data")
 ```
 
 !!!NB - FARM CODE - DONT DELETE
-```{r, eval=T}
-gogo()
-## Run SNORM on farm like below
-# nextflow run submsn_intgrtn.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_seu_norm.RDS" --mthd "HarmonyIntegration" --o_file_name "v3_m2_asex_harmony.RDS" --cluster_resoln 1 --cl_nm "harmony_clusters_asex" --umap_redctn_nm "umap.harmony" --new_redctn "integrated.harmony" --resume
-```
+
 
 
 ```{r, eval=T}
 gogo()
 ## Run harmony integration with the number of PCs being automatically detected by findPC
 
-# nextflow run submsn_intgrtn_pc.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_seu_norm.RDS" --mthd "HarmonyIntegration" --o_file_name "v3_m2_asex_harmony.RDS" --cluster_resoln 1 --cl_nm "harmony_clusters_asex" --umap_redctn_nm "umap.harmony" --new_redctn "integrated.harmony" --intgrtn_pc 30 --integrtd_pc_man "no" --elbo_nm "v3_m2_asex_harmony_elbo.RDS"  --findpc_mthd "perpendicular line" --resume
+# nextflow run  ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 5 --integrtd_pc_man "no" --findpc_mthd "perpendicular line" --ncores "16" --mem "120 GB" -resume
+
 ```
 
 
 ```{r}
-v3_m2_asex_harmony <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony.RDS")
-v3_m2_asex_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_elbo.RDS")
+v3_m2_asex_norm_harmony <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_norm_harmony.RDS")
+v3_m2_asex_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/v3_m2_asex_norm_harmony_elbo.RDS")
+v3_m2_asex_norm_harmony_elbo
+
 ```
+
 
 
 ```{r}
-v3_m2_asex_harmony <- JoinLayers(v3_m2_asex_harmony)
+v3_m2_asex_harmony <-  v3_m2_asex_norm_harmony
+
 ```
+
+```{r, fig.width=6, fig.height=5}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors)
+```
+
 
 
 ```{r, fig.width=6, fig.height=5}
 # visualize by batch and cell type annotation
 # cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StagePrelim", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors)
 ```
+
+
+```{r, fig.width=10, fig.height=5}
+
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(2,3), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony, reduction = "pca", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+
+```
+
+```{r, fig.width=10, fig.height=5}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(2,3), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony, reduction = "pca", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+```
+
+
+```{r, fig.width=10, fig.height=5}
+
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(2,3)) #+ scale_color_manual(values = sp_fld_colors)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= v3_m2_asex_harmony@meta.data$StageFL_ND,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, fig.width=10, fig.height=5}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2), split.by = "dset") #+ scale_color_manual(values = sp_fld_colors)
+```
+
+
 
 ```{r, fig.width=12, fig.height=4}
 # visualize by batch and cell type annotation
@@ -561,45 +806,32 @@ DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = c("orig.ident
 ```{r, fig.width=6, fig.height=5}
 # visualize by batch and cell type annotation
 # cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "harmony_clusters_asex", label = T, dims = c(1,2))
+DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = "harmony_clusters", label = T, dims = c(1,2))
 ```
 
+
+```{r, fig.width=10, fig.height=5}
+
+DimPlot(v3_m2_asex_harmony, cells.highlight = colnames(v3_m2_asex_harmony[, v3_m2_asex_harmony$donor == "MSC12"]), label = F, dims = c(1,2), split.by = "dset", reduction = "umap.harmony") #+ scale_color_manual(values = sp_fld_colors)
+```
 
 ```{r, fig.width=12, fig.height=12}
 
-FeaturePlot(v3_m2_asex_harmony, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
+# FeaturePlot(v3_m2_asex_harmony, features = top3_gns$gene, pt.size = 0.01, reduction = "umap.harmony", ncol = 3, slot = "data")
 ```
 
-```{r, fig.width=12, fig.height=4}
-# visualize by batch and cell type annotation
-# cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_harmony, reduction = "umap.harmony", group.by = c("StageFL"), label = F)
+#### field + lab integrated slingshot with entire asexual dataset that is not working
+
+```{r}
+# gogo()
+v3_m2_asex_harmony_res <- FindClusters(v3_m2_asex_harmony, resolution = 0.7, cluster.name = "harmony_clusters_ss")
+
 ```
 
-```{r, fig.width=12, fig.height=4}
-# visualize by batch and cell type annotation
-# cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_harmony, reduction = "pca", group.by = c("StageFL"), label = F)
-```
 
-```{r, fig.width=12, fig.height=4}
-# visualize by batch and cell type annotation
-# cell type annotations were previously added by Azimuth
-DimPlot(v3_m2_asex_harmony, reduction = "pca", group.by = c("dset"), label = F)
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-# Display the combined datasets as an interactive 3D plot
-
-plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["pca"]]@cell.embeddings),
-        x = ~PC_1, y = ~PC_2, z = ~PC_3,
-        color= v3_m2_asex_harmony@meta.data$StageFL,
-        # colors = c('blue', 'red'),
-        opacity = 0.8,
-        size = 0.2, 
-        type = 'scatter3d'
-)
-
+```{r}
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(2,3))
 ```
 
 
@@ -607,24 +839,9 @@ plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["pca"]]@cell.embeddings
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(v3_m2_asex_harmony_res@reductions[["umap.harmony"]]@cell.embeddings),
         x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
-        color= v3_m2_asex_harmony@meta.data$StageFL,
-        # colors = c('blue', 'red'),
-        opacity = 0.8,
-        size = 0.2, 
-        type = 'scatter3d'
-)
-
-```
-
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-# Display the combined datasets as an interactive 3D plot
-
-plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["umap.harmony"]]@cell.embeddings),
-        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
-        color= v3_m2_asex_harmony@meta.data$StageFL,
+        color= v3_m2_asex_harmony_res@meta.data$harmony_clusters_ss,
         # colors = c('blue', 'red'),
         opacity = 0.8,
         size = 0.2, 
@@ -635,41 +852,901 @@ plot_ly(data = data.frame(v3_m2_asex_harmony@reductions[["umap.harmony"]]@cell.e
 
 
 ```{r}
-# strn_c_new_mdata_m22_min_qcd_mg <- strn_c_new_mdata_m22_min_qcd %>% 
-#   bind_rows(., .id = "donor") %>% 
-#   mutate(bcode = paste0(str_remove(donor, "SC"), "_", bcode), 
-#          StrainDon = paste0(str_remove(donor, "SC"), "_", strain)) %>%
-#   select(bcode, strain, StrainDon) %>% 
-#   column_to_rownames("bcode") 
+v3_m2_asex_harmony_res <- JoinLayers(v3_m2_asex_harmony_res)
+
+```
+
+```{r}
+## subset where field parasites are for slingshot
+saveRDS(v3_m2_asex_harmony_res, "data/processed/Pf/m2_all/v3_m2_asex_harmony_res.RDS")
+```
+
+```{r, eval=F}
+gogo()
+## !!!NOTE - Need to specify start and end cluster due to complex 2D structure so using old slingshot script
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_slingshot.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/slingshot.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_res.RDS" --o_file_name "v3_m2_asex_harmony_ss.RDS" --umap_nm "umap.harmony" --clstr "harmony_clusters_ss" --s_clstr "5" --e_clstr "9" --redctn "UMAP" --ncores "20" --mem "100 GB" -resume
+
+# --s_clstr "9" --e_clstr "5" --redctn "UMAP"
+# --s_clstr "8" --e_clstr "9"
+# --s_clstr "3" --e_clstr "1"
+```
+
+
+```{r, eval=FALSE}
+v3_m2_asex_harmony_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_ss.RDS")
+```
+
+
+```{r, eval=T}
+# brewer.pal(10,"Set3") %>% set_names(levels(as.factor(v3_m2_asex_harmony_ss$harmony_clusters_ss)))
+```
+
+
+```{r, eval=T}
+# plot(reducedDims(v3_m2_asex_harmony_ss)$UMAP[,1:2], col = brewer.pal(10,"Set3")[as.factor(v3_m2_asex_harmony_ss$harmony_clusters_ss)], pch=16, asp = 0.7)
+
+```
+
+```{r, eval=FALSE}
+##Prepare slingshot dataset (SDS) object 
+v3_m2_asex_harmony_sshot_sds <- SlingshotDataSet(v3_m2_asex_harmony_ss)
+
+plot(reducedDims(v3_m2_asex_harmony_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(v3_m2_asex_harmony_ss$StagePrelim)], pch=16, asp = 0.7)
+lines(v3_m2_asex_harmony_sshot_sds, lwd=2, col="black",dims = 1:2)
+```
+
+
+
+```{r, results="asis", eval=FALSE}
+
+v3_m2_asex_umap_meta_df <- reducedDims(v3_m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1",  "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  
+
+# v3_m2_asex_umap_meta_df <- reducedDims(v3_m2_asex_harmony_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_ss@colData[,c("stage", "slingPseudotime_1", "slingPseudotime_2",  "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+# mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 22) ,
+        legend.title = element_text(size = 24, face = "bold") )
+
+# map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>% 
+map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>% 
+  ggplot(aes(x = umapharmony_1, y =umapharmony_2, color = !!rlang::sym(.x))) + geom_point(size=0.5) + 
+  scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+  tm)
+
+# v3_m2_asex_umap_meta_df %>% 
+#   ggplot(aes(x = umapharmony_2, y =umapharmony_3, color = slingPseudotime_1)) + geom_point(size=0.5) + 
+#   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+#   tm
+
+
+```
+
+#### Alternative subset for field + lab integrated slingshot with early asexual dataset that is working
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), cells.highlight = colnames(v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res@meta.data$dset == "Field"]))
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
+```
+
+
+```{r}
+v3_m2_asex_harmony_res@meta.data %>% dplyr::count(harmony_clusters_ss, dset) %>% group_by(harmony_clusters_ss) %>% mutate(prop = round(n/sum(n), 2)) %>% filter(dset == "Field" & prop >0.2)
+
+# v3_m2_asex_harmony_res[, v3_m2_asex_harmony_res$donor != "MSC12" | is.na(v3_m2_asex_harmony_res$donor)]@meta.data %>% dplyr::count(harmony_clusters, dset) %>% group_by(harmony_clusters) %>% mutate(prop = round(n/sum(n), 2)) %>% filter(dset == "Field" & prop >0.1)
+v3_m2_asex_harmony_res[, v3_m2_asex_harmony_res$donor != "MSC12" | is.na(v3_m2_asex_harmony_res$donor)] @meta.data %>% dplyr::count(harmony_clusters_ss, dset) %>% group_by(harmony_clusters_ss) %>% mutate(prop = round(n/sum(n), 2)) %>% filter(dset == "Field" & prop >0.3)
+```
+
+```{r}
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("6", "3", "0", "2", "7", "11") & v3_m2_asex_harmony_res@reductions$umap.harmony@cell.embeddings[,"umapharmony_1"] < 2.5]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("4", "0", "2", "6") ]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("0", "1", "3", "7", "8") ]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("0", "1", "2", "4", "12", "13") ]
+v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters_ss %in% c("0", "1", "5", "12") ]
+
+
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
+```
+
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dset")
+
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld[,!v3_m2_asex_harmony_res_fld$donor %in% c("MSC12") & !is.na(v3_m2_asex_harmony_res_fld$donor)], pt.size = 0.4, reduction = "umap.harmony", group.by = "donor", label = T, dims = c(1,2))
+```
+
+```{r}
+## subset where field parasites are for slingshot
+v3_m2_asex_harmony_res_fld <- JoinLayers(v3_m2_asex_harmony_res_fld)
+saveRDS(v3_m2_asex_harmony_res_fld, "data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld.RDS")
+```
+
+```{r, eval=T}
+gogo()
+## !!!NOTE - Need to specify start and end cluster due to complex 2D structure so using old slingshot script
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_slingshot.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/slingshot.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld.RDS" --o_file_name "v3_m2_asex_harmony_fld_ss.RDS" --umap_nm "umap.harmony" --clstr "harmony_clusters_ss" --s_clstr "12" --e_clstr "5" --redctn "UMAP" --ncores "20" --mem "100 GB" -resume
+
+```
+
+
+```{r, eval=T}
+v3_m2_asex_harmony_fld_ss <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_harmony_fld_ss.RDS")
+```
+
+
+```{r, eval=T}
+##Prepare slingshot dataset (SDS) object 
+v3_m2_asex_harmony_fld_ss_sds <- SlingshotDataSet(v3_m2_asex_harmony_fld_ss)
+
+plot(reducedDims(v3_m2_asex_harmony_fld_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(v3_m2_asex_harmony_fld_ss$StagePrelim)], pch=16, asp = 0.7)
+lines(v3_m2_asex_harmony_fld_ss_sds, lwd=2, col="black",dims = 1:2)
+```
+
+
+
+```{r, results="asis"}
+
+v3_m2_asex_umap_meta_df <- reducedDims(v3_m2_asex_harmony_fld_ss)$UMAP[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_asex_harmony_fld_ss@colData[,c("stage", "slingPseudotime_1", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+# mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 22) ,
+        legend.title = element_text(size = 24, face = "bold") )
+
+map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>% 
+  ggplot(aes(x = umapharmony_1, y =umapharmony_2, color = !!rlang::sym(.x))) + geom_point(size=0.5) + 
+  scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+  tm)
+
+# v3_m2_asex_umap_meta_df %>% 
+#   ggplot(aes(x = umapharmony_2, y =umapharmony_3, color = slingPseudotime_1)) + geom_point(size=0.5) + 
+#   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+#   tm
+
+
+```
+
+correlation of pseudotimes from field only object and field + lab object. Proceed with field + lab for now?
+```{r, fig.width=5, fig.height=5}
+fld_only_umap_meta_df %>% left_join(., v3_m2_asex_umap_meta_df, by = "cell_bc", suffix = c("_fld", "_fld_lb")) %>% ggplot(aes(x = slingPseudotime_1_fld, y = slingPseudotime_1_fld_lb)) + geom_point()
+```
+
+
+Save integrated dataset with pseudotimes
+```{r}
+saveRDS(v3_m2_asex_harmony_fld_ss_sds, "data/processed/Pf/m2_all/v3_m2_asex_harmony_fld_ss_sds.RDS")
+```
+
+
+```{r}
+## add pseudotime from the field_lab integrated object and from the field only object
+v3_m2_asex_harmony_res_fld_pt <- v3_m2_asex_harmony_fld_ss@colData[, "slingPseudotime_1", drop = F] %>% 
+  as.data.frame()  %>% 
+  rename("pseudotime" = slingPseudotime_1)  %>% 
+  rownames_to_column("bcode") %>% 
+  left_join(., m2_asex_harmony_ss@colData[, "slingPseudotime_1", drop=F] %>% 
+              as.data.frame() %>% 
+              rename("pseudotime_fld_only" = slingPseudotime_1) %>%
+              rownames_to_column("bcode")) %>% 
+  column_to_rownames("bcode") %>%
+  AddMetaData(v3_m2_asex_harmony_res_fld, .)
+```
+
+
+```{r}
+## add pseudotime
+saveRDS(v3_m2_asex_harmony_res_fld_pt,  "data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
 ```
 
 ```{r, fig.width=12, fig.height=4}
-# add stage metadata
-# v3_m2_asex_harmony <- strn_c_new_mdata_m22_min_qcd_mg %>% select(StrainDon) %>%  AddMetaData(v3_m2_asex_harmony,.)
-
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c("StageFL"), label = F)
 ```
 
 ```{r, fig.width=12, fig.height=4}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "pca", group.by = c("StageFL"), label = F)
+```
+
+```{r, fig.width=12, fig.height=4}
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "pca", group.by = c("dset"), label = F)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["pca"]]@cell.embeddings),
+        x = ~PC_1, y = ~PC_2, z = ~PC_3,
+        color= v3_m2_asex_harmony_res_fld_pt@meta.data$StageFL,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.2, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= v3_m2_asex_harmony_res_fld_pt@meta.data$StageFL,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.2, 
+        type = 'scatter3d'
+)
+
+```
+
+
+
+```{r, fig.width=15, fig.height=5}
+# visualize by batch and cell type annotation
+v3_m2_asex_harmony_res_fld_pt@meta.data %>% filter(str_detect(donor, "MSC")) %>% dplyr::count(donor, Symptomatic, Hb_Type)
+```
+
+########################### START Each donor separate integration ########################### 
+
+
+#### Remove likely doublets with gametocytes
+#### Remove likely doublets with asexual
+```{r}
+## Remove likely doublets with asexual using SBP1 and REX1 as asexual markers - may need to find better markers
+# m2_list_asex_no_gam <- map(m2_list_asex, ~subset(x = .x, subset = `PF3D7-0501300` > 1 | `PF3D7-0935900` > 1 , invert = T, slot = 'counts'))
+# m2_list_asex_no_gam <- map(m2_list_asex_no_gam, ~subset(x = .x, subset = `PF3D7-0501300` == 1 & `PF3D7-0935900` == 1 , invert = T, slot = 'counts'))
+
+```
+
+```{r}
+## Remove likely doublets with asexual using SBP1 and REX1 as asexual markers - may need to find better markers
+# rm(m2_list_asex)
+```
+
+
+```{r}
+## Making list of objects and renaming before integrating
+# map(m2_list_asex_no_gam, ~table(.x@meta.data$stage_c))
+map(m2_list_asex, ~table(.x@meta.data$stage_c))
+
+```
+
+
+```{r}
+## asexual subsetting and downsampling
+set.seed(123)
+
+EF_V3_ref_asx_subset <- EF_V3_ref_asx_cnts[,EF_V3_ref_asx_cnts$stagenewx %in% c("early ring", "late ring", "early trophozoite")]
+
+EF_V3_ref_asx_subset <- EF_V3_ref_asx_subset[,EF_V3_ref_asx_subset@meta.data %>% rownames_to_column('bcode') %>% group_by(stagenewx) %>% slice_sample(n=1000) %>% pull(bcode)]
+```
+
+
+
+Merge each donor with lab gams
+```{r}
+## Lab male and females separately
+v3_m2_don_asex_list <- imap( m2_list_asex, ~{
+  
+  merge(x = EF_V3_ref_asx_subset, y = .x, add.cell.ids = c("Lab", str_remove(.y, "SC")), 
+                       merge.data = F)
+  
+  }) 
+
+```
+
+```{r}
+## Lab male and females separately
+m12_asex_subset <- m2_list_asex[["MSC12"]][,m2_list_asex[["MSC12"]]$StagePrelim %in% c("Early ring", "Late ring", "Early trophozoite")]
+```
+
+Merge each donor with M12 asexuals 
+```{r}
+## Lab male and females separately
+m12C_m2_don_asex_list <- imap( m2_list_asex[!names(m2_list_asex) == "MSC12"], ~{
+  
+  merge(x = m12_asex_subset, y = list(EF_V3_ref_asx_subset, .x), add.cell.ids = c("M12", "Lab", str_remove(.y, "SC")),  merge.data = F)
+  # merge(x = m12_asex_subset, y = .x, add.cell.ids = c("M12", str_remove(.y, "SC")),  merge.data = F)
+  
+  }) 
+
+```
+
+
+```{r, fig.width=12, fig.height=4}
 # add stage metadata
-# v3_m2_asex_harmony <- v3_m2_asex_harmony@meta.data %>% 
-#   rownames_to_column('bcode') %>%
-#   mutate(donor = str_remove(orig.ident, ".mrna"), 
-#          # strain_don = case_when(str_detect(orig.ident, "MSC") ~ paste0(Strain_DN, "_", donor))
-#          ) %>%
-#   left_join(., irods_id_sk21_mdata_cln %>% select(sample_nm, Symptomatic, Hb_Type), by = c("donor" = "sample_nm")) %>%
-#   select(bcode, donor, Symptomatic, Hb_Type) %>%
-#   column_to_rownames('bcode') %>% 
-#   AddMetaData(v3_m2_asex_harmony,.)
+add_mdata_fn <- function(obj, stg_lab = "stagenewx"){
+  obj@meta.data %>% 
+  rownames_to_column('bcode') %>%
+  mutate(dset_labmrg = if_else(str_detect(orig.ident, "MSC"),  str_remove(orig.ident, ".mrna"), "Lab"),
+         StageFL = coalesce(!!rlang::sym(stg_lab), stage),
+         StageFL_ND = str_to_sentence(StageFL),
+         dset = if_else(str_detect(orig.ident, "MSC"),  "Field", "Lab"),
+         Stage_HMO = str_to_sentence(str_remove_all(StageFL, "gametocyte \\(|\\)"))
+         ) %>%
+  select(bcode, dset_labmrg, StageFL, StageFL_ND, Stage_HMO, dset) %>%
+  column_to_rownames('bcode') %>% 
+  AddMetaData(obj,.)
+}
 
 ```
 
-```{r, fig.width=15, fig.height=5}
-# visualize by batch and cell type annotation
-v3_m2_asex_harmony@meta.data %>% filter(str_detect(donor, "MSC")) %>% dplyr::count(donor, Symptomatic, Hb_Type)
+
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+v3_m2_don_asex_list <- map(v3_m2_don_asex_list, ~add_mdata_fn(obj = .x)) 
+m12C_m2_don_asex_list <- map(m12C_m2_don_asex_list, ~add_mdata_fn(obj = .x, stg_lab = "stagenewx")) 
+# m12C_m2_don_asex_list <- map(m12C_m2_don_asex_list, ~add_mdata_fn(obj = .x, stg_lab = "StagePrelim")) 
+
 ```
 
 
-```{r, fig.width=15, fig.height=5}
+```{r}
+all_sample_name_nms <- c("MSC1", "MSC3","MSC12", "MSC13", "MSC14", "MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
+```
+
+```{r}
+
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex.RDS")))
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/m12C_m2_don_asex.RDS")))
+
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm.RDS")))
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/m12C_m2_don_asex_norm.RDS")))
+
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony.RDS")))
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/m12C_m2_don_asex_norm_harmony.RDS")))
+```
+
+```{r, message=FALSE, warning=FALSE}
+## save for running stdseurat in farm
+imap(v3_m2_don_asex_list, ~saveRDS(.x, paste0("data/processed/Pf/", .y, "/v3_m2_don_asex.RDS")))
+imap(m12C_m2_don_asex_list, ~saveRDS(.x, paste0("data/processed/Pf/", .y, "/m12C_m2_don_asex.RDS")))
+
+```
+
+Seurat standard normalization and harmony
+
+
+```{r}
+gogo()
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/m12C_m2_don_asex.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 100 --cluster_resoln 1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --ncores "2" --mem "100 GB" -resume
+
+## NOTE - MANUAL PC AT 3 keeps the clusters together and introduces less variability
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/m12C_m2_don_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 3 --integrtd_pc_man "yes" --findpc_mthd "perpendicular line" --min_dist 0.1 --nneighbs 50  --ncores "3" --mem "100 GB" -resume
+
+## !!NOTE - DONT USE - BACKUP FOR AUTO PC. ABOVE WORKS BEST
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/m12C_m2_don_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 5 --integrtd_pc_man "no" --findpc_mthd "perpendicular line" --ncores "3" --mem "100 GB" -resume
+
+```
+
+
+```{r}
+v3_m2_don_asex_norm_harmony_list <- list.files("data/processed/Pf", pattern = "v3_m2_don_asex_norm_harmony.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/v3_m2_don_asex_norm_harmony.RDS'))) %>%
+  .[names(m12C_m2_don_asex_list)] %>%
+  .[!is.na(.)] %>%
+  map(readRDS)
+  
+```
+
+
+```{r}
+m12C_m2_don_asex_norm_elbo_list <- list.files("data/processed/Pf", pattern = "m12C_m2_don_asex_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/m12C_m2_don_asex_norm_elbo.RDS'))) %>%
+  .[names(m12C_m2_don_asex_list)] %>%
+  .[!is.na(.)] %>%
+  map(readRDS)
+  
+m12C_m2_don_asex_norm_elbo_list
+```
+
+```{r}
+m12C_m2_don_asex_norm_harmony_list <- list.files("data/processed/Pf", pattern = "m12C_m2_don_asex_norm_harmony.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/m12C_m2_don_asex_norm_harmony.RDS'))) %>%
+  .[names(m12C_m2_don_asex_list)] %>%
+  .[!is.na(.)] %>%
+  map(readRDS)
+  
+```
+
+!! NOTE - RENAMING PREVIOUS OBJECT TO AVOID CHANGING CODE BELOW
+```{r}
+v3_m2_don_asex_norm_harmony_list <- m12C_m2_don_asex_norm_harmony_list
+
+```
+
+
+
+```{r, fig.width=6, fig.height=5}
 # visualize by batch and cell type annotation
-m2_asex_harmony_tr <- v3_m2_asex_harmony[,v3_m2_asex_harmony@meta.data$dset == "Field"]
+map(v3_m2_don_asex_norm_harmony_list, ~DimPlot(.x, reduction = "pca", group.by = "StageFL_ND", label = F, pt.size = 3, dims = c(1,2)))
+# map(v3_m2_don_asex_norm_harmony_list, ~DimPlot(.x, reduction = "umap.unintegrated", group.by = "StageFL_ND", label = F, pt.size = 0.5, dims = c(1,2))) 
+```
+
+
+```{r, fig.width=15, fig.height=4}
+# visualize by batch and cell type annotation
+map(v3_m2_don_asex_norm_harmony_list, ~DimPlot(.x, reduction = "umap.harmony", group.by = c("StageFL", "donor", "strain"), label = F, dims = c(1,2))) #+ scale_color_manual(values = sp_fld_colors)
+```
+
+```{r, fig.width=6, fig.height=5}
+# gogo()
+```
+
+```{r, fig.width=15, fig.height=4}
+# visualize by batch and cell type annotation
+map(v3_m2_don_asex_norm_harmony_list, ~DimPlot(.x, reduction = "umap.harmony", group.by = c("StageFL", "donor", "strain"), label = F, dims = c(1,2))) #+ scale_color_manual(values = sp_fld_colors)
+```
+
+
+```{r, fig.width=6, fig.height=5}
+# gogo()
+```
+
+```{r, fig.width=6, fig.height=5}
+# visualize by batch and cell type annotation
+map(v3_m2_don_asex_norm_harmony_list, ~DimPlot(.x, reduction = "umap.harmony", group.by = "StageFL", label = F, dims = c(1,2))) #+ scale_color_manual(values = sp_fld_colors)
+```
+
+```{r, fig.width=6, fig.height=5}
+# visualize by batch and cell type annotation
+map(v3_m2_don_asex_norm_harmony_list, ~FeaturePlot(.x, reduction = "pca", features = "nFeature_RNA", label = F, dims = c(1,2))) 
+map(v3_m2_don_asex_norm_harmony_list, ~FeaturePlot(.x, reduction = "umap.harmony", features = "nFeature_RNA", label = F, dims = c(1,2))) 
+```
+
+
+
+```{r}
+# gogo()
+v3_m2_don_asex_norm_harmony_res_list <- map(v3_m2_don_asex_norm_harmony_list, ~FindClusters(.x, resolution = 0.04, cluster.name = "harmony_clusters_ss", verbose = F))
+
+```
+
+```{r}
+imap(v3_m2_don_asex_norm_harmony_res_list, ~DimPlot(.x, pt.size = 0.4, reduction = "umap.harmony", group.by = c("harmony_clusters_ss", "Stage_HMO"), label = T, dims = c(1,2)) + labs(title = .y))
+```
+
+
+```{r}
+map(v3_m2_don_asex_norm_harmony_res_list, ~DimPlot(.x, pt.size = 0.4, reduction = "pca", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), raster = F))
+# DimPlot(v3_m2_fm_harmony, reduction = "pca", group.by = c("dset"), label = F)
+
+```
+
+
+```{r}
+map(v3_m2_don_asex_norm_harmony_res_list, ~.x@meta.data %>% dplyr::count(Stage_HMO, harmony_clusters_ss) %>% group_by(harmony_clusters_ss) %>% slice_max(n) )
+
+start_clst <- map(v3_m2_don_asex_norm_harmony_res_list, ~.x@meta.data %>% dplyr::count(Stage_HMO, harmony_clusters_ss) %>% group_by(harmony_clusters_ss) %>% slice_max(n) %>% filter(Stage_HMO == "Early ring") %>% ungroup() %>%  slice_max(n) %>% pull(harmony_clusters_ss)) %>% unlist()
+# start_clst <- map(v3_m2_don_asex_norm_harmony_res_list, ~.x@meta.data %>% dplyr::count(Stage_HMO, harmony_clusters_ss) %>% filter(Stage_HMO == "Early ring") %>%  slice_max(n) %>% pull(harmony_clusters_ss)) %>% unlist()
+
+end_clst <- map(v3_m2_don_asex_norm_harmony_res_list, ~.x@meta.data %>% dplyr::count(Stage_HMO, harmony_clusters_ss) %>% group_by(harmony_clusters_ss) %>% slice_max(n) %>% filter(Stage_HMO == "Early trophozoite") %>% ungroup() %>% slice_max(n) %>% pull(harmony_clusters_ss)) %>% unlist()
+
+```
+
+
+```{r, fig.width=12, fig.height=4}
+map(v3_m2_don_asex_norm_harmony_res_list, ~FeaturePlot(.x[,.x@meta.data$dset == "Field"], features = c("PF3D7-0406200", "PF3D7-1469900", "PF3D7-0903800", "PF3D7-0501300", "PF3D7-0935900"), pt.size = 0.1, reduction = "pca", ncol = 5, slot = "counts", order = T, raster = F))
+```
+
+slingshot
+```{r, message=FALSE, warning=FALSE}
+## save for running stdseurat in farm
+v3_m2_don_asex_norm_harmony_res_list <- map(v3_m2_don_asex_norm_harmony_res_list, ~JoinLayers(.x))
+
+```
+
+
+```{r}
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_[0-9]*.RDS")))
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_[0-9]*_ss.RDS")))
+
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_NA.RDS")))
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_NA_ss.RDS")))
+
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+## save for running slingshot in farm putting the starting cluster at the end of name
+imap(v3_m2_don_asex_norm_harmony_res_list, ~saveRDS(.x, paste0("data/processed/Pf/", .y, "/v3_m2_don_asex_norm_harmony_res_", start_clst[.y], "_", end_clst[.y], ".RDS")))
+
+```
+
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_slingshot_start_clst.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/slingshot.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/v3_m2_don_asex_norm_harmony_res_[0-9]_[0-9].RDS" --sufx "ss" --umap_nm "umap.harmony" --clstr "harmony_clusters_ss" --e_clstr "NULL" --redctn "UMAP"  --ncores "2" --mem "100 GB"
+```
+
+
+
+```{r}
+# v3_m2_fm_seu_norm <-  readRDS("data/processed/Pf/m2_all/v3_m2_fm_seu_norm.RDS")
+v3_m2_don_asex_norm_harmony_res_ss <- list.files("data/processed/Pf", pattern = "v3_m2_don_asex_norm_harmony_res_[0-9]+_[0-9]+_ss.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/v3_m2_don_asex_norm_harmony_res_.*'))) %>%
+  .[names(v3_m2_don_asex_norm_harmony_res_list)] %>%
+  .[!is.na(.)] %>%
+  map(readRDS)
+  
+```
+
+
+```{r, eval=T}
+##Prepare slingshot dataset (SDS) object 
+v3_m2_don_asex_norm_harmony_res_ss_sds <- map(v3_m2_don_asex_norm_harmony_res_ss, ~SlingshotDataSet(.x))
+
+map2(v3_m2_don_asex_norm_harmony_res_ss, v3_m2_don_asex_norm_harmony_res_ss_sds, ~{
+  plot(reducedDims(.x)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(.x$Stage_HMO)], pch=16, asp = 0.7)
+  lines(.y, lwd=2, col="black",dims = 1:2)
+})
+```
+
+
+```{r}
+# gogo()
+```
+
+
+Find which pseudotime is for which stage
+```{r}
+ptime_stage_dict <- v3_m2_don_asex_norm_harmony_res_ss %>% map(., ~.x@colData[, c("slingPseudotime_1", "dset", "Stage_HMO")] %>% data.frame() %>% select(contains("slingPseudotime_"),  "dset", "Stage_HMO") %>% filter(dset == "Field") %>% count(!is.na(slingPseudotime_1), Stage_HMO) %>% pivot_longer(cols = contains("slingPseudotime"), names_to = "pt") %>% filter(value == TRUE) %>% group_by(pt) %>% slice_max(n) %>% select(pt, Stage_HMO) %>% ungroup() %>% mutate(across(pt, ~str_remove_all(., "!is.na\\(|\\)"))))
+  
+```
+
+```{r}
+saveRDS(ptime_stage_dict, "data/processed/Pf/m2_all/ptime_stage_dict.RDS")
+```
+
+Remove those with NA in slingPseudotime_1 - some weird MSC12 cells that cluster outside the trajectory - MSC14 and MSC55
+
+```{r}
+map(v3_m2_don_asex_norm_harmony_res_ss, ~table(!is.na(.x@colData[, "slingPseudotime_1"])))
+```
+
+
+```{r}
+v3_m2_don_asex_norm_harmony_res_ss <- map(v3_m2_don_asex_norm_harmony_res_ss, ~.x[, !is.na(.x@colData[, "slingPseudotime_1"])])
+```
+
+```{r}
+## Label pseudotimes with the relevant stage name
+v3_m2_don_asex_norm_harmony_res_ss_pt <- map(v3_m2_don_asex_norm_harmony_res_ss, ~{
+  
+  .x@colData[,'asexual_pt'] <- .x@colData[, "slingPseudotime_1"]
+  
+  return(.x)
+  
+})
+
+
+```
+
+```{r}
+## Label pseudotimes with the relevant stage name
+# v3_m2_don_asex_norm_harmony_res_ss_pt <- map2(v3_m2_don_asex_norm_harmony_res_ss, ptime_stage_dict, ~{
+#   
+#   .x@colData[,'asexual_pt'] <- .x@colData[, as.character(.y[.y[, "Stage_HMO"] == "Female", "pt"])]
+#   .x@colData[,'male_pt'] <- .x@colData[, as.character(.y[.y[, "Stage_HMO"] == "Male", "pt"])]
+#   
+#   return(.x)
+#   
+# })
+
+
+```
+
+
+```{r}
+rm(v3_m2_don_asex_norm_harmony_res_ss)
+```
+
+
+```{r}
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_ss_pt.RDS")))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+## save for running stdseurat in farm
+imap(v3_m2_don_asex_norm_harmony_res_ss_pt, ~saveRDS(.x, paste0("data/processed/Pf/", .y, "/v3_m2_don_asex_norm_harmony_res_ss_pt.RDS")))
+```
+
+```{r, results="asis"}
+v3_m2_don_asex_norm_harmony_res_list<- map2(v3_m2_don_asex_norm_harmony_res_list, v3_m2_don_asex_norm_harmony_res_ss_pt, ~{
+  .x@meta.data  %>% 
+  rownames_to_column("cell_bc") %>% 
+  select(cell_bc, orig.ident) %>%
+  mutate(n_cb = str_remove(cell_bc, "_1")) %>% 
+  left_join(., .y@colData[,c("slingPseudotime_1", "asexual_pt", "orig.ident")] %>% 
+              as.data.frame() %>% 
+              rownames_to_column("cell_bc") %>%
+              mutate(n_cb = str_remove(cell_bc, "_1")), 
+            by=c("n_cb", "orig.ident") ) %>% 
+  select(cell_bc.x, slingPseudotime_1, asexual_pt) %>% 
+  column_to_rownames("cell_bc.x") %>% 
+  AddMetaData(.x, .)
+})
+
+```
+
+
+
+```{r}
+## Function to Add metadata for visualization to object when integrating field with lab
+
+add_mdata <- function(seu_obj) {
+  seu_obj@meta.data %>% 
+    mutate(#Stage_MSC_MCA = str_to_sentence(coalesce(Stage_MSC, StageMCA)),
+           Stage_MSC_MCA = str_to_sentence(do.call(coalesce, pick(any_of(c("Stage_MSC", "StageMCA"))))),
+           #stage_stageHL = coalesce(stage, stageHL),
+           stage_stageHL = do.call(coalesce, pick(any_of(c("stage", "stageHL")))),
+           mutate(across(c(Stagex, stagenewx), str_to_sentence)),
+           stage_int = case_when(is.na(stage_stageHL) ~ Stagex, T ~ Stage_MSC_MCA),
+           dset_int = case_when(str_detect(orig.ident, "D") ~ Stagex, T ~ orig.ident),
+           stageHL_fine_int = case_when(str_detect(orig.ident, "D") ~ Stagex, T ~ stage_stageHL),
+           stageHL_int = case_when(str_detect(orig.ident, "D") ~ stagenewx, T ~ stage_stageHL),
+           stagec_int = case_when(str_detect(orig.ident, "D") ~ "Lab", T ~ Stage_MSC_MCA)) %>% 
+    select(stage_int, dset_int, stageHL_int, stagec_int, stageHL_fine_int) %>% 
+    AddMetaData(seu_obj, .)
+}
+
+
+```
+
+
+```{r}
+## Add metadata for visualization to object
+v3_m2_don_asex_norm_harmony_res_list <- map(v3_m2_don_asex_norm_harmony_res_list, ~add_mdata(seu_obj= .x))
+```
+
+```{r, results="asis"}
+fld_only_umap_meta_df_lst <- map(v3_m2_don_asex_norm_harmony_res_list, ~.x@reductions$umap.harmony@cell.embeddings[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., .x@meta.data[,c("stage", "slingPseudotime_1",  "asexual_pt",  "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")) 
+
+# fld_only_umap_meta_df <- reducedDims(v3_m2_fm_harmony_res_sshot)$PCA[,c(1,2,3)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., v3_m2_fm_harmony_res_sshot@colData[,c("stage", "slingPseudotime_1", "slingPseudotime_2", "orig.ident")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc")  #%>% 
+# mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
+
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 22) ,
+        legend.title = element_text(size = 24, face = "bold") )
+
+map(c("asexual_pt"), ~{
+  pt <- .x
+  map(fld_only_umap_meta_df_lst, ~{
+    .x %>% 
+    ggplot(aes(x = umapharmony_1, y =umapharmony_2, color = !!rlang::sym(pt))) + geom_point(size=0.5) + 
+    scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
+    tm
+  })
+})
+
+
+pt_plt_fn = function(obj, ptime = "female_pt", grp = "orig.ident", col = donor_cols_m) { 
+  ggplot(obj, aes(x = !!rlang::sym(ptime), col= !!rlang::sym(grp), fill= !!rlang::sym(grp))) + 
+  scale_color_manual(name = "Stage", values = col)+
+  scale_fill_manual(name = "Stage", values = col)+
+  geom_density(aes(y = ..count..*0.18), size=2, bw = 0.18, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+}
+
+map(fld_only_umap_meta_df_lst, ~pt_plt_fn(obj = .x, ptime = "asexual_pt", grp = "stage", col = sp_fld_colors))
+# map(fld_only_umap_meta_df_lst, ~pt_plt_fn(obj = .x,ptime = "male_pt", grp = "stage", col = sp_fld_colors))
+# map(fld_only_umap_meta_df_lst, ~pt_plt_fn(obj = .x,ptime = "slingPseudotime_1", grp = "orig.ident", col = donor_cols_m))
+# map(fld_only_umap_meta_df_lst, ~pt_plt_fn(obj = .x,ptime = "slingPseudotime_2", grp = "orig.ident", col = donor_cols_m))
+
+
+
+```
+
+
+```{r}
+map(all_sample_name_nms, ~system(paste0("rm data/processed/Pf/", .x, "/v3_m2_don_asex_norm_harmony_res_pt.RDS")))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+## save for running stdseurat in farm
+imap(v3_m2_don_asex_norm_harmony_res_list, ~saveRDS(.x, paste0("data/processed/Pf/", .y, "/v3_m2_don_asex_norm_harmony_res_pt.RDS")))
+```
+
+
+########################## END Each donor separate integration ########################### 
+
+
+## !!NOTE - MISC code - exploration of gam markers to be removed later 
+```{r, fig.width=15, fig.height=5}
+# Additional exploration
+gogo()
+```
+
+```{r}
+## Field asexuals exploration
+v3_m2_asex_harmony_res_fld_pt_FIELD <- v3_m2_asex_harmony_res_fld_pt[, v3_m2_asex_harmony_res_fld_pt$dset=="Field"]
+
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt_FIELD, reduction = "umap.harmony", features = "PF3D7-1222600")
+```
+
+
+```{r}
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt_FIELD, reduction = "umap.harmony", features = c("PF3D7-1222600", "PF3D7-0935400"),order = T, pt.size = 0.5, raster = F)
+```
+
+
+```{r}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+DotPlot(v3_m2_asex_harmony_res_fld_pt_FIELD, features = c("PF3D7-1222600", "PF3D7-0935400", "PF3D7-0406200", "PF3D7-1016900", "PF3D7-0936600", "PF3D7-1477300", "PF3D7-1477700"), group.by = "StageFL") + theme(axis.text.x = element_text(angle = 15)) + scale_x_discrete(labels = c("ap2g", "gdv1", "pfs16", "etramp10.3", "gexp5", "pfg14-744", "pfg14-748"))
+```
+
+
+```{r}
+table(v3_m2_asex_harmony_res_fld_pt_FIELD$StageFL)
+
+```
+
+```{r}
+cells_ap2g_exp <- LayerData(v3_m2_asex_harmony_res_fld_pt_FIELD, layer = "counts")["PF3D7-1222600",]
+```
+
+
+```{r}
+cells_ap2g_exp[cells_ap2g_exp>0]
+```
+
+
+```{r}
+v3_m2_asex_harmony_res_fld_pt_FIELD@meta.data %>% filter(StagePrelim == "Field unlabelled") %>% select(contains("stage_lab"), nFeature_RNA)
+```
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld_pt_FIELD, reduction = "umap.harmony", cells.highlight = names(cells_ap2g_exp[cells_ap2g_exp>1]), sizes.highlight = 2, raster=FALSE)
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld_pt_FIELD, reduction = "umap.harmony", cells.highlight = colnames(v3_m2_asex_harmony_res_fld_pt_FIELD[,v3_m2_asex_harmony_res_fld_pt_FIELD@meta.data$StagePrelim == "Developing"]), sizes.highlight = 2, raster=FALSE)
+```
+
+
+```{r}
+DimPlot(v3_m2_asex_harmony_res_fld_pt_FIELD, reduction = "umap.harmony", cells.highlight = colnames(v3_m2_asex_harmony_res_fld_pt_FIELD[,v3_m2_asex_harmony_res_fld_pt_FIELD@meta.data$StagePrelimAll == "Field unlabelled"]), sizes.highlight = 2, raster=FALSE)
+```
+
+
+Other intergration methods for field asexuals
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run submsn_intgrtn.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_norm.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --resume
+
+```
+
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run submsn_intgrtn_rpca.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_norm.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --k_wt 70 --norm_mthd "LogNormalize" --resume
+```
+
+```{r}
+m2_asex_rpca_int <-  readRDS("data/processed/Pf/m2_all/m2_asex_rpca_int.RDS")
+```
+
+
+```{r}
+DimPlot(m2_asex_rpca_int, group.by = "stage", pt.size = 0.4, reduction = "umap.rpca")
+DimPlot(m2_asex_rpca_int, dims = c(2,3), group.by = "stage", pt.size = 0.4, reduction = "umap.rpca")
+```
+
+```{r, eval=FALSE}
+DimPlot(m2_asex_rpca_int, dims = c(1,3), group.by = "donor", pt.size = 0.4, reduction = "umap.rpca")
+DimPlot(m2_asex_rpca_int, dims = c(2,3), group.by = "donor", pt.size = 0.4, reduction = "umap.rpca")
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+# Display the combined datasets as an interactive 3D plot 
+plot_ly(data = data.frame(m2_asex_rpca_int@reductions[["umap.rpca"]]@cell.embeddings), x = ~umaprpca_1, y = ~umaprpca_2, z = ~umaprpca_3,  color= m2_asex_rpca_int@meta.data$stage, opacity = 0.8, size = 1,   type = 'scatter3d')
+
+```
+
+```{r}
+DimPlot(m2_asex_norm_harmony, reduction = "pca", group.by = "stage")
+```
+
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
+
+# nextflow run submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex.RDS" --o_file_name "m2_asex_seu_sct.RDS" --umap_name "UMAP_" --hvg 250 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "yes" --elbo_nm "m2_asex_seu_sct_elbo.RDS" --resume
+```
+
+
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run submsn_intgrtn_rpca.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_rpca.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_asex_seu_sct.RDS" --mthd "RPCAIntegration" --o_file_name "m2_asex_sct_rpca_int.RDS" --cluster_resoln 1 --cl_nm "rpca_clusters" --umap_redctn_nm "umap.rpca" --new_redctn "integrated.rpca" --intgrtn_pc 6 --k_wt 70 --norm_mthd "SCT" --resume
+```
+
+```{r}
+m2_asex_sct_rpca_int <-  readRDS("data/processed/Pf/m2_all/m2_asex_sct_rpca_int.RDS")
+```
+
+
+```{r, fig.width=14, fig.height=5}
+DimPlot(m2_asex_sct_rpca_int, pt.size = 0.4, reduction = "umap.rpca", group.by = c("rpca_clusters", "stage"), dims = c(2,3))
+```
+
+## Re-intergrate only the asexuals and reumap
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+Convert("data/processed/Pf/m2_all/m2_asex_scvi.h5ad", dest = "h5seurat", overwrite = TRUE)
+m2_asex_scvi <- LoadH5Seurat("data/processed/Pf/m2_all/m2_asex_scvi.h5seurat", assays = "RNA")
+m2_asex_scvi
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+DimPlot(m2_asex_scvi)
+```
+
+#### Alternative integration of asexual field and lab
+```{r, eval=T}
+gogo()
+## Run SNORM on farm like below
+# nextflow run submsn_intgrtn.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_norm.RDS" --mthd "HarmonyIntegration" --o_file_name "v3_m2_asex_harmony.RDS" --cluster_resoln 1 --cl_nm "harmony_clusters_asex" --umap_redctn_nm "umap.harmony" --new_redctn "integrated.harmony" --resume
+```
+
+
+miscellanous script not sure what they do
+```{r}
+gogo()
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/v3_m2_don_asex.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 300 --cluster_resoln 1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_intgrtn_pc.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_integrtn_pc_auto.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/v3_m2_don_asex_norm.RDS" --mthd "HarmonyIntegration" --mthd_nm "harmony" --cluster_resoln 1 --intgrtn_pc 5 --integrtd_pc_man "no" --findpc_mthd "perpendicular line" -resume
 ```

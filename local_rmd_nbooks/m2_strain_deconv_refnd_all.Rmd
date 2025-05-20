@@ -43,6 +43,7 @@ suppressPackageStartupMessages({
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
 })
 ```
 
@@ -61,7 +62,7 @@ knitr::opts_knit$set(root.dir = paste0('/lustre/scratch126/tol/teams/lawniczak/u
 # source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_GE_postQC_header.R")
 # source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header.R")
 source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
-source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header_m55.R")
+# source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_header_m55_m60.R")
 # source("mali22_code_lnk/local_rmd_nbooks/m2_pm_pbulk_gtypes_preQC_header.R")
 # source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
 sample_name_nms
@@ -74,7 +75,6 @@ source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
-
 VCF to GDS conversion
 ```{r, warning=FALSE, message=FALSE, eval=T}
 ##Read in the genotypes and annotate
@@ -82,8 +82,9 @@ VCF to GDS conversion
 gt_ss_afm_p1_bi <-pmap(list(sample_name_k, optimum_k), ~{
   sm <- ..1
   gp <- ..2
-  map(grps, ~seqVCF2GDS(paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA")
-)
+  
+  map(grps, ~seqVCF2GDS(paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.vcf"), paste0("data/processed/",species, "/", sm ,"/", gtyp_step, "/", .x,"_k", gp,"_", algn_nm,"/p1/fb_biallelic.gds"),  storage.option="ZIP_RA"))
+  
 })
 
 ```
@@ -226,7 +227,7 @@ Vartrix matrix to get number of molecules supporting either reference or alterna
 vtx_rd <- function(sample_id, grp, opt_k ){
   
   ##Read in the alternate allele matrix for all the stg/strn combinations and combine into a list - also shortening the names of the matrices (list items)
-  alt_mtx <- list.files(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
+  alt_mtx <- list.files(paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/"), pattern = "^[D|SC|G|P|N|M].*.mtx", full.names = T, recursive = T, include.dirs = T) %>% 
     set_names(nm = (str_remove_all(.,paste0("data/processed/",species, "/", sample_id ,"/", gtyp_step, "/", grp, "_k", opt_k, "_", algn_nm,"/p1/vartrix_biallelic/", '/|.mtx')) %>% str_replace_all(c("PoorQC"="P", "Low_n"="Lo", "Female"="F", "Male" = "M", "Asexual" = "A", "Gametocyte" = "G", "_a_" = "_A_"))  %>%  tools::file_path_sans_ext())) %>%
     map(readMM) 
   
@@ -291,6 +292,7 @@ fb_vt_bind <- function(fb_gtype , vtx_mtx, rm_grps="None") {
     mutate(across(c(pos, depth, quality, matches('.*_DP$|.*_RefN$|.*_AltN$|.*sNum$|.*cProp$')), as.numeric)) %>%
     dplyr::select(-c(matches(rm_grps))) %>%
     filter(if_any(starts_with('SC'), ~!is.na(.))) %>%
+    filter(if_any(starts_with('MSC'), ~!is.na(.))) %>%
     # filter(quality>75 & depth>40)  %>%
     mutate(filt_reason1 = case_when(quality<=75 | depth<=40 ~ 'Low quality',
                                     str_detect(chrom, mt_chrom_nm) ~ 'Mt',
@@ -626,9 +628,9 @@ ss_afm_broadqc_plt
 
 snps_qc_filts <- function(m14_gt){
   
-  snp_qc_tbl <- m14_gt %>% filter(filt_reason1 == 'Pass') %>% rename_with( ~str_replace(., '$','_raw'), matches("^(G|D|SC|P_|N).*(_A|_F|_M|_G|_Lo|_G|blet|tive|Unassigned|fail|[0-9])$")) %>% dplyr::select(chrom, pos, matches('.*_raw$|.*_qc$|.*_sNum$|.*_cProp$|.*_DP$|.*_RefN$|.*_AltN$'), type, filter,VQSLOD,CDS,AC,AN,AF, alleles)   %>% 
-      pivot_longer(.,cols = matches('^(G|D|SC|P_|N).*'), 
-                   names_pattern = "(^[G|D|SC|P_|N].*[A|M|F|G|Lo|t|tive|Unassigned|stgQC_fail|(0-9)])_(alt_sNum|alt_cProp|ref_sNum|ref_cProp|raw|qc|DP|RefN|AltN)", 
+  snp_qc_tbl <- m14_gt %>% filter(filt_reason1 == 'Pass') %>% rename_with( ~str_replace(., '$','_raw'), matches("^(G|D|SC|P_|N|M).*(_A|_F|_M|_G|_Lo|_G|blet|tive|Unassigned|fail|[0-9])$")) %>% dplyr::select(chrom, pos, matches('.*_raw$|.*_qc$|.*_sNum$|.*_cProp$|.*_DP$|.*_RefN$|.*_AltN$'), type, filter,VQSLOD,CDS,AC,AN,AF, alleles)   %>% 
+      pivot_longer(.,cols = matches('^(G|D|SC|P_|N|M).*'), 
+                   names_pattern = "(^[G|D|SC|P_|N|M].*[A|M|F|G|Lo|t|tive|Unassigned|stgQC_fail|(0-9)])_(alt_sNum|alt_cProp|ref_sNum|ref_cProp|raw|qc|DP|RefN|AltN)", 
                    names_to = c( "groups" ,".value")) %>%
       mutate(filt_reason = case_when(filter != 'PASS' | is.na(filter) ~ 'Absent Pf7_Pass & ULI', ##is.na(type) ~ 'Absent Pf7_Pass & ULI',### !!NB - Marking those missing in the pf7 dataset first. May need to be put last below if we want to include those absent if pf7 as some of these have been seen to be of good quality
                                      alt_sNum < 8 & ref_sNum < 8 ~  "Low UMI support",
@@ -684,11 +686,11 @@ Minimal QC (lessQC [lqc]) retaining the "Noisy", "Non distinct", 'Ref inverted' 
 
 snps_qc_filts_lqc <- function(m14_gt){
     
-    snp_qc_tbl <- m14_gt %>% filter(filt_reason1 == 'Pass') %>% rename_with( ~str_replace(., '$','_raw'), matches("^(G|D|SC|P_|N).*(_A|_F|_M|_G|_Lo|_G|blet|tive|Unassigned|fail|[0-9])$")) %>% dplyr::select(chrom, pos, matches('.*_raw$|.*_qc$|.*_sNum$|.*_cProp$|.*_DP$|.*_RefN$|.*_AltN$'), type, filter,VQSLOD,CDS,AC,AN,AF, alleles)   %>% 
-        pivot_longer(.,cols = matches('^(G|D|SC|P_|N).*'), 
+    snp_qc_tbl <- m14_gt %>% filter(filt_reason1 == 'Pass') %>% rename_with( ~str_replace(., '$','_raw'), matches("^(G|D|SC|P_|N|M).*(_A|_F|_M|_G|_Lo|_G|blet|tive|Unassigned|fail|[0-9])$")) %>% dplyr::select(chrom, pos, matches('.*_raw$|.*_qc$|.*_sNum$|.*_cProp$|.*_DP$|.*_RefN$|.*_AltN$'), type, filter,VQSLOD,CDS,AC,AN,AF, alleles)   %>% 
+        pivot_longer(.,cols = matches('^(G|D|SC|P_|N|M).*'), 
                      # names_pattern = "(^[G|D|S].*[A|M|F|blet])_([alt|ref|raw|qc|DP|RefN|AltN].*)",
                      # names_pattern = "(^[G|D|S].*[A|M|F|t])_(alt_sNum|alt_cProp|ref_sNum|ref_cProp|raw|qc|DP|RefN|AltN)", 
-                     names_pattern = "(^[G|D|SC|P_|N].*[A|M|F|G|Lo|t|tive|Unassigned|stgQC_fail|(0-9)])_(alt_sNum|alt_cProp|ref_sNum|ref_cProp|raw|qc|DP|RefN|AltN)", 
+                     names_pattern = "(^[G|D|SC|P_|N|M].*[A|M|F|G|Lo|t|tive|Unassigned|stgQC_fail|(0-9)])_(alt_sNum|alt_cProp|ref_sNum|ref_cProp|raw|qc|DP|RefN|AltN)", 
                      names_to = c( "groups" ,".value")) %>%
         mutate(filt_reason = case_when(filter != 'PASS' | is.na(filter) ~ 'Absent Pf7_Pass & ULI', ##is.na(type) ~ 'Absent Pf7_Pass & ULI',### !!NB - Marking those missing in the pf7 dataset first. May need to be put last below if we want to include those absent if pf7 as some of these have been seen to be of good quality
                                        alt_sNum < 5 & ref_sNum < 5 ~  "Low UMI support",
@@ -800,7 +802,9 @@ annot_snp_qc %>%
   mutate(across(filt_reason, ~droplevels(factor(., levels = snp_qc_lvls)))) %>%
   dplyr::count(groups, filt_reason, .drop=F) %>%
     mutate(n_imp = as.numeric(case_when(filt_reason == 'Low UMI support' ~ NA, T ~ n)))%>%
-  group_by(groups) %>% mutate(perc = round((n_imp/sum(n_imp, na.rm = T))*100, digits = 1)) %>%
+  mutate(across(groups, ~str_remove_all(., "MSC[0-9]+_"))) %>% 
+    group_by(groups) %>% 
+    mutate(perc = round((n_imp/sum(n_imp, na.rm = T))*100, digits = 1)) %>%
   ggplot(aes(x=filt_reason,fill=filt_reason, y = n/1000)) + 
   geom_col(position = position_dodge(width = 1)) + 
   geom_text(aes(label=ifelse(is.na(n_imp), "", paste0(n_imp, "(", perc,")")), color = filt_reason), vjust = 0.5, hjust = -0.1, position = position_dodge(width = 1), size = 6.5, angle = 90, show.legend = F, fontface= 'bold') + 

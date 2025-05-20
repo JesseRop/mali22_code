@@ -73,7 +73,10 @@ source("mali22_code_lnk/pf_common_vars.R")
 
 ```{r}
 # source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_strain_decon_all_GE_postQC_header.R')
-source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header_m55.R')
+source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_resc_ppQC_header.R')
+# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_resc_preQC_header.R')
+# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header_m55_m60.R')
+# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header.R')
 ```
 
 
@@ -110,7 +113,8 @@ clusters_log_likelihoods_lst %>%
   mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
   ggplot(., aes(x = No_of_clusters, y = log_likelihood)) +
     geom_point() +
-    geom_line(aes(group = 1)) + facet_grid(algnr ~ sample, scales = "free_y")
+    geom_line(aes(group = 1)) + 
+  facet_grid(algnr ~ sample, scales = "free_y")
 ```
 
 
@@ -348,14 +352,21 @@ soupo_kselect_list[str_detect(names(soupo_kselect_list), paste0(.x, "_"))] %>%
 
 
 ```{r}
-##Transfer stage labels and other metadata from farm
-# list.files("data/processed/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) 
+# ##Transfer stage labels and other metadata from farm
+# # list.files("data/processed/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
+# #   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) 
+# 
+# all_msc_anotd_preQC_mdata <- readRDS("data/processed/Pf/all_msc_anotd_preQC_mdata.RDS") %>% .[sample_name_nms]
+# msc_mdata <- map(all_msc_anotd_preQC_mdata, ~.x %>% rownames_to_column('bcode'))
+# # msc_mdata <- map2(all_msc_anotd_preQC_mdata, msc_qcd_anotd_mdata, ~.x  %>% select(StagePrelim) %>% rownames_to_column('bcode') %>% left_join(., .y %>% rownames_to_column('bcode'), by='bcode'))
 
-all_msc_anotd_preQC_mdata <- readRDS("data/processed/Pf/all_msc_anotd_preQC_mdata.RDS") %>% .[sample_name_nms]
-msc_mdata <- map(all_msc_anotd_preQC_mdata, ~.x %>% rownames_to_column('bcode'))
-# msc_mdata <- map2(all_msc_anotd_preQC_mdata, msc_qcd_anotd_mdata, ~.x  %>% select(StagePrelim) %>% rownames_to_column('bcode') %>% left_join(., .y %>% rownames_to_column('bcode'), by='bcode'))
+all_ed_pref_w_mdata_cb_mdata <- readRDS(paste0("data/processed/", species, "/" , sv_dir, "/all_ed_pref_w_mdata_cb_mdata.csv"))
+msc_mdata <- map(all_ed_pref_w_mdata_cb_mdata, ~.x %>% 
+                   rownames_to_column('bcode') %>%
+                   mutate(StagePrelim = coalesce(StagePrelim, str_remove_all(fine_stg, "\\(|\\)"))))
+
 ```
+
 
 ```{r}
 ##Transfer stage labels and other metadata from farm
@@ -367,14 +378,16 @@ mdata_all <- msc_mdata %>% .[sample_name_nms] %>%
         # dplyr::rename('stageHL' = stageHR_msc14) %>%
         mutate(#across(stageHL, ~str_replace_all(.,c('high count' = 'HE', 'low count' = 'LE'))),
                ##Collapse asexuals and gams and number of cells per coarse group & add the number per xluster as a column in metadata
-               stage_afm = case_when(str_detect(StagePrelim, 'ring|troph') ~ 'Asexual', 
+               stage_afm = case_when(str_detect(StagePrelim, 'ring|troph|schizont') ~ 'Asexual', 
                                      str_detect(StagePrelim, '\\(male') ~ 'Male', 
                                      str_detect(StagePrelim, 'Male') ~ 'Male', 
                                      str_detect(StagePrelim, 'emale') ~ 'Female', 
                                      str_detect(StagePrelim, 'developing') ~ 'Developing',
+                                     str_detect(StagePrelim, 'weak_score|discrepantFM') ~ 'Unassigned',
                                      T ~StagePrelim),
-               stage_ag = case_when(str_detect(StagePrelim, 'ring|troph') ~ 'Asexual', 
+               stage_ag = case_when(str_detect(StagePrelim, 'ring|troph|schizont') ~ 'Asexual', 
                                     str_detect(StagePrelim, 'ale|developing') ~ 'Gametocyte',
+                                    str_detect(StagePrelim, 'weak_score|discrepantFM') ~ 'Unassigned',
                                      T ~StagePrelim)) 
       ) 
 
@@ -387,7 +400,8 @@ mdata_all <- msc_mdata %>% .[sample_name_nms] %>%
 soupo_seu_kmerge <- list(soupo_kmerge[sm_aln_nms_al], rep(mdata_all[sample_name_nms], length(algn_nms))) %>%
   pmap(~{
     # ..1 %>% left_join(., ..2 %>% rownames_to_column('bcode'), by = 'bcode')  
-    ..1 %>% left_join(., ..2 , by = 'bcode')  
+    # ..1 %>% left_join(., ..2 , by = 'bcode')  
+    ..1 %>% inner_join(., ..2 , by = 'bcode')  ## !!NOTE - RETAIN ONLY CELLBENDER CELLS FOR WHICH WE HAVE DONE STAGE QC
   })
 
 ```
@@ -745,25 +759,26 @@ imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=
 
 ```{r, fig.width=6, fig.height=4, eval=T}
 # list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
-snk_plts <- list(strn_harmnzd_tbls_mn_hs2, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
+snk_plts_hmo <- list(strn_harmnzd_tbls_mn_hs2, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
   pmap(~{  
     
-snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"))
+  snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"))
     
  })
 
 ```
 
-```{r, fig.width=6, fig.height=4, eval=T}
-# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
-snk_plts[1:15]
-```
 
 ```{r, eval=T}
 # snk_plts[str_detect(names(snk_plts), "minmap")]
-snk_plts[str_detect(names(snk_plts), "minmap")] %>% imap(., ~.x + labs(title = .y))
+snk_plts_hmo <- snk_plts_hmo %>% imap(., ~.x + labs(title = .y))
 ```
 
+
+```{r, fig.width=6, fig.height=4, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts_hmo[str_detect(names(snk_plts_hmo), "MSC14|MSC49|MSC55|MSC60")]
+```
 
 #### Adding stage assignments to the sankey plots to see how they transition across Ks and alignment method
 ```{r, eval=T}
@@ -782,16 +797,23 @@ strn_harmnzd_tbls_mn_hs2_stg <- list(strn_harmnzd_tbls_mn_hs2, mdata_all[str_rem
 snk_plts_stg <- list(strn_harmnzd_tbls_mn_hs2_stg, don_k_names_minmap,  don_k_names_hsat, str_remove_all(don_k_names_hsat, "S.*_"), don_hmonizd_minmap_base) %>%
   pmap(~{  
     
-snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"), strain_colours = strain_stg_cols_n)
+  snk_pt_fn(..1, strns_2_plt = c(..2, ..5, ..3), labls = c("minimap", "hisatHMO", "hisat"), bp_face = c("plain"), strain_colours = strain_stg_cols_n)
     
  })
 
 ```
 
-```{r, fig.width=6, fig.height=8, eval=T}
-# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
-snk_plts_stg[1:15]
+```{r, eval=T}
+# snk_plts[str_detect(names(snk_plts), "minmap")]
+snk_plts_stg <- snk_plts_stg %>% imap(., ~.x + labs(title = .y))
 ```
+
+
+```{r, fig.width=6, fig.height=10, eval=T}
+# list(strn_harmnzd_tbls_5, don_k_names, opt_clusters_nms, don_hmonizd_k_names) %>%
+snk_plts_stg[str_detect(names(snk_plts_stg), "MSC14|MSC49|MSC55|MSC60")]
+```
+
 
 Rechecking the overlap of strain assignments between different mappers after harmonization of strain names
 hisat and hisat harmonized  should be 100% identical to confirm no errors in harmonizing labels 
@@ -950,7 +972,8 @@ Strain_qc_cutoff=0
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2:4), "MSC57" = c(2:4))
 
-opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(5:7),"MSC60" = c(6:8), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:9), "MSC12" = c(2:3)) %>% .[sample_name_nms]
+# opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(7:9),"MSC60" = c(8:10), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:9), "MSC12" = c(2:3)) %>% .[sample_name_nms]
+opt_narrow_clusters_nms <-  list("MSC33" = c(8:9),"MSC48" = c(4:5),"MSC49" = c(6:7),"MSC55" = c(6:8),"MSC60" = c(7:8), "MSC66" = c(8:9), "MSC38" = c(5:7), "MSC40" = c(8:9), "MSC50_MACS" = c(2), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:3), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(3:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:8), "MSC12" = c(2:3)) %>% .[sample_name_nms]
 
 
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5))
@@ -1151,7 +1174,7 @@ Calculate proportion of variance explained by PC1 and PC2
 
 ```{r}
 ## Save PCA
-saveRDS(soupo_PCA, paste0("data/processed/", species,"/soupo_PCA_m22.RDS"))
+saveRDS(soupo_PCA, paste0("data/processed/", species, "/" , sv_dir,"/soupo_PCA_m22.RDS"))
 ```
 
 
@@ -1385,7 +1408,7 @@ map(strn_c_mdata, . %>%
       pull(cluster) %>%
       str_remove_all(., 'ametocyte|sexual')
 ) %>% imap(., ~paste(.x, .y, sep='_')) %>%
-  saveRDS(., paste0("data/processed/", species,"/ss_ag_gtype_clusters_100_m22.RDS"))
+  saveRDS(., paste0("data/processed/", species, "/" , sv_dir,"/ss_ag_gtype_clusters_100_m22.RDS"))
 
 ```
 
@@ -1463,7 +1486,7 @@ opt_narrow_k_tbl
 
 ```{r}
 ## Write out the counts of the pseudobulk groups that have been processed
-saveRDS(opt_narrow_k_tbl, paste0("data/processed/", species,"/opt_narrow_k_tbl.RDS"))
+saveRDS(opt_narrow_k_tbl, paste0("data/processed/", species, "/" , sv_dir,"/opt_narrow_k_tbl.RDS"))
 ```
 
 #### Adding option to downsample the large clusters for faster running of pseudobulk genotyping pipeline
@@ -1491,7 +1514,7 @@ strn_c_mdata_with_ds <- imap(strn_c_mdata, ~{
     obj %>% 
       group_by(!!rlang::sym(paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k)), stage_afm) %>%
       mutate(samp = sample(n())) %>%
-      mutate(!!paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k,"_ds") := case_when(stage_afm == "Asexual" & samp <= 700 ~ "yes", stage_afm == "Female" & samp <= 250 ~ "yes", stage_afm == "Male" & samp <= 250 ~ "yes" ))  %>%
+      mutate(!!paste0('Strain_hmo_', str_remove(s_nm, 'SC'), '_', algn_nm, '_',k,"_ds") := case_when(stage_afm == "Asexual" & samp <= 500 ~ "yes", stage_afm == "Female" & samp <= 200 ~ "yes", stage_afm == "Male" & samp <= 200 ~ "yes" ))  %>%
       select(-c(samp))
 
   }) %>% purrr::reduce(left_join, by = c(names(obj)))
