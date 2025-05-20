@@ -20,7 +20,7 @@ params.cond_de_out = "de.RDS"
 
 // - compute resources for first process
 ncores="10"
-mem="100 GB"
+mem="140 GB"
 
 // - Standard scripts for running souporcell
 params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/tradeseq_nf.R"
