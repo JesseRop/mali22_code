@@ -82,11 +82,16 @@ algn_nm = 'minmap'
 #### Source commong functions, varriables and tables
 ```{r}
 ##Boxplot labeling function
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/plotting_common_fns.R")
-source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/pf_common_vars.R")
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
 ```
 
+
+```{r}
+# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_GE_postQC_header.R')
+source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header.R')
+```
 
 initialize variable for the sample names
 
@@ -98,13 +103,13 @@ initialize variable for the sample names
 ##Sample ID
 # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57") #%>% sort()
 ## All sample ids removing "MSC38" which seems to have lots of doublets
-sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25") %>% sort()
-
-# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
-
-##Samples
-sample_name <- sample_name_nms
-sample_id_lst <- sample_name_nms
+# sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60", "MSC66", "MSC38", "MSC40", "MSC50_MACS", "MSC53", "MSC57", "MSC24", "MSC37", "MSC39", "MSC45", "MSC50_SLO", "MSC54", "MSC67", "MSC68", "MSC70", "MSC41", "MSC51", "MSC25", "MSC1", "MSC3", "MSC13", "MSC14", "MSC12") %>% sort()
+# 
+# # sample_name_nms <- c("MSC33", "MSC48","MSC49", "MSC55", "MSC60") %>% sort()
+# 
+# ##Samples
+# sample_name_nms <- sample_name_nms
+# sample_name_nms <- sample_name_nms
 
 ##Sample IDs
 # source_irods_nms <- list("5736STDY13782211","5736STDY13782212","5736STDY13782213","5736STDY13782214","5736STDY13782215", "5736STDY13437393") %>% set_names(sample_name_nms)
@@ -124,7 +129,7 @@ Save paths to raw MSC files in list - also needed for soupX below
 ```{r}
 all_msc_raw_paths <- list.files("data/raw/", pattern = "raw_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_'))) %>%
-  .[sample_id_lst]
+  .[sample_name_nms]
 ```
 
 TURN CHUNKS FOR PROCESSING OF RAW CELLRANGER OUTPUTS TO FALSE -
@@ -132,8 +137,8 @@ TURN CHUNKS FOR PROCESSING OF RAW CELLRANGER OUTPUTS TO FALSE -
 ##Read filtered cellranger matrices into R
 # all_msc_raw <- all_msc_raw_paths[1:5] %>%
 #   map(~Read10X(.,gene.column = 1)) %>% 
-#   map2(., sample_id_lst, ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) %>% 
-#   set_names(sample_id_lst)
+#   map2(., sample_name_nms, ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) %>% 
+#   set_names(sample_name_nms)
 ```
 
 
@@ -141,16 +146,16 @@ TURN CHUNKS FOR PROCESSING OF RAW CELLRANGER OUTPUTS TO FALSE -
 ##Read filtered cellranger matrices into R
 # all_msc_anotd_preQC <- list.files("data/raw/", pattern = "filtered_feature_bc_matrix$", full.names = T, recursive = T, include.dirs = T)%>% 
 #   set_names(nm = (str_remove_all(.,'data/raw//|/Pf.*') %>% str_replace(., '/', '_'))) %>%
-#   .[sample_id_lst] %>% 
+#   .[sample_name_nms] %>% 
 #   # str_sort(., numeric = T) %>%
 #   map(~Read10X(.,gene.column = 1)) %>% 
-#   map2(., sample_id_lst, ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) 
+#   map2(., sample_name_nms, ~ CreateSeuratObject(.x, project = paste0(.y, ".mrna"))) 
 ```
 
 ```{r, message=F, warning=F}
 ##Read filtered cellranger matrices into R 4,6,10,12,15
 all_msc_anotd_preQC <- readRDS("data/processed/Pf/all_msc_anotd_preQC.RDS")
-all_msc_anotd_preQC <- all_msc_anotd_preQC %>% .[sample_id_lst]
+all_msc_anotd_preQC <- all_msc_anotd_preQC %>% .[sample_name_nms]
 ```
 
 
@@ -167,14 +172,22 @@ imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = T)+ labs(title = .
 
 ```{r, warning=FALSE, message=FALSE}
 ##Seurat UMAP
-imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelimC", label = T)+ labs(title = .y))
+imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelim", label = T)+ labs(title = .y))
+# imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), group.by = "StagePrelim", label = T)+ labs(title = .y))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_msc_anotd_preQC, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-1222600", reduction = "umap", order = T, slot = "counts")+ labs(title = .y))
+
 ```
 
 ```{r, fig.height = 15, fig.width = 15}
 
-gn_lc <- rep(600, length(sample_id_lst))
-ugn_lc <- rep(list(NULL), length(sample_id_lst))
-nc_lst <- rep("nCount_RNA", length(sample_id_lst))
+gn_lc <- rep(600, length(sample_name_nms))
+ugn_lc <- rep(list(NULL), length(sample_name_nms))
+nc_lst <- rep("nCount_RNA", length(sample_name_nms))
 
 vp_fn <- function(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, ugnc_lst= ugn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelimC", ptsz = 0.01, nrws = ceiling(length(all_msc_anotd_preQC)/5)) {
   list(seu_lst, gnc_lst, ugnc_lst, ftr) %>% 
@@ -182,7 +195,7 @@ vp_fn <- function(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, ugnc_lst= ugn_
         geom_hline(yintercept = ..2)+
         geom_hline(yintercept = ..3)+
         theme(legend.position = 'none')}) %>% 
-  plot_grid(plotlist = ., labels = sample_id_lst, nrow = nrws) 
+  plot_grid(plotlist = ., labels = sample_name_nms, nrow = nrws) 
 }
 
 ```
@@ -194,8 +207,8 @@ vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 1000, ftr = n
 ```
 
 ```{r, fig.height = 15, fig.width = 15}
-gn_lc <- rep(300, length(sample_id_lst))
-nf_lst <- rep("nFeature_RNA", length(sample_id_lst))
+gn_lc <- rep(300, length(sample_name_nms))
+nf_lst <- rep("nFeature_RNA", length(sample_name_nms))
 
 vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 100000, ftr = nf_lst, grp = "StagePrelimC", ptsz = 0)
 
@@ -204,7 +217,7 @@ vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 100000, ftr =
 
 
 ```{r, fig.height = 15, fig.width = 15}
-gn_lc <- rep(600, length(sample_id_lst))
+gn_lc <- rep(600, length(sample_name_nms))
 vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 1000, ftr = nc_lst, grp = "StagePrelimC", ptsz = 0.01)
 
 ```
@@ -216,7 +229,7 @@ vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 1000, ftr = n
 #### Violin plots
 ```{r, fig.height = 5, fig.width = 15}
 
-gn_lc <- rep(550, length(sample_id_lst))
+gn_lc <- rep(550, length(sample_name_nms))
 
 all_mdata <- map(all_msc_anotd_preQC, ~.@meta.data) %>% 
   bind_rows(., .id = 'sample')
@@ -237,7 +250,7 @@ all_mdata %>%
 
 ```{r, fig.height = 15, fig.width = 15}
 
-gn_lc <- rep(300, length(sample_id_lst))
+gn_lc <- rep(300, length(sample_name_nms))
 
 vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf_lst, grp = NULL, ptsz = 0.01)
 
@@ -247,9 +260,9 @@ vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = gn_lc, seu_thresh = 800, ftr = nf
 ```{r, fig.height = 10, fig.width = 15}
 
 # rna_lc <- c(530, 600, 530, 700, 600)
-rna_lc <- rep(600, length(sample_id_lst))
+rna_lc <- rep(600, length(sample_name_nms))
 # rna_uc <- c(7500, 13000, 24000, 40000, 17000)
-rna_uc <- rep(10000, length(sample_id_lst))
+rna_uc <- rep(10000, length(sample_name_nms))
 
 vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = rna_lc, ugnc_lst = rna_uc, seu_thresh = 10000, ftr = nc_lst, grp = NULL, ptsz = 0.01)
 
@@ -263,7 +276,7 @@ vp_fn(seu_lst = all_msc_anotd_preQC, gnc_lst = rna_lc, ugnc_lst = rna_uc, seu_th
 # gn_uc <- c(1900, 2600, 3300, 3800, 3200)
 # gn_lc <- c(250, 250, 250, 300, 250)
 
-qc_cutoffs <- pmap(list(all_msc_anotd_preQC, rep('nFeature_RNA', length(sample_id_lst)), rep('nCount_RNA', length(sample_id_lst))), ~{
+qc_cutoffs <- pmap(list(all_msc_anotd_preQC, rep('nFeature_RNA', length(sample_name_nms)), rep('nCount_RNA', length(sample_name_nms))), ~{
   list("gn_lci" = as.integer(quantile(..1@meta.data[, ..2], 0.005, na.rm = T)),
         "gn_uci" = as.integer(quantile(..1@meta.data[, ..2], 0.995, na.rm = T)),
        "rna_lci" = as.integer(quantile(..1@meta.data[, ..3], 0.005, na.rm = T)),
@@ -290,7 +303,7 @@ md_don <- map(all_msc_anotd_preQC, ~.@meta.data #%>%
                        # mutate(across(c(sim_lab1, sim_lab2), as.numeric))
                      ) %>% 
   bind_rows(., .id = 'donor') %>%
-  mutate(across(donor, ~factor(., levels = as.character(sample_id_lst))))
+  mutate(across(donor, ~factor(., levels = as.character(sample_name_nms))))
 
 gh_df <- map( c("rna_uci","gn_uci", "rna_lci","gn_lci"), ~{
   categ <- .x
@@ -391,7 +404,7 @@ std_theme <- theme(axis.text=element_text(size=18),
 gh_df_v <- map(gh_df, deframe)
 
 # cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_anotd_preQC,  sample_id_lst, gh_df_v[[c("rna_lci")]] , gh_df_v[[c("rna_uci")]], gh_df_v[[c("gn_lci")]], gh_df_v[[c("gn_uci")]], names(all_msc_anotd_preQC))  %>% 
+list(all_msc_anotd_preQC,  sample_name_nms, gh_df_v[[c("rna_lci")]] , gh_df_v[[c("rna_uci")]], gh_df_v[[c("gn_lci")]], gh_df_v[[c("gn_uci")]], names(all_msc_anotd_preQC))  %>% 
   purrr::pmap(.,~{
     # create tabset for each group 
     cat('##### ',..3,'   \n')
@@ -413,18 +426,28 @@ list(all_msc_anotd_preQC,  sample_id_lst, gh_df_v[[c("rna_lci")]] , gh_df_v[[c("
 #### Calculate mitochodrial/apicoplast percentage per cell and average expression per cell {.tabset}
 Fraction of transcripts that are of mitochondrial/apicoplast origin
 ```{r}
-## filter less based on mitochondrial proportions
-all_msc_anotd_preQC <- all_msc_anotd_preQC%>% 
-  map(. %>% 
-        PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt') %>%
-        PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api') )
-
+# ## filter less based on mitochondrial proportions
 # all_msc_anotd_preQC <- all_msc_anotd_preQC%>% 
-#     map(. %>% PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api'))
+#   map(. %>% 
+#         PercentageFeatureSet(., pattern = "PF3D7-MIT", col.name = 'percent.mt') %>%
+#         PercentageFeatureSet(., pattern = "PF3D7-API", col.name = 'percent.api') )
+# 
 
-## filter less based on mitochondrial proportions
 ```
 
+```{r}
+## filter less based on mitochondrial proportions
+all_msc_anotd_preQC <- all_msc_anotd_preQC%>% 
+  map(., ~{
+    
+    mit_fts <- rownames(.x)[str_detect(rownames(.x), "MIT")]
+    api_fts <- rownames(.x)[str_detect(rownames(.x), "API")]
+    
+    .x %>% PercentageFeatureSet(., features = mit_fts, col.name = 'percent.mt') %>%
+    PercentageFeatureSet(., features = api_fts, col.name = 'percent.api') 
+})
+
+```
 Average expression of mitochodrial genes
 
 ```{r, message=FALSE, warning=FALSE}
@@ -450,7 +473,7 @@ all_msc_anotd_preQC <- list(all_msc_anotd_preQC, mt_avg_exp) %>%
 
 ```{r, warning=FALSE, message=FALSE}
 
-# mt_filt <-list(rep(0.4, length(sample_name)))
+# mt_filt <-list(rep(0.4, length(sample_name_nms)))
 # mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38"=0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25)
 # mt_filt <- c("MSC33" = 0.5, "MSC48" = 0.25, "MSC49" = 0.4, "MSC55" = 0.4, "MSC60" = 0.3,  "MSC66" = 0.4, "MSC38" = 0.4, "MSC40" = 0.5, "MSC50_MACS" = 0.6, "MSC53" = 0.4, "MSC57" = 0.4, "MSC24" = 0.6, "MSC37" = 0.2, "MSC39" = 0.2, "MSC45" = 0.25, "MSC50_SLO" = 0.6, "MSC54" = 0.4, "MSC67" = 0.4, "MSC68" = 0.2, "MSC70" = 0.25, "MSC41" = 0.4, "MSC51" = 0.4, "MSC25" = 0.4)
 mt_filt1 <- unlist(map(all_msc_anotd_preQC, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
@@ -461,7 +484,7 @@ Visualization of proportion of mitochondrial genes and ncount
 
 ```{r, results='asis'}
 # cat('## Visualize field parasites {.tabset}   \n')
-list(all_msc_anotd_preQC, mt_filt1, sample_id_lst, names(all_msc_anotd_preQC))  %>% 
+list(all_msc_anotd_preQC, mt_filt1, sample_name_nms, names(all_msc_anotd_preQC))  %>% 
   purrr::pmap(.,~{
 
     p <- FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 1)+ 
@@ -503,7 +526,7 @@ trunc_axis <- ggh4x::guide_axis_truncated(
   trunc_upper = unit(2.2, "cm")
 )
 
-raw_umap <- list(all_msc_anotd_preQC, sample_id_lst)  %>%
+raw_umap <- list(all_msc_anotd_preQC, sample_name_nms)  %>%
   purrr::pmap(.,  ~ {
     # create tabset for each group
     cat('####', ..2, '   \n')
@@ -537,7 +560,7 @@ raw_umap
 # gn_uc <- c(1900, 2600, 3300, 3800, 3200)
 # gn_lc <- c(250, 250, 250, 300, 250)
 
-all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep('nFeature_RNA', length(sample_id_lst)), rep('nCount_RNA', length(sample_id_lst))), ~{
+all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep('nFeature_RNA', length(sample_name_nms)), rep('nCount_RNA', length(sample_name_nms))), ~{
   ..1@meta.data %>%
     rownames_to_column('bcode') %>%
     group_by(StagePrelimC) %>%
@@ -566,7 +589,7 @@ md_don_cl <- map(all_msc_anotd_preQC, ~.@meta.data #%>%
                        # mutate(across(c(sim_lab1, sim_lab2), as.numeric))
                      ) %>% 
   bind_rows(., .id = 'donor') %>%
-  mutate(across(donor, ~factor(., levels = as.character(sample_id_lst))))
+  mutate(across(donor, ~factor(., levels = as.character(sample_name_nms))))
 
 gh_df_cl <- map( c("rna_uci","gn_uci", "rna_lci","gn_lci"), ~{
   categ <- .x
@@ -651,9 +674,10 @@ We did souporcell assuming a range of 3 strains (6,7 and 8)
 ```{r}
 algn_nm <- "minmap"
 ##Read in strain information
-soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
+# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
+soupo_kselect_list_pp <-  readRDS(paste0("data/processed/", species, "/" , sv_dir, "/strn_c_new_mdata_m22.RDS"))  %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
 
-# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS") %>% .[paste(sample_id_lst, algn_nm, sep = "_")]
+# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
 
 
 
@@ -710,7 +734,7 @@ As some cells are already determined to be negative by souporcell then we use th
 
 Find gene count cut offs
 ```{r, results='asis'}
-strn_knee_p <- list(all_msc_anotd_preQC, sample_id_lst, 1:length(all_msc_anotd_preQC))  %>% 
+strn_knee_p <- list(all_msc_anotd_preQC, sample_name_nms, 1:length(all_msc_anotd_preQC))  %>% 
   purrr::pmap(.,~{
     pg <- .@meta.data  %>% 
       group_by(strain_gt) %>% 
@@ -796,20 +820,23 @@ FARM CODE
 imap(all_msc_anotd_preQC, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/seu_norm_anotd.RDS")))
 ```
 
+
+
 !!!NB - FARM CODE - DONT DELETE
 ```{r, eval=T}
 gogo()
 ## Run SCT on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm_anotd.RDS" --o_file_name "seu_sctnorm_anotd.RDS" --umap_name "UMAP_SCT" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_sct_clusters" --umap_redctn_nm "umap_sct" --redctn "pca" --integrtd_pc30 "yes" --elbo_nm "seu_norm_elbo.RDS" -resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/seu_norm_anotd.RDS" --normlzn "sct" --umap_name "UMAP_SCT" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_sct_clusters" --umap_redctn_nm "umap_sct" --redctn "pca" --integrtd_pc30 "yes" --pca_redctn_nm "pca" --resume 
 ```
 
 Read in seurat objects processed in farm
 FARM CODE
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc_anotd_ysct <- list.files("data/processed/", pattern = "seu_sctnorm_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_anotd_ysct <- list.files("data/processed/", pattern = "seu_norm_anotd_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 ```
 
@@ -845,6 +872,8 @@ imap(all_msc_anotd_ysct, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "Stag
 
 ```
 
+
+
 ```{r, warning=FALSE, message=FALSE}
 
 imap(all_msc_anotd_ysct, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = .x@meta.data %>% filter(strain_gt == "Negative") %>% row.names()) + labs(title = .y))
@@ -869,7 +898,7 @@ map(all_msc_anotd_ysct, ~.x@meta.data %>%
 
 
 ```{r, results='asis'}
-list(strn_knee_p, sample_id_lst)  %>%
+list(strn_knee_p, sample_name_nms)  %>%
   purrr::pmap(.,  ~ {
     # create tabset for each group
     cat('#####', ..2, '   \n')
@@ -924,7 +953,7 @@ md_don_all %>%
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
 md_don_all %>% 
   mutate(strain_dbt = case_when(str_detect(strain_gt, "SC") ~ "Singlet", T ~ strain_gt)) %>%
-      # mutate(across(sample, ~factor(., levels = unlist(sample_id_lst[1:4]))))  %>% 
+      # mutate(across(sample, ~factor(., levels = unlist(sample_name_nms[1:4]))))  %>% 
   ggplot(aes(x = strain_dbt, y = !!rlang::sym(..1))) +
   scale_color_manual(values = strain_cols_n) +
   theme_classic() +
@@ -943,7 +972,7 @@ md_don_all %>%
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
 md_don_all %>% 
   mutate(strain_dbt = case_when(str_detect(strain_gt, "SC") ~ "Singlet", T ~ strain_gt)) %>%
-      # mutate(across(sample, ~factor(., levels = unlist(sample_id_lst[1:4]))))  %>% 
+      # mutate(across(sample, ~factor(., levels = unlist(sample_name_nms[1:4]))))  %>% 
   ggplot(aes(x = seurat_clusters, y = !!rlang::sym(..1)/1000, color = StagePrelimC)) +
   scale_color_manual(values = sp_fld_colors) +
   theme_classic() +
@@ -968,7 +997,7 @@ md_don_all %>%
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
 md_don_all %>% 
   mutate(strain_dbt = case_when(str_detect(strain_gt, "SC") ~ "Singlet", T ~ strain_gt)) %>%
-      # mutate(across(sample, ~factor(., levels = unlist(sample_id_lst[1:4]))))  %>% 
+      # mutate(across(sample, ~factor(., levels = unlist(sample_name_nms[1:4]))))  %>% 
   ggplot(aes(x = seurat_clusters, y = !!rlang::sym(..1)/1000, color = StagePrelimC)) +
   scale_color_manual(values = sp_fld_colors) +
   theme_classic() +
@@ -991,7 +1020,7 @@ md_don_all %>%
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 300), c('Transcript', 'Gene')), ~{
 md_don_all %>% 
   mutate(strain_dbt = case_when(str_detect(strain_gt, "SC") ~ "Singlet", T ~ strain_gt)) %>%
-      # mutate(across(sample, ~factor(., levels = unlist(sample_id_lst[1:4]))))  %>% 
+      # mutate(across(sample, ~factor(., levels = unlist(sample_name_nms[1:4]))))  %>% 
   ggplot(aes(x = seurat_clusters, y = !!rlang::sym(..1)/1000, color = StagePrelimC)) +
   # scale_color_manual(values = sp_fld_colors) +
   theme_classic() +
@@ -1016,7 +1045,7 @@ md_don_all %>%
 pmap(list(c('nCount_RNA', 'nFeature_RNA'), c(520, 250), c('Transcript', 'Gene')), ~{
 md_don_all %>% 
   mutate(strain_dbt = case_when(str_detect(strain_gt, "SC") ~ "Singlet", T ~ strain_gt)) %>%
-      # mutate(across(sample, ~factor(., levels = unlist(sample_id_lst[1:4]))))  %>% 
+      # mutate(across(sample, ~factor(., levels = unlist(sample_name_nms[1:4]))))  %>% 
   ggplot(aes(x = StagePrelimC, y = !!rlang::sym(..1)/1000)) +
   # scale_color_manual(values = sp_fld_colors) +
   theme_classic() +
@@ -1082,6 +1111,7 @@ scmap cosine similarities for the top 2 assigned stage labels among the top 10 s
 #         legend.position = 'bottom')
 # 
 # scm_barpt
+# gogo()
 ```
 
 
@@ -1091,7 +1121,7 @@ scmap cosine similarities for the top 2 assigned stage labels among the top 10 s
 
 
 ```{r, results='asis', message=F, warning=F, fig.width = 10, fig.height = 5}
-list(all_msc_anotd_ysct, sample_id_lst)  %>%
+list(all_msc_anotd_ysct, sample_name_nms)  %>%
   purrr::pmap(.,  ~ {
     # create tabset for each group
     cat('#####', ..2, '   \n')
@@ -1264,8 +1294,15 @@ pmap(list(all_msc_anotd_ysct), ~..1@meta.data %>% dplyr::count( StagePrelimC, se
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-
+#REX1
 imap(all_msc_anotd_ysct, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-0935900", reduction = "umap_norm")+ labs(title = .y))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_msc_anotd_ysct, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-1222600", reduction = "umap_norm", order = T)+ labs(title = .y))
 
 ```
 
@@ -1375,6 +1412,7 @@ map(all_msc_filt, ~{
 
 FARM CODE
 
+
 ```{r, eval=T}
 ## write out seurat bpcells object files for normalization processing in farm
 imap(all_msc_filt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/filt_seu_sct.RDS")))
@@ -1384,16 +1422,24 @@ imap(all_msc_filt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/filt_se
 ```{r, eval=T}
 gogo()
 ## Run SNORM on farm like below
-# nextflow run submsn_seu_norm.nf --scrpt "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct.RDS" --o_file_name "filt_seu_norm.RDS" --umap_name "UMAP_F_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap.unintegrated" --redctn "pca" --integrtd_pc30 "no" --elbo_nm "m2_list_elbo.RDS" -resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/filt_seu_sct.RDS" --normlzn "norm" --umap_name "UMAP_F_NORM" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters_nm" --umap_redctn_nm "umap_norm" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume 
+
+```
+
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+# imap(all_msc_bp, ~system(paste0("rm data/processed/Pf/",.y,"/seu_obj/filt_seu_norm.RDS")))
 ```
 
 
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_msc_filt <- list.files("data/processed/", pattern = "^filt_seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+all_msc_filt <- list.files("data/processed/", pattern = "^filt_seu_sct_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
   set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj.*'))) %>% 
-  .[sample_name] %>%
+  .[sample_name_nms] %>%
   map(readRDS)
 ```
 
