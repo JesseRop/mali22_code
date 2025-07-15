@@ -327,25 +327,13 @@ part <- "Part1"
 outdir <- paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/sk_25_QC/PmML03_PowML03_QC_objects/", part, "/")
 
 # processed_data_noretain <- readRDS(paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_wo_retain.RDS"))
-# processed_data_withretain <- readRDS( paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_w_retain.RDS"))
 ```
 
 
 ```{r}
 # processed_data_noretain_50 <- map(processed_data_noretain, ~.x[["50"]] %>% filter(!is.na(Barcode) )) %>% .[sample_name]
-# processed_data_noretain_100 <- map(processed_data_noretain, ~.x[["100"]] %>% filter(!is.na(Barcode) )) %>% .[sample_name]
-# 
-# processed_data_withretain_50 <- map(processed_data_withretain, ~.x[["50"]] %>% filter(!is.na(Barcode) )) %>% .[sample_name]
-# processed_data_withretain_100 <- map(processed_data_withretain, ~.x[["100"]] %>% filter(!is.na(Barcode) )) %>% .[sample_name]
-
 ```
 
-
-```{r}
-# processed_data_noretain_50
-# processed_data_withretain_100
-
-```
 
 ```{r}
 processed_data_w_retain <- readRDS("data/processed/Pf/m2_all/processed_data_w_retain.RDS")
@@ -408,28 +396,6 @@ processed_data_withretain_50 <- processed_data_w_retain[w_rtn_50] %>% set_names(
 
 processed_data_noretain_100 <- processed_data_wo_retain[wo_rtn_100] %>% set_names(names(edrops_thresh))%>% .[sample_name]
 processed_data_withretain_100 <-  processed_data_w_retain[w_rtn_100] %>% set_names(names(edrops_thresh))%>% .[sample_name]
-
-```
-
-
-```{r}
-# # processed_data_noretain_50 <- processed_data_wo_retain[str_detect(names(processed_data_wo_retain), "_50_wo_retain")]
-# # processed_data_noretain_50 <- processed_data_noretain_50 %>% .[names(processed_data_noretain_50)[str_detect(names(processed_data_noretain_50), paste0(sample_name, collapse = "|"))]]
-# # names(processed_data_noretain_50) <- str_remove(names(processed_data_noretain_50), "_50_wo_retain")
-# 
-# processed_data_noretain_100 <- processed_data_wo_retain[str_detect(names(processed_data_wo_retain), "_100_wo_retain")]
-# processed_data_noretain_100 <- processed_data_noretain_100 %>% .[names(processed_data_noretain_100)[str_detect(names(processed_data_noretain_100), paste0(sample_name, collapse = "|"))]]
-# names(processed_data_noretain_100) <- str_remove(names(processed_data_noretain_100), "_100_wo_retain")
-# 
-# 
-# # processed_data_withretain_50 <-  processed_data_w_retain[str_detect(names(processed_data_w_retain), "_50_w_retain")]
-# # processed_data_withretain_50 <- processed_data_withretain_50 %>% .[names(processed_data_withretain_50)[str_detect(names(processed_data_withretain_50), paste0(sample_name, collapse = "|"))]]
-# # names(processed_data_withretain_50) <- str_remove(names(processed_data_withretain_50), "_50_w_retain")
-# 
-# processed_data_withretain_100 <-  processed_data_w_retain[str_detect(names(processed_data_w_retain), "_100_w_retain")]
-# processed_data_withretain_100 <- processed_data_withretain_100 %>% .[names(processed_data_withretain_100)[str_detect(names(processed_data_withretain_100), paste0(sample_name, collapse = "|"))]]
-# names(processed_data_withretain_100) <- str_remove(names(processed_data_withretain_100), "_100_w_retain")
-# 
 
 ```
 
@@ -1161,25 +1127,6 @@ all_msc_raw_mdata <- map(all_msc_bp_raw, ~.x@meta.data %>%
 
 
 
-
-```{r, fig.width=15, fig.height=5}
-# all_mdata_10x_resc <- map(all_msc_bp_raw, ~.x@meta.data %>% 
-#                            left_join(., donor_10x_mdata_sk21_summ, by = "donor")
-#                          ) 
-
-
-```
-
-```{r, fig.width=15, fig.height=5}
-
-# mdata_10x_resc %>% 
-#   pivot_longer(cols = c("Limit (no retain): 50", "CBendr", "Limit (no retain): 100"), names_to = "Cell_id_mthd", values_to = "cellNo") %>%
-#   ggplot(aes(x = parasites_loaded, y = cellNo)) +
-#   geom_point(size = 4) +
-#   geom_line(aes(group = Cell_id_mthd), size = 1) +
-#   facet_wrap(Cell_id_mthd ~ .)
-```
-
 Find gene count cut offs
 ```{r, fig.height= 4, fig.width= 4}
 library(scales)
@@ -1322,14 +1269,6 @@ all_rank_ncount_cb_don %>%
 all_rank_ncount_cb_don %>%
   filter(!is.na(is_cell_cb)) %>%
   count(donor, is_cell_cb)
-
-```
-
-```{r, fig.height= 14, fig.width= 10, eval=T}
-
-# all_rank_ncount_don %>%
-#   filter(!is.na(is_cell_cb)) %>%
-#   count(donor, is_cell_cb)
 
 ```
 
@@ -1744,30 +1683,6 @@ all_rank_gn_umi_bp_don %>% filter(is_cell_cb %in% c("CellCb.8", "CellCb.5") | is
 
 
 ```{r}
-# Convert matrix to raw counts
-# all_msc_counts <- map(all_msc_bp_raw, ~as(.x[["RNA"]]$counts, Class = "dgCMatrix"))
-```
-
-```{r}
-# Run emptyDrops with the current limit
-# e.out <- map(all_msc_counts, ~emptyDrops(.x, lower=100, test.ambient=TRUE))
-# e.out <- map(all_msc_counts, ~emptyDrops(.x, lower=50, test.ambient=TRUE))
-
-
-```
-
-
-```{r}
-# for(i in 1:length(e.out)) {
-#   e.out[[i]]["Is_Cell"] <- ifelse(e.out[[i]][,"FDR"] <= 0.01, "Cell", "Non-Cell")
-# }
-
-```
-
-
-
-
-```{r}
 # all_msc_bp_edrops50 <- map(all_msc_bp_raw, ~subset(.x, subset = Is_Cell_100 == "Cell"))
 all_msc_bp_edrops50 <- map(all_msc_bp_raw, ~subset(.x, subset = is_cell_ed == "CellEd"))
 all_msc_bp_edrops50
@@ -1807,17 +1722,6 @@ cell_counts
 
 ```{r, eval=T}
 rm(all_msc_bp_raw)
-```
-
-
-```{r, message=F, warning=F, eval=F}
-# Convert to dense object - might be necessary in future instances
-# all_msc <- all_msc_bp %>%
-#   map(., ~{
-#     .x[["RNA"]]$counts <- as(object = .x[["RNA"]]$counts, Class = "dgCMatrix")
-#     return(.x)
-#   })
-
 ```
 
 
