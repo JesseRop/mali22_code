@@ -205,9 +205,14 @@ list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.name
 
 ```{r, message=F, warning=F, eval=T}
 ##Write BPcells matrices
-list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
-  .[sample_name] %>%
+# list.files("data/raw/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/raw/Pf//|/outs.*'))) %>% 
+##Write BPcells matrices
+list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf//|/outs.*'))) %>% 
+  .[source_irods] %>%
+  set_names(names(source_irods)) %>%
+  # .[sample_name] %>%
   map(~open_matrix_10x_hdf5(path = .)) %>% 
   imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/counts_mtx'), overwrite = T))
 ```
