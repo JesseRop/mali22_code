@@ -127,8 +127,8 @@ smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
 
 ```{r}
 # Remove poor quality samples
-poorQC_samples <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39") 
-sample_name <- sample_name[!(sample_name %in% poorQC_samples)] %>% str_sort(., numeric = T)
+# poorQC_samples <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39") 
+# sample_name <- sample_name[!(sample_name %in% poorQC_samples)] %>% str_sort(., numeric = T)
 ```
 
 Read in seurat objects processed in farm
@@ -236,7 +236,14 @@ saveRDS(com_markers_localMac, "data/processed/Pf/m2_all/annot_refs/com_markers_l
 
 ```{r}
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_singleR.sh
+
 # nextflow run ../mali22_code_lnk/nf_scripts/submsn_singleR.nf --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/singleR_mult.R --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --ref_obj_p "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/annot_refs/msc_qcd_anotd_sce_13_14.RDS" --marker_obj_p "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/annot_refs/com_markers_localMac.RDS" --ref_stage "stageHL" --o_sufx "pred_sR" --ncores "3" --mem "25 GB" -resume
+```
+
+```{r, message=F, warning=F}
+# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
+sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+sample_name_ed_cr
 ```
 
 Read in cell annotation singleR processed in farm
@@ -246,210 +253,36 @@ Read in cell annotation singleR processed in farm
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
 
 # all_ed_pref_elbo <- list.files("data/processed/Pf", pattern = "bpseu_ed_pref.*_sct_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_pref_pred <- list.files("data/processed/Pf", pattern = "bpc_seu_.*pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_norm.*'))) %>%
+all_pref_pred <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops50)_pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_pred.*'))) %>%
 # all_pref_pred <- list.files("data/processed/Pf", pattern = "bpseu_.*pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_pref.*'))) %>% 
-  # .[sample_name_all] %>%
-  .[sample_name_ed_cr] %>%
+  .[sample_name_all] %>%
+  # .[sample_name_ed_cr] %>%
   map(readRDS)
 
 # all_pref_pred
 ```
 
 
-Read in cell annotation singleR processed in farm
-```{r, message=F, warning=F, eval=FALSE}
-##Read elbo plots
-
-# all_ed_pref_elbo <- list.files("data/processed/Pf", pattern = "bpseu_ed_pref.*_sct_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_pref_sce <- list.files("data/processed/Pf", pattern = "^sce_.*RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|sce|_pref.RDS'))) %>% 
-  # .[sample_name_all] %>%
-  .[sample_name_ed_cr] %>%
-  map(readRDS)
-
-all_pref_sce
-```
-
 ```{r}
-msc_qcd_anotd_m13_m14 <- merge(msc_qcd_anotd[["MSC13"]], msc_qcd_anotd[["MSC14"]]) 
-
-```
-
-```{r, message=F, warning=F}
-msc_qcd_anotd_sce_13_14 <- map(list(msc_qcd_anotd_m13_m14), ~{
-  obj <- as.SingleCellExperiment(.x)
-  logcounts(obj) <- NULL
-  normcounts(obj) <- NULL
-  obj <- logNormCounts(obj)
-  obj$stage_asx <- ifelse(obj$stageHL %in% c("Late ring", "Early trophozoite"), "Asexual", obj$stageHL)
-  })
-
-```
-
-```{r}
-# m14_qcd_anotd <- msc_qcd_anotd[["MSC14"]]
-# m13_qcd_anotd <- msc_qcd_anotd[["MSC13"]]
-
-```
-
-
-```{r}
-# m14_qcd_anotd_sce <- as.SingleCellExperiment(m14_qcd_anotd)
-# m13_qcd_anotd_sce <- as.SingleCellExperiment(m13_qcd_anotd)
-
-```
-
-
-```{r}
-# m14_qcd_anotd_sce 
-# m13_qcd_anotd_sce 
-
-```
-
-
-```{r}
-# logcounts(m14_qcd_anotd_sce) <- NULL
-# logcounts(m13_qcd_anotd_sce) <- NULL
-# normcounts(m14_qcd_anotd_sce) <- NULL
-# normcounts(m13_qcd_anotd_sce) <- NULL
-```
-
-
-```{r}
-# m14_qcd_anotd_sce <- logNormCounts(m14_qcd_anotd_sce)
-# m13_qcd_anotd_sce <- logNormCounts(m13_qcd_anotd_sce)
-
-```
-
-
-```{r, message=F, warning=F, eval=FALSE}
-all_ed_pref_sce <- map(all_ed_pref, ~{
-  obj <- as.SingleCellExperiment(.x)
-  logcounts(obj) <- NULL
-  normcounts(obj) <- NULL
-  obj <- logNormCounts(obj)
-  })
-
-```
-
-```{r, eval=T, eval=FALSE}
-## write out seurat bpcells object files for normalization processing in farm
-imap(all_ed_pref_sce, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_.*"), "/seu_obj/bpseu", str_extract(.y, "_.*"), "_pref_sce.RDS")))
-```
-
-
-```{r, message=F, warning=F, eval=FALSE}
-logcounts(all_ed_pref_sce[[1]])
-
-```
-
-
-```{r, message=F, warning=F}
-# com.markers <- getClassicMarkers(
-#     ref = msc_qcd_anotd_sce[c("MSC14", "MSC13")], 
-#     labels = list(msc_qcd_anotd_sce[["MSC14"]]$stage_afm, msc_qcd_anotd_sce[["MSC13"]]$stage_afm))
-# 
-# com.markers %>% str
-```
-
-
-```{r}
-
+map(all_pref_pred[1:6], ~table(.x$labels))
 ```
 
 
 
-```{r, eval=FALSE}
-# Performing predictions.
-pref_pred <- map(all_ed_pref_sce["MSC68_cbendr"], ~{
-  SingleR(test = .x, assay.type.test="logcounts", 
-          ref = msc_qcd_anotd_sce[c("MSC14", "MSC13")], 
-          assay.type.ref = "logcounts", 
-          labels = list(msc_qcd_anotd_sce[["MSC14"]]$stageHL, msc_qcd_anotd_sce[["MSC13"]]$stageHL)) 
-  })
-
-
-```
-
-
-```{r}
-# Performing predictions.
-# pref_pred2 <- map(all_ed_pref_sce["MSC68_cbendr"], ~{
-#   SingleR(test = .x, assay.type.test="logcounts", 
-#           ref = msc_qcd_anotd_sce_13_14[[1]], 
-#           assay.type.ref = "logcounts", 
-#           labels = msc_qcd_anotd_sce_13_14[[1]]$stageHL) 
-#   })
-
-
-```
-
-```{r}
-# map(pref_pred2, ~table(.x$labels))
+```{r, eval=FALSE, fig.width=16, fig.height=10}
+map(all_pref_pred[1:2], ~plotScoreHeatmap(.x))
 ```
 
 ```{r, eval=FALSE}
-map(pref_pred, ~table(.x$labels))
-```
-
-
-```{r}
-# data.frame("single" = pref_pred2$MSC49_edrops50$labels, "multi" = pref_pred[[1]]$labels) %>% count(single, multi)
-```
-
-
-```{r, eval=FALSE}
-map(pref_pred, ~table(.x$scores[1:10,]))
-```
-
-
-```{r}
-# map(pref_pred2, ~plotScoreHeatmap(.x))
-```
-
-```{r}
-# map(pref_pred2, ~plotScoreHeatmap(.x))
-```
-
-```{r}
-# map(pref_pred2, ~{
-#   to.remove <- is.na(.x$pruned.labels)
-#   to.remove
-#   table(Label=.x$labels, Removed=to.remove)
-# })
-
-
-```
-
-```{r, eval=FALSE}
-map(pref_pred, ~plotScoreHeatmap(.x))
-```
-
-```{r, eval=FALSE}
-map(pref_pred, ~plotScoreHeatmap(.x))
-```
-
-
-```{r, eval=FALSE}
-map2(pref_pred, all_ed_pref_sce[3], ~plotScoreHeatmap(.x, annotation_col=as.data.frame(colData(.y)[,"Is_Cell_50",drop=FALSE])))
+map2(all_pref_pred, all_ed_pref_sce[3], ~plotScoreHeatmap(.x, annotation_col=as.data.frame(colData(.y)[,"Is_Cell_50",drop=FALSE])))
 
 ```
 
 
 ```{r, eval=FALSE}
-map(pref_pred, ~{
-  to.remove <- is.na(.x$pruned.labels)
-  to.remove
-  table(Label=.x$labels, Removed=to.remove)
-})
-
-
-```
-
-```{r, eval=FALSE}
-map(pref_pred, ~{
+map(all_pref_pred, ~{
   to.remove <- is.na(.x$pruned.labels)
   to.remove
   table(Label=.x$labels, Removed=to.remove)
@@ -459,63 +292,35 @@ map(pref_pred, ~{
 ```
 
 
-```{r, eval=FALSE}
-pref_pred[[1]]$pruned.labels
-
-```
 
 ```{r, eval=FALSE}
-map(pref_pred, ~{
-  to.remove <- pruneScores(.x, min.diff.next=0.1)
-  table(Label=.x$labels, Removed=to.remove)
-  
-  
-})
+map(all_pref_pred[1], ~plotDeltaDistribution(.x))
 
 ```
 
 
-```{r, eval=FALSE}
-map(pref_pred, ~plotDeltaDistribution(.x))
-
-```
-
-
-
-
-```{r, eval=FALSE}
-# new.data <- logNormCounts(new.data)
-out <- pairwiseBinom(counts(msc_qcd_anotd_sce[[c("MSC14")]]), msc_qcd_anotd_sce[[c("MSC14")]]$stageHL, direction="up")
-markers <- getTopMarkers(out$statistics, out$pairs, n=20)
-
-markers %>% str
-```
 
 
 ```{r}
-# config <- configureMarkerHeatmap(pref_pred[[1]], all_ed_pref_sce[[3]], "epsilon")
+# config <- configureMarkerHeatmap(all_pref_pred[[1]], all_ed_pref_sce[[3]], "epsilon")
 # mat <- assay(all_ed_pref_sce[[3]], "logcounts")[head(config$rows, 20), config$columns]
 # aggregated <- scuttle::summarizeAssayByGroup(mat, config$predictions)
 # pheatmap::pheatmap(assay(aggregated), cluster_col=FALSE)
 ```
 
+
 ```{r}
-# map(pref_pred, all_ed_pref_sce[3], ~plotMarkerHeatmap(.x, .y, "Male"))
+# map(all_pref_pred, all_ed_pref_sce[3], ~plotMarkerHeatmap(.x, .y, "Male"))
 
 ```
 
 ```{r}
 # collected <- list()
-# for (lab in unique(pref_pred[[1]]$labels)) {
+# for (lab in unique(all_pref_pred[[1]]$labels)) {
 #   print(lab)
 #   collected[[lab]] <- SingleR::plotMarkerHeatmap(results = predictions, test = all_ed_pref_sce[[3]], label = lab)[[4]]
 # }
 
-```
-
-
-```{r, fig.width=18, fig.height=10}
-# do.call(gridExtra::grid.arrange, collected)
 ```
 
 
@@ -537,6 +342,132 @@ markers %>% str
 # scater::plotUMAP(m13_qcd_anotd_sce, colour_by = "seurat_clusters")
 ```
 
+################## evaluate singleR MAnually
+
+###### Add metadata from above to the objects
+
+
+```{r, message=FALSE}
+## get predictions for stages
+all_pref_pred_df <- map(all_pref_pred, ~.x[, c("scores", "labels", "pruned.labels", "reference")] %>% 
+                          as.data.frame() %>% 
+                          rename_with(~str_replace_all(., c("\\.\\."="_", "\\."="_", "_$"="")), contains("score")) %>%
+                          rownames_to_column("bcode"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+all_pref_pred_df_com_scores <- map(all_pref_pred_df, ~{
+  .x %>% 
+    mutate(actl_score = case_when(reference == 1 ~ scores_MSC13_scores,
+                                  reference == 2 ~ scores_MSC14_scores),
+           pred_stage = case_when(reference == 1 ~ scores_MSC13_labels,
+                                  reference == 2 ~ scores_MSC14_labels),
+           lab_consistency = case_when(scores_MSC13_labels == scores_MSC14_labels ~ labels,
+                                       str_detect(scores_MSC13_labels, "Female") & str_detect(scores_MSC14_labels, "Female") ~ labels,
+                                       str_detect(scores_MSC13_labels, "Male") & str_detect(scores_MSC14_labels, "Male") ~ labels,
+                                       scores_MSC14_labels %in% c("Late ring", "Early trophozoite") ~ labels,
+                                       str_detect(scores_MSC13_labels, "Female") & str_detect(scores_MSC14_labels, "Male") ~ "FemaleMale",
+                                       str_detect(scores_MSC13_labels, "Male") & str_detect(scores_MSC14_labels, "Female") ~ "FemaleMale", 
+                                       scores_MSC13_labels != scores_MSC14_labels & !(scores_MSC14_labels %in% c("Late ring", "Early trophozoite"))  ~ "unclear"))
+  
+})
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+# all_pref_pred_df_com_scores <- map(all_pref_pred_df, ~{
+#   .x %>% 
+#   pivot_longer(cols = contains("scores_"), names_to = "pred_stage", values_to = "scores", values_drop_na = T)%>% 
+#   mutate(across(pred_stage, ~str_replace_all(., c("scores_" = "", "_LE" = " (LE)", "Early_trophozoite" = "Early trophozoite", "Late_ring" = "Late ring")))) %>%
+#   mutate(actl_score = case_when(reference == 2 & pred_stage == labels ~ scores,
+#                                 reference == 1 & pred_stage == paste0(labels, "_1") ~ scores)) %>% 
+#   group_by(bcode) %>% 
+#   mutate(lab_consistency =case_when(all(is.na(actl_score)) & reference == 2 & pred_stage == paste0(labels, "_1") ~ "unclear",
+#                              all(is.na(actl_score)) & reference == 1 & pred_stage == labels  ~ "unclear")) %>% 
+#   ungroup() %>%
+#   mutate(across(actl_score, ~case_when(lab_consistency ==  "unclear" ~ scores,
+#                                        T ~ .)))
+#   })
+#   
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+map(all_pref_pred_df_com_scores, ~.x %>% group_by(bcode) %>% filter(any(lab_consistency == "unclear")))
+  
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+all_pref_pred_df_com_scores_fnl <- map(all_pref_pred_df_com_scores, ~.x %>% 
+                                         # filter(!is.na(actl_score)) %>% 
+                                         # select("bcode", "labels", "pruned.labels", "reference", "pred_stage", "scores", "actl_score", "lab_consistency") %>% 
+                                         select("bcode", "labels", "pruned.labels", "reference", "pred_stage", "actl_score", "lab_consistency") %>% 
+                                         mutate(#across(lab_consistency, ~replace_na(lab_consistency, "consistent")),
+                                                fine_stg = case_when(#lab_consistency == "unclear" ~ "unclear",
+                                                                     is.na(pruned.labels) ~ "weak_score",
+                                                                     lab_consistency == "FemaleMale" ~ "discrepantFM",
+                                                                     T ~ pruned.labels)))
+  
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+
+# all_pref_pred_df[[1]] %>% 
+#   pivot_longer(cols = contains("scores_"), names_to = "pred_stage", values_to = "scores")%>% 
+#   mutate(across(pred_stage, ~str_replace_all(., c("scores_" = "", "_LE" = " (LE)", "Early_trophozoite" = "Early trophozoite", "Late_ring" = "Late ring")))) %>%
+#   mutate(actl_score = case_when(reference == 2 & pred_stage == labels ~ scores,
+#                                 reference == 1 & pred_stage == paste0(labels, "_1") ~ scores)) %>% 
+#   mutate(drop_out =case_when(reference == 1 & pred_stage == paste0(labels, "_1") & is.na(scores) ~ "unclear",
+#                              reference == 2 & pred_stage == labels & is.na(scores) ~ "unclear")) %>%
+#   filter(!is.na(actl_score) | !is.na(drop_out) ) %>%
+#   select(bcode, actl_score)
+  
+```
+
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_seu <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops50).RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|.RDS'))) %>% 
+# all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
+  .[sample_name_all] %>%
+  map(readRDS)
+
+```
+
+
+```{r, message=FALSE}
+##Doublet removal
+# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
+all_ed_pref_w_mdata <- list(all_seu, all_pref_pred_df_com_scores_fnl) %>%
+  pmap(~ {
+    ..2 %>%
+      column_to_rownames("bcode") %>%
+      AddMetaData(..1, .)
+       })
+
+```
+
+```{r, message=FALSE}
+##Doublet removal
+# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
+all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, scf_outputs, str_remove(names(all_ed_pref_norm), "_(cbendr|edrops50)")) %>%
+  pmap(~ {
+    ..2 %>%
+      left_join(., ..3, by = "bcode") %>%
+      left_join(., soupo_kselect %>% filter(str_remove(sample_k, "_[0-9]+") == ..4), by = c("bcode" = "barcode")) %>%
+      column_to_rownames("bcode") %>%
+      AddMetaData(..1, .)
+       })
+
+```
 ##################################################  END - SingleR use markers to id cells ##################################################
 
 
@@ -904,8 +835,8 @@ sample_name_ed_cr
 # all_ed_pref <- list.files("data/processed/Pf", pattern = "bpseu_ed_pref.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 all_ed_pref <- list.files("data/processed/Pf", pattern = "bpseu_.*_pref_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_pref_sct.*'))) %>% 
-  # .[sample_name_all] %>%
-  .[sample_name_ed_cr] %>%
+  .[sample_name_all] %>%
+  # .[sample_name_ed_cr] %>%
   map(readRDS)
 
 ```
