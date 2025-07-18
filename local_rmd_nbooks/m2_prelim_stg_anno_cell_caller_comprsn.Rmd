@@ -238,7 +238,6 @@ saveRDS(com_markers_localMac, "data/processed/Pf/m2_all/annot_refs/com_markers_l
 ```{r}
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_singleR.sh
 
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_singleR.nf --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/singleR_mult.R --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --ref_obj_p "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/annot_refs/msc_qcd_anotd_sce_13_14.RDS" --marker_obj_p "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/annot_refs/com_markers_localMac.RDS" --ref_stage "stageHL" --o_sufx "pred_sR" --ncores "3" --mem "25 GB" -resume
 ```
 
 ```{r, message=F, warning=F}
@@ -410,7 +409,7 @@ all_seu <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops5
 
 ```{r, message=FALSE}
 ##Doublet removal
-# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
+# all_seu_prelim_stg_norm <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
 all_seu_prelim_stg <- list(all_seu, all_pref_pred_df_fnl) %>%
   pmap(~ {
     ..2 %>%
@@ -443,11 +442,11 @@ gogo()
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_norm.*'))) %>% 
+all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops50)_prelim_stg_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_prelim.*'))) %>% 
 # all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
-  .[sample_name_all] %>%
+  .[sample_name_ed_cr] %>%
   map(readRDS)
 
 ```
@@ -456,91 +455,88 @@ all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_norm.RDS$",
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read elbo plots
-all_seu_norm_elbo <- list.files("data/processed/Pf", pattern = "bpc_seu.*_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_norm.*'))) %>% 
+all_seu_prelim_stg_norm_elbo <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops50)_prelim_stg_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_prelim.*'))) %>% 
 # all_seu_norm_elbo <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
-  .[sample_name_all] %>%
+  .[sample_name_ed_cr] %>%
   map(readRDS)
 
-all_seu_norm_elbo
+all_seu_prelim_stg_norm_elbo
 ```
 
 
 ```{r}
-map(all_seu_norm, ~{table(.x@meta.data$nFeature > 100)})
+map(all_seu_prelim_stg_norm, ~{table(.x@meta.data$nFeature > 100)})
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-imap(all_seu_norm, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
-imap(all_seu_norm, ~DimPlot(.x, dims = c(1,2), label = T, reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T) + labs(title = .y))
 
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "sR_fine_stg") + labs(title = .y))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ccp4
+imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", order = T) + labs(title = .y)}, "missing"))
+imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ## ccp4
-imap(all_seu_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", order = T) + labs(title = .y)}, "missing"))
-imap(all_seu_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-## ccp4
-imap(all_seu_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", order = T) + labs(title = .y)}, "missing"))
-imap(all_seu_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
+imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", order = T) + labs(title = .y)}, "missing"))
+imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 ## remove the _150
-all_seu_norm <- all_seu_norm[!str_detect(names(all_seu_norm), "_150")]
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-rm(all_seu_norm)
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm[!str_detect(names(all_seu_prelim_stg_norm), "_150")]
 
 ```
 
 
-
 ```{r, warning=FALSE, message=FALSE}
-imap(all_seu_norm, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y))
-imap(all_seu_norm, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "pca") + labs(title = .y))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 ## Pfs16
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0406200") + labs(title = .y))
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0406200", reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0406200") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0406200", reduction = "pca") + labs(title = .y))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ## sbp1
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0501300") + labs(title = .y))
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0501300", reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0501300") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0501300", reduction = "pca") + labs(title = .y))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ## mget
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-1469900") + labs(title = .y))
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-1469900", reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-1469900") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-1469900", reduction = "pca") + labs(title = .y))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ## ccp4
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0903800") + labs(title = .y))
-imap(all_seu_norm, ~FeaturePlot(.x, features = "PF3D7-0903800", reduction = "pca") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0903800") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0903800", reduction = "pca") + labs(title = .y))
 ```
 
 
 
 ```{r}
 
-ncount_filt <- unlist(map(all_seu_norm, ~quantile(.x@meta.data[, "nCount_RNA"], 0.999, na.rm = T)))
+# ncount_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "nCount_RNA"], 0.999, na.rm = T)))
 ```
 
 
@@ -554,31 +550,35 @@ std_theme <- theme(axis.text=element_text(size=18),
 ```
 
 ```{r, results='asis'}
-pmap(list(all_seu_norm, ncount_filt, names(all_seu_norm)), ~{
-    VlnPlot(..1, feature = "nCount_RNA", group.by = "seurat_clusters", pt.size = 1)+ 
-      # scale_color_manual(values = sp_fld_colors) +
-      geom_hline(yintercept = ..2)  +
-      labs(title = ..3) +
-      std_theme
+# pmap(list(all_seu_prelim_stg_norm, ncount_filt, names(all_seu_prelim_stg_norm)), ~{
+#     VlnPlot(..1, feature = "nCount_RNA", group.by = "seurat_clusters", pt.size = 1)+ 
+#       # scale_color_manual(values = sp_fld_colors) +
+#       geom_hline(yintercept = ..2)  +
+#       labs(title = ..3) +
+#       std_theme
+# 
+#   })
 
-  })
+```
 
+```{r, results='asis'}
+gogo()
 ```
 
 ## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
 ```{r, eval=FALSE}
 ## !!!!!!NB -CONSIDER FORE REMOVAL LATER
 #filter out cells with high ncountRNA 
-all_seu_norm <- all_seu_norm %>%
-  map2(., ncount_filt, ~.x  %>%
-         subset(., nCount_RNA < .y )
-  )
+# all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
+#   map2(., ncount_filt, ~.x  %>%
+#          subset(., nCount_RNA < .y )
+#   )
 
 ```
 
 Get mt_filt based on automatic removal of quantiles
 ```{r}
-all_seu_norm <- all_seu_norm%>% 
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm%>% 
   map(., ~{
     
     mit_fts <- rownames(.x)[str_detect(rownames(.x), "MIT")]
@@ -591,16 +591,16 @@ all_seu_norm <- all_seu_norm%>%
 ```
 
 ```{r}
-mt_filt <- unlist(map(all_seu_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
-# mt_filt <- unlist(map(all_seu_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.99, na.rm = T)))
-# api_filt <- unlist(map(all_seu_norm, ~quantile(.x@meta.data[, "percent.api"], 0.995, na.rm = T)))
+mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
+# mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.99, na.rm = T)))
+# api_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.api"], 0.995, na.rm = T)))
 
 ```
 
 
 ```{r, results='asis'}
 
-pmap(list(all_seu_norm, mt_filt, names(all_seu_norm)), ~{
+pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
     FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "seurat_clusters", pt.size = 1)+ 
       scale_color_manual(values = sp_fld_colors) +
       geom_hline(yintercept = ..2)  +
@@ -612,14 +612,14 @@ pmap(list(all_seu_norm, mt_filt, names(all_seu_norm)), ~{
 ```
 
 ```{r}
-map2(all_seu_norm, mt_filt, ~.@meta.data %>% dplyr::count(percent.mt>.y ))
+map2(all_seu_prelim_stg_norm, mt_filt, ~.@meta.data %>% dplyr::count(percent.mt>.y ))
 ```
 
 ## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
 ```{r, eval=FALSE}
 ## !!!!!!NB -CONSIDER FORE REMOVAL LATER
 #filter out cells with high mitochondrial count
-all_seu_norm <- all_seu_norm %>%
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
   map2(., mt_filt, ~.x  %>%
          subset(., percent.mt < .y )
   )
@@ -628,7 +628,7 @@ all_seu_norm <- all_seu_norm %>%
 
 
 ```{r, results='asis'}
-pmap(list(all_seu_norm, mt_filt, names(all_seu_norm)), ~{
+pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
     FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "seurat_clusters", pt.size = 1)+ 
       scale_color_manual(values = sp_fld_colors) +
       geom_hline(yintercept = ..2)  +
@@ -639,175 +639,7 @@ pmap(list(all_seu_norm, mt_filt, names(all_seu_norm)), ~{
 
 ```
 
-#### !!!!!!!! NOTE - Nothing filtered out to this point
-```{r}
-## Retain those with >100 ncount
-# all_msc_cr_dropd <- map2(all_seu_norm[paste0(sample_name, "_edrops50")], all_seu_norm[sample_name], ~.x[,!(colnames(.x) %in% colnames(.y))])
 
-all_ed <- all_seu_norm[c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))]
-all_ed <- map(all_ed, ~.x[,.x@meta.data$nCount_RNA >= 100 ])
-
-all_ed
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-## ap2g
-imap(all_ed, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", order = T) + labs(title = .y)}, "missing"))
-imap(all_ed, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
-``` 
-
-
-```{r, warning=FALSE, message=FALSE}
-map(all_ed, possibly(~table(.x@assays[["SCT"]]@counts["PF3D7-1222600",] > 0), "missing"))
-
-``` 
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-table(all_ed[[5]]@assays[["SCT"]]@counts["PF3D7-1222600",] > 0)
-table(all_ed[[5]]@assays[["SCT"]]@data["PF3D7-1222600",] > 0)
-
-``` 
-
-```{r, warning=FALSE, message=FALSE}
-crd_m5_tr <- all_ed[[5]]
-DefaultAssay(crd_m5_tr) <- "RNA"
-crd_m5_tr[["SCT"]] <- NULL
-crd_m5_tr[["RNA"]]$counts <- as(object = crd_m5_tr[["RNA"]]$counts, Class = "dgCMatrix")
-
-crd_m5_tr_v3 <- CreateAssayObject(counts = crd_m5_tr[["RNA"]]$counts)
-
-crd_m5_tr[["RNA"]] <- crd_m5_tr_v3
-
-crd_m5_tr
-``` 
-
-```{r, warning=FALSE, message=FALSE}
-table(crd_m5_tr[["RNA"]]$counts["PF3D7-1222600",] > 0)
-
-crd_m5_tr_ap2g <- crd_m5_tr[,crd_m5_tr[["RNA"]]$counts["PF3D7-1222600",] > 0]
-crd_m5_tr_ap2g
-``` 
-
-
-```{r, warning=FALSE, message=FALSE}
-# crd_m5 <- all_ed[[5]][["RNA"]]
-# DefaultAssay(crd_m5) <- "RNA"
-
-``` 
-
-```{r, warning=FALSE, message=FALSE}
-# crd_m5[["RNA"]]$counts <- as(object = crd_m5[["RNA"]]$counts, Class = "dgCMatrix")
-# # crd_m5[["RNA"]]$data <- as(object = crd_m5[["RNA"]]$data, Class = "dgCMatrix")
-# 
-# table(crd_m5[["RNA"]]$counts["PF3D7-1222600",] > 0)
-# 
-# crd_m5_ap2g <- crd_m5[crd_m5[["RNA"]]$counts["PF3D7-1222600",] > 0,]
-``` 
-
-```{r, warning=FALSE, message=FALSE}
-dense_mtx <- subset(all_ed[[5]], subset = `PF3D7-1222600` > 0)
-dense_mtx
-``` 
-
-
-FARM CODE
-
-```{r, eval=T}
-## write out seurat bpcells object files for normalization processing in farm
-### gn_edrops50
-# imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_edrops50"), "/seu_obj/bpseu_ed_pref.RDS")))
-imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/bpseu", str_extract(.y, "_[ed|cb].*"), "_pref.RDS")))
-
-```
-
-
-```{r, eval=T}
-gogo()
-## Run standard normalisation on farm like below
-## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" -resume
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "20 GB" --resume
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC60,MSC66,MSC67,MSC70,MSC24,MSC33,MSC40,MSC54,MSC55}/seu_obj/bpseu_ed_pref.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume
-```
-
-```{r}
-# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
-sample_name <- slct_sample_names
-```
-
-```{r}
-# Remove poor quality samples
-poorQC_samples <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39") 
-sample_name <- sample_name[!(sample_name %in% poorQC_samples)] %>% str_sort(., numeric = T)
-```
-
-Read in seurat objects processed in farm
-```{r, message=F, warning=F}
-# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
-# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC55") %>% str_sort(., numeric = T)
-# sample_name <- slct_sample_names
-sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
-sample_name_ed_cr
-```
-
-
-## Transfer files to local
-
-
-```{r, message=F, warning=F, eval=FALSE}
-##Read BPcells matrices
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
-
-# all_ed_pref <- list.files("data/processed/Pf", pattern = "bpseu_ed_pref.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_ed_pref <- list.files("data/processed/Pf", pattern = "bpseu_.*_pref_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_pref_sct.*'))) %>% 
-  .[sample_name_all] %>%
-  # .[sample_name_ed_cr] %>%
-  map(readRDS)
-
-```
-
-
-```{r, message=F, warning=F}
-# ##Read BPcells matrices
-all_ed_pref_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_norm.*'))) %>% 
-# all_ed_pref_norm <- list.files("data/processed/Pf", pattern = "bpseu_.*_pref_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_pref_norm.*'))) %>%
-  # .[sample_name_all] %>%
-  .[sample_name_ed_cr] %>%
-  map(readRDS)
-
-# all_ed_pref_norm <- all_ed_pref
-```
-
-Read in seurat objects processed in farm
-```{r, message=F, warning=F, eval=FALSE}
-##Read elbo plots
-# all_seu_norm_elbo <- list.files("data/processed/Pf", pattern = "*seu_norm_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
-
-# all_ed_pref_elbo <- list.files("data/processed/Pf", pattern = "bpseu_ed_pref.*_sct_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_ed_pref_elbo <- list.files("data/processed/Pf", pattern = "bpseu_.*_pref_sct_elbo.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_pref_sct_elbo.*'))) %>% 
-  # .[sample_name_all] %>%
-  .[sample_name_ed_cr] %>%
-  map(readRDS)
-
-all_ed_pref_elbo
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
-## in cellbender but not in edrops
-map(all_ed_pref_norm, ~DimPlot(.x, label = T))
-
-```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
@@ -856,534 +688,18 @@ plts[[29]]
 ```
 
 
-########################################START PREP V3 REFERENCE FROM SUNIL########################################
-#### full msc_atlas reference dataset
-```{r}
-##Read MCA V3 + field blood stage reference dataset
-# v3labmscs.ref.sce <- readRDS("../Mali2/data/raw/Pf/v3labmscs.ref.sce.RDS")
-v3labmscs.ref.sce <- readRDS("data/raw/Pf/v3labmscs.ref.sce.RDS")
-```
-
-
-
-```{r, message=FALSE, warning=FALSE}
-##Collapse asexual stages into 1 "Asexual"
-v3labmscs.ref.sce@colData[,c("stageHL_ref", "stageHL_ref_asx")] <- colData(v3labmscs.ref.sce) %>% 
-  data.frame() %>% 
-  mutate(stageHL_ref = case_when(str_detect(orig.ident, "msc") & stageLR == "late ring" ~ "Late ring", 
-                                 str_detect(orig.ident, "msc") & stageLR == "early trophozoite" ~ "Early trophozoite", 
-                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (female) LE" ~ "Female LE", 
-                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (female)" ~ "Female", 
-                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (male) LE" ~ "Male LE", 
-                                 str_detect(orig.ident, "msc") & stageLR == "gametocyte (male)" ~ "Male", T ~ stageLR)) %>% 
-  mutate(stageHL_ref_asx = case_when(stageHL_ref %in% c("Early trophozoite", "Late ring") ~ "Asexual", T ~ stageHL_ref)) %>%
-  select(stageHL_ref, stageHL_ref_asx)
-
-```
-
-
-```{r, message=FALSE, warning=FALSE}
-scater::plotReducedDim(v3labmscs.ref.sce, dimred = "PCA", colour_by = "stageHL_ref_asx", ncomponents = c(2,3))
-```
-
-
-```{r, message=FALSE, warning=FALSE, eval = T}
-saveRDS(v3labmscs.ref.sce, "data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS")
-```
-########################################END PREP V3 REFERENCE FROM SUNIL########################################
-#####################################START - scmap #################################################################
-## scmap
-
-```{r, eval=T}
-gogo()
-## Run scmap on farm like below
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_scmap.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/scmap.R" --sce_ref "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/v3labmscs.ref.sce.stgasx.RDS" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --w 3 --cos_sim 0.4 --o_sufx "prelim_anotd" --stg_labl "stageHL_ref"  --ncores "3" --mem "40 GB" -resume
-```
-
-
-```{r, message=F, warning=F}
-##Read the annotations
-all_msc_anots_pref <- list.files("data/processed/", pattern = "bpseu_.*prelim_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/seu_obj/|bpseu|_pref.*'))) %>% 
-  .[sample_name_ed_cr] %>% 
-  .[!is.na(.)] %>%
-  map(readRDS)
-```
-
-
-
-```{r}
-##Modify the stage labels for MSC14
-# all_msc_anotd_preQC[[4]] <- all_msc_anotd_preQC[[4]]@meta.data %>%
-# all_msc_anotd_preQC <- pmap(list(all_msc_anotd_preQC, rep(0.4,length(sample_name)), c(rep('ring|trophozoite|developing', length(sample_name)))), ~{
-all_msc_anots_pref_v2 <- pmap(list(all_msc_anots_pref, rep(0.4,length(sample_name_ed_cr)), c(rep('ring|trophozoite|developing', length(sample_name_ed_cr)))), ~{
-  ..1 %>%
-    mutate(across(Stage_MSC, as.character)) %>%
-    # mutate(Stage_MSC = Stage_MSC) %>%
-    mutate(StagePrelim_lf = case_when(
-      is.na(Stage_MSC) & sim_lab1 > 0.35 & str_detect(stage_lab1, ..3) & str_detect(stage_lab2, ..3) & str_detect(stage_lab3, ..3) ~ stage_lab1, ## lower cos sim of 0.35 for asexuals instead of 0.4
-      is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Male|male') & str_detect(stage_lab2, 'Male|male') & str_detect(stage_lab3, 'Male|male') ~ stage_lab1,
-      is.na(Stage_MSC) & sim_lab1 > ..2 & str_detect(stage_lab1, 'Female|female') & str_detect(stage_lab2, 'Female|female') & str_detect(stage_lab3, 'Female|female') ~ stage_lab1,
-      TRUE ~ Stage_MSC)#,
-      # across(StagePrelim, str_to_sentence)
-    )%>%
-    mutate(StagePrelim = case_when(
-      str_detect(StagePrelim_lf, "developing") ~ "Early trophozoite", ## !!NB - label developing gams as early trophs the closest stage
-      str_detect(StagePrelim_lf, "schizont") & str_detect(stage_lab2, "ring|trophozoite")  & str_detect(stage_lab3, "ring|trophozoite") ~ str_to_sentence(stage_lab2),
-      str_detect(StagePrelim_lf, "late|early") ~ str_to_sentence(StagePrelim_lf),
-      str_detect(StagePrelim_lf, "gametocyte") ~ str_to_sentence(str_remove_all(StagePrelim_lf, "gametocyte \\(|\\)")),
-      is.na(StagePrelim_lf) ~ "Unassigned",
-      TRUE ~ StagePrelim_lf)#,
-      # across(StagePrelim, str_to_sentence)
-    ) %>%
-    mutate(StagePrelimC = case_when(
-      str_detect(StagePrelim, "ring|trophozoite|developing|schizont") ~ "Asexual",
-      TRUE ~ StagePrelim)#,
-      # across(StagePrelim, str_to_sentence)
-    ) %>%
-    mutate(across(c(StagePrelim, StagePrelimC), ~droplevels(factor(., levels = stg_refnd_lvls))))# %>%
-    # dplyr::select(Stage_MSC, StagePrelim, StagePrelim_lf, StagePrelimC) #%>%
-    # mutate(across(starts_with('Stage_V'), ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
-    # AddMetaData(.x, .)
-})
-
-```
-
-```{r}
-## Adding annotations to query cells
-all_ed_pref_norm <- list(all_msc_anots_pref_v2, all_ed_pref_norm) %>%
-  pmap(~ ..1 %>%
-         column_to_rownames("cell_bc") %>%
-         mutate(across(Stage_MSC, ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
-         AddMetaData(..2, .) 
-  )
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-# imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'Stage_MSC', cols = sp_fld_colors) + labs(title = .y))
-imap(all_ed_pref_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'Stage_MSC') + labs(title = .y))
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-# imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'stage_lab1', cols = sp_fld_colors)+ labs(title = .y))
-imap(all_ed_pref_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'stage_lab1')+ labs(title = .y))
-```
-
-```{r, warning=FALSE, message=FALSE}
-
-map(all_ed_pref_norm, ~..1@meta.data %>% dplyr::count(Stage_MSC, stage_lab1))
-
-```
-
-
-
-```{r, warning=FALSE, message=FALSE}
-
-# map(all_msc_anotd_preQC, ~.x@meta.data %>% dplyr::count(Stage_MSC, StagePrelim, stage_lab1))
-map(all_ed_pref_norm, ~.x@meta.data %>% dplyr::count(StagePrelim, StagePrelimC))
-```
-
-```{r, warning=FALSE, message=FALSE}
-# imap(all_msc_anotd_preQC, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'stage_lab1', cols = sp_fld_colors)+ labs(title = .y))
-imap(all_ed_pref_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = 'StagePrelim', cols = sp_fld_colors3)+ labs(title = .y))
-```
-
-#####################################END - scmap #################################################################
-
-
-#####################################START - sdblfinder #################################################################
-## scDblFinder
-
-!!!NB - FARM CODE - DONT DELETE
-```{r, eval=T}
-gogogo()
-## Remove the output files before rerunning since some object it might fail and old object persists
-# map(names(all_msc_filt), ~system(paste0('rm data/processed/Pf/', .x,'/seu_obj/scdblf_outs.RDS')))
-
-# nextflow run ../mali22_code_lnk/nf_scripts/doubletF_rand_clust.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/scdblfindr_rand_clust.R" --filt_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpseu_{edrops50,cbendr}_pref.RDS" --o_sufx "scdblf" --hvg "700" --resume
-```
-
-Read in seurat objects processed in farm
-```{r, message=F, warning=F}
-##Read BPcells matrices
-scf_outputs <- list.files("data/processed/Pf", pattern = "^bpc_seu_.*_scdblf.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*bpc_seu|_norm_scdblf.*'))) %>% 
-# scf_outputs <- list.files("data/processed/Pf", pattern = "^bpseu_.*_pref_scdblf.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*bpseu|_pref_scdblf.*'))) %>% 
-  .[sample_name_ed_cr] %>%
-  map(readRDS)
-```
-
-
-Assess agreement between the calls
-```{r, message=FALSE}
-map(scf_outputs, ~.x %>% select(contains("class")) %>% group_by_all() %>% count())
-
-```
-
-Chsqr of the different scdblfinder flavours tests
-```{r, message=FALSE}
-pw_scf_comp <- scf_outputs[[1]] %>% select(contains("class")) %>% colnames() %>% combn(., 2, simplify = F)
-
-pw_scf_comp_nms <- map(pw_scf_comp, ~{paste0(.x[[1]], '_VS_', .x[[2]])})
-
-a <- map(scf_outputs, ~{
-  tbl = .x
-  map(pw_scf_comp, ~{chisq.test(tbl[,.x[[1]]], tbl[,.x[[2]]])[c('statistic', 'p.value')]} %>% base::as.data.frame() %>%  rownames_to_column('test') ) %>%  
-    set_names(pw_scf_comp_nms) %>% 
-    bind_rows(., .id = "comps")
-}) %>% 
-    bind_rows(., .id = "donor")
-
-```
-
-```{r, message=FALSE}
-# ##Doublet removal
-# all_msc_w_dblts <- list(all_msc_filt, scf_outputs) %>%
-#   pmap(~ {
-#     ..2 %>%
-#       column_to_rownames("bcode") %>%
-#       AddMetaData(..1, .)
-#        })
-
-```
-
-######!!! NOTE RUN SCDBL HERE SINCE NEXTFLOW PIPELINE IS SLOW
-```{r, message=FALSE, warning=FALSE}
-## check sce
-# all_pref_sce
-
-# all_pref_dblt_clst <- map(all_pref_sce, ~{
-#   scDblFinder(.x, clusters = "seurat_clusters", returnType = "table", nfeatures = 700)
-# })
-
-```
-
-```{r, message=FALSE, warning=FALSE}
-## check sce
-# all_pref_sce
-
-# saveRDS(all_pref_dblt_clst, "data/processed/Pf/m2_all/all_pref_dblt_clst.RDS")
-```
-
-######!!! NOTE RUN SCDBL HERE SINCE NEXTFLOW PIPELINE IS SLOW
-```{r, message=FALSE, warning=FALSE}
-## check sce
-# all_pref_sce
-
-# all_pref_dblt_rand <- map(all_pref_sce, ~{
-#   scDblFinder(.x, returnType = "table", nfeatures = 700)
-# })
-
-```
-
-```{r, message=FALSE, warning=FALSE}
-## check sce
-# all_pref_sce
-
-# saveRDS(all_pref_dblt_rand, "data/processed/Pf/m2_all/all_pref_dblt_rand.RDS")
-
-```
-
-```{r, message=FALSE, warning=FALSE}
-## check sce
-# all_pref_dblt_clst_df <- map(all_pref_dblt_clst, ~{
-#   data.frame(.x[,c("score", "class", "type")]) %>% 
-#         filter(type == "real") %>%
-#         select(score, class) %>%
-#         mutate(across(class, str_to_sentence)) %>%
-#     rownames_to_column("bcode")
-#   })
-
-
-```
-
-
-
-```{r, message=FALSE, warning=FALSE}
-
-# all_pref_dblt_clst_df[[1]]
-```
-
-#####################################END - sdblfinder #################################################################
-
-#####################################START - soupc #################################################################
-
-## Log likelihood Elbow plots visualisations for all MSCs
-
-```{r, message=FALSE, warning=FALSE}
-## Read in log likelihoods for estimation of number of clusters from elbow plots
-species = "Pf"
-soup_dir = "soupc_resc"
-algn_nms = c("minmap", "hsat")
-algn_nm = "minmap"
-sample_name_nms = rep(sample_name, 2)
-
-```
-
-
-
-```{r, message=FALSE, warning=FALSE}
-## Read in log likelihoods for estimation of number of clusters from elbow plots
-
-clusters_log_likelihoods_lst = map2(sample_name, rep(algn_nm, each= length(sample_name)), ~read_table(paste0('data/processed/',species,'/', .x,'/', soup_dir, '/',.y,'/clusters_log_likelihoods.txt'), col_names = c('No_of_clusters', 'td1','td2','td3', 'td4','log_likelihood')) %>% select(-(starts_with("td"))) %>% mutate(across(No_of_clusters, ~str_remove_all(., ".*out_dir_k|/clusters.err:best")))) %>% set_names(paste(sample_name, rep(algn_nm, each= length(sample_name)), sep ='_'))
-```
-
-```{r} 
-map(clusters_log_likelihoods_lst, ~.x %>%
-  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-  ggplot(., aes(x = No_of_clusters, y = log_likelihood)) +
-  geom_point() +
-  geom_line(aes(group = 1)) +
-  # facet_grid(rows = .~id)+
-  theme(axis.text=element_text(size=10),
-        axis.title=element_text(size=16,face="bold"),
-        legend.text = element_text(size=15),
-        title = element_text(size=16,face="bold"),
-        strip.text.x = element_text(size = 18, face = "bold")))
-```
-
-
-```{r, fig.width= 20, fig.height=12} 
-clusters_log_likelihoods_lst %>% 
-  bind_rows(., .id = "sample_algnr") %>% 
-  separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",algnr = "[a-z].*")) %>%
-  # separate_wider_delim(., "sample_algnr", names = c("sample", "algnr"), delim = "_") %>% 
-  mutate(across(c('sample'), ~factor(., levels = sample_name))) %>%
-  mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
-  ggplot(., aes(x = No_of_clusters, y = log_likelihood)) +
-    geom_point() +
-    geom_line(aes(group = 1)) +
-  facet_wrap(. ~ sample, nrow = 4) +
-  # facet_grid(algnr ~ sample, scales = "free_y") +
-  theme(axis.text=element_text(size=10),
-        axis.title=element_text(size=16,face="bold"),
-        legend.text = element_text(size=15),
-        title = element_text(size=16,face="bold"),
-        strip.text.x = element_text(size = 18, face = "bold"))
-```
-
-
-Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
-
-Read all the souporcell files for all the iterations. May be excessive but since we have the memory and cpu and we may need to use the files downstream then why not.
-```{r, results='hide', eval=FALSE}
-# list.files(paste0("data/processed/", species,"/"), pattern = "clusters.tsv", full.names = T, recursive = T, include.dirs = T)
-list.files(paste0("data/processed/", species), pattern = "^clusters.tsv$", full.names = T, recursive = T, include.dirs = T)%>% set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/|k|/clusters.tsv')) %>% str_replace_all(., '/', '_'))) 
-```
-
-```{r, results='hide', eval=T}
-# optimum clusters
-# opt_clusters_nms <- list(
-#   "MSC14" = c(8),
-#   "MSC24" = c(1),
-#   "MSC49" = c(6),
-#   "MSC55" = c(6),
-#   "MSC68" = c(3)
-#   
-# ) %>% .[sample_name]
-
-opt_clusters_nms <-  list(
-  "MSC33" = c(8),
-  "MSC37" = c(5),
-  "MSC38" = c(4),
-  "MSC39" = c(4),
-  "MSC40" = c(8),
-  "MSC48" = c(4),
-  "MSC49" = c(6),
-  "MSC55" = c(6),
-  "MSC60" = c(7),
-  "MSC66" = c(8),
-  "MSC68" = c(3),
-  "MSC50_SLO" = c(2),
-  "MSC50_MACS" = c(1),
-  "MSC53" = c(1),
-  "MSC57" = c(1),
-  "MSC24" = c(1),
-  "MSC45" = c(1),
-  "MSC54" = c(1),
-  "MSC67" = c(1),
-  "MSC70" = c(1),
-  "MSC41" = c(3),
-  "MSC51" = c(1),
-  "MSC25" = c(2),
-  "MSC1" = c(5),
-  "MSC3" = c(2),
-  "MSC13" = c(2),
-  "MSC14" = c(8),
-  "MSC12" = c(2)
-  
-) %>% .[sample_name]
-
-## number of optimum clusters (K) iterations for each donor
-opt_clusters_len <- map(opt_clusters_nms, length)
-
-## number of optimum clusters to investigate per sample factoring the number of alignments
-opt_clusters_nms_aln <- rep(opt_clusters_nms, length(algn_nms)) 
-opt_clusters_len_aln <- map(opt_clusters_nms_aln, length)
-
-
-## Donors factoring the number of alignments
-sample_name2 <- map2(sample_name, opt_clusters_len[sample_name], ~
-                      rep(.x, each = .y))
-
-sample_name2 <- unlist(flatten(sample_name2))
-
-opt_clusters <- unlist(flatten(opt_clusters_nms[sample_name]))
-
-## sorted donor_opt_cluster names
-sorted_names <- paste0(sample_name2, "_", opt_clusters)
-
-```
-
-```{r, eval=FALSE}
-
-list.files(paste0("data/processed/", species, "/MSC50_SLO"), pattern = "^clusters.tsv$", full.names = T, recursive = T, include.dirs = T) %>%
-  set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/m.*k|/k|/clusters.tsv')) %>% 
-                    str_replace_all(., '/', '_'))) %>% 
-  .[sorted_names]
-```
-
-minimap2
-```{r, eval=T}
-
-soupc_all <- list.files(paste0("data/processed/", species), pattern = "^clusters.tsv$", full.names = T, recursive = T, include.dirs = T)%>%
-  set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '/|', soup_dir,'/m.*k|/k|/clusters.tsv')) %>% 
-                    str_replace_all(., '/', '_'))) %>% 
-  .[sorted_names] %>%
-  map_df(read_delim, delim = "\t", col_types = 'cccddd', .id = "sample_k") %>% 
-  mutate(across(sample_k, ~str_remove(., "_minmap")))
-
-
-```
-
-
-Select only information from clusters.tsv for the best k as determined from the log likelihood plot for each MSC sample
-
-```{r, eval=T}
-
-##Change Strain to G0,G1,G2 for publication figures and enhanced readability
-soupo_kselect <- soupc_all %>%
-# soupo_kselect_al <- soupc_all_al %>%
-  # filter(sample_k %in% knee_k) %>%
-  dplyr::select(sample_k, barcode, status, assignment) %>% 
-  dplyr::mutate("Strain" = case_when(status == "doublet" ~ "Doublet",
-                                     status == "unassigned" ~ "Negative",
-                                     assignment == "0" ~ "SC1",
-                                     assignment == "1" ~ "SC2",
-                                     assignment == "2" ~ "SC3",
-                                     assignment == "3" ~ "SC4",
-                                     assignment == "4" ~ "SC5",
-                                     assignment == "5" ~ "SC6",
-                                     assignment == "6" ~ "SC7",
-                                     assignment == "7" ~ "SC8",
-                                     assignment == "8" ~ "SC9",
-                                     assignment == "9" ~ "SC10",
-                                     assignment == "10" ~ "SC11",
-                                     assignment == "11" ~ "SC12",
-                                     assignment == "12" ~ "SC13",
-                                     assignment == "13" ~ "SC14",
-                                     assignment == "14" ~ "SC15",
-                                     assignment == "15" ~ "SC16")
-  ) 
-
-soupo_kselect <- soupo_kselect %>% mutate(don = str_remove(sample_k, "_.*"))
-
-```
-
-
-#####################################END - soupc #################################################################
-
-
-###### Add metadata from above to the objects
-
-
-
-
-
-```{r, message=FALSE}
-all_stg_anots <- map2(all_pref_pred_df_com_scores_fnl, all_msc_anots_pref_v2, ~{
-  .x %>% 
-    left_join(.y, by = c("bcode" = "cell_bc"))
-  })
-```
-
-
-```{r, message=FALSE}
-# pred@listData$orig.results$ref2$scores
-soupo_kselect_list <- split(soupo_kselect, f = ~factor(sample_k))
-names(soupo_kselect_list) <- str_remove(names(soupo_kselect_list), "_[0-9]+")
-```
-
-
-```{r, message=FALSE}
-# split()
-```
-
-```{r, message=FALSE}
-##Doublet removal
-# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
-all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, scf_outputs, str_remove(names(all_ed_pref_norm), "_(cbendr|edrops50)")) %>%
-  pmap(~ {
-    ..2 %>%
-      left_join(., ..3, by = "bcode") %>%
-      left_join(., soupo_kselect %>% filter(str_remove(sample_k, "_[0-9]+") == ..4), by = c("bcode" = "barcode")) %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
-       })
-
-```
-####to delete later -  below
-```{r, message=FALSE}
-##Doublet removal
-# # all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
-# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl,  str_remove(names(all_ed_pref_norm), "_(cbendr|edrops50)")) %>%
-#   pmap(~ {
-#     ..2 %>%
-#       # left_join(., ..3, by = "bcode") %>%
-#       left_join(., soupo_kselect %>% filter(str_remove(sample_k, "_[0-9]+") == ..3), by = c("bcode" = "barcode")) %>%
-#       column_to_rownames("bcode") %>%
-#       AddMetaData(..1, .)
-#        })
-
-```
-
-```{r, eval=T}
-## write out seurat bpcells object files for normalization processing in farm
-### gn_edrops50
-# imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_edrops50"), "/seu_obj/bpseu_ed_pref.RDS")))
-imap(all_ed_pref_w_mdata, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_ed_pref_w_mdata", str_extract(.y, "_[ed|cb].*"), "_pref.RDS")))
-
-```
-
-
-```{r, eval=T}
-## write out seurat bpcells object files for normalization processing in farm
-### gn_edrops50
-# imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_edrops50"), "/seu_obj/bpseu_ed_pref.RDS")))
-imap(all_ed_pref_w_mdata, ~saveRDS(.x@meta.data, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_ed_pref_w_mdata", str_extract(.y, "_[ed|cb].*"), "_mdata.RDS")))
-
-```
-
 ```{r}
 # !!!!NOTE - MOVE A NOTEBOOK UP
-all_ed_pref_w_mdata_cb_mdata <- map(all_ed_pref_w_mdata, ~.x@meta.data)
-# saveRDS(all_ed_pref_w_mdata_cb_mdata, "data/processed/Pf/all_ed_pref_w_mdata_cb_mdata.csv")
+all_seu_prelim_stg_norm_cb_mdata <- map(all_seu_prelim_stg_norm, ~.x@meta.data)
+# saveRDS(all_seu_prelim_stg_norm_cb_mdata, "data/processed/Pf/all_seu_prelim_stg_norm_cb_mdata.csv")
 species <- "Pf"
 sv_dir <- "pbulk_gtypes_preQC_resc"
 system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
 
-saveRDS(all_ed_pref_w_mdata_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_ed_pref_w_mdata_cb_mdata.csv"))
+saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata.csv"))
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-## ccp4
-all_ed_pref_w_mdata[[1]]@meta.data %>% glimpse
-
-```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
 # imap(all_ed_pref_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4, dims = c(1,3)) + 
@@ -1392,36 +708,19 @@ all_ed_pref_w_mdata[[1]]@meta.data %>% glimpse
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-imap(all_ed_pref_w_mdata, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4) + 
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4) + 
        labs(title = .y) )
 
 ```
 
-```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-ls()
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-imap(all_ed_pref_w_mdata, ~DimPlot(.x, label = T, group.by = c("labels", "scf_class_norm", "scf_class_rand", "status", "seurat_clusters"), ncol = 5) + 
-       labs(title = .y) )
-
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-## ccp4
-# imap(all_ed_pref_w_mdata, ~DimPlot(.x, label = T, group.by = c("labels", "scf_class_norm", "status", "Strain"), ncol = 4) + 
-imap(all_ed_pref_w_mdata, ~DimPlot(.x, label = T, group.by = c("labels", "status", "Strain"), ncol = 3) + 
-       labs(title = .y) )
-
-```
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in edrops but not in cellbender
 ed_notin_cb <- pmap(list(
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")],
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")],
-  names(all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")])),~{
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")],
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")],
+  names(all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")])),~{
   DimPlot(..1, label = T, cells.highlight = colnames(..1)[!colnames(..1) %in% colnames(..2)], sizes.highlight = 0.1, label.size = 6) + 
       theme_void() +
       theme(legend.position = "none", text = element_text(size =12)) +labs(title = ..3)
@@ -1439,9 +738,9 @@ plot_grid(plotlist = ed_notin_cb, ncol = 4)
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
 cb_notin_ed <- pmap(list(
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")],
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")],
-  names(all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")])),~{
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")],
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")],
+  names(all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")])),~{
   DimPlot(..2, label = T, cells.highlight = colnames(..2)[!colnames(..2) %in% colnames(..1)], sizes.highlight = 0.1, label.size = 6) + 
       theme_void() +
       theme(legend.position = "none", text = element_text(size =12)) +labs(title = ..3)
@@ -1457,9 +756,9 @@ plot_grid(plotlist = cb_notin_ed, ncol = 4)
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in both edrops and cellbender
 ed_in_cb <- pmap(list(
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")],
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")],
-  names(all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")])), ~{
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")],
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")],
+  names(all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")])), ~{
   DimPlot(..1, label = T, cells.highlight = colnames(..1)[colnames(..1) %in% colnames(..2)], sizes.highlight = 0.01, label.size = 6) + 
       theme_void() +
       theme(legend.position = "none", text = element_text(size =12), 
@@ -1477,9 +776,9 @@ plot_grid(plotlist = ed_in_cb, ncol = 4)
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=5}
 ## in both cellbender and edrops
 cb_in_ed <- pmap(list(
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")],
-  all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "edrops")],
-  names(all_ed_pref_w_mdata[str_detect(names(all_ed_pref_w_mdata), "cbendr")])), ~{
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")],
+  all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "edrops")],
+  names(all_seu_prelim_stg_norm[str_detect(names(all_seu_prelim_stg_norm), "cbendr")])), ~{
   DimPlot(..1, label = T, cells.highlight = colnames(..1)[colnames(..1) %in% colnames(..2)], sizes.highlight = 0.01, label.size = 6) + 
       theme_void() +
       theme(legend.position = "none", text = element_text(size =12), 
@@ -1497,26 +796,15 @@ plot_grid(plotlist = cb_in_ed, ncol = 4)
 ```
 
 
-```{r}
-# edrops_cbender8_mdata_uni <- readRDS("data/processed/Pf/m2_all/edrops_cbender8_mdata_uni.RDS")
-```
-
-#########Move to top
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=5}
-## in both cellbender and edrops
-# all_ed_pref_w_mdata <- map2(all_ed_pref_w_mdata, edrops_cbender8_mdata_uni[str_remove(names(all_ed_pref_w_mdata), "_(edrops50|cbendr)")], ~.y %>% column_to_rownames("bcode") %>% select(mthds_union) %>% AddMetaData(.x, .))
-
-```
-
 
 ```{r, warning=FALSE, message=FALSE}
-map(all_ed_pref_w_mdata, ~DimPlot(.x, group.by = "mthds_union"))
+map(all_seu_prelim_stg_norm, ~DimPlot(.x, group.by = "mthds_union"))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-plts_mthds <- imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by = "mthds_union") +  theme_void() + theme(legend.position = "bottom") + labs(title = .y), "no cells"))
+plts_mthds <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by = "mthds_union") +  theme_void() + theme(legend.position = "bottom") + labs(title = .y), "no cells"))
 
 ```
 
@@ -1536,7 +824,7 @@ plot_grid(plotlist = plts_mthds[29:56], ncol = 4)
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$nFeature_RNA <100]), sizes.highlight = 0.05) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$nFeature_RNA <100]), sizes.highlight = 0.05) + 
                                      theme(legend.position = "none",
                                            text = element_text(size =20)) +
                                      labs(title = .y), "no cells"))
@@ -1546,7 +834,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = T, cells.highlight =  co
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$status == "unassigned"]), sizes.highlight = 0.05) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$status == "unassigned"]), sizes.highlight = 0.05) + 
                                      theme(legend.position = "none",
                                            text = element_text(size =20)) +
                                      labs(title = .y), "no cells"))
@@ -1556,7 +844,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = T, cells.highlight =  co
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "fine_stg", label.size = 6) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "fine_stg", label.size = 6) + 
                                      scale_color_manual(values = sp_col_new) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20)) +
@@ -1567,7 +855,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "fine_stg
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~FeaturePlot(.x, label = F, features =  "actl_score", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = F, features =  "actl_score", label.size = 6, order = T) + 
                                      # scale_color_manual(values = sp_col_new) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -1579,7 +867,7 @@ imap(all_ed_pref_w_mdata, possibly(~FeaturePlot(.x, label = F, features =  "actl
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~FeaturePlot(.x, label = F, features =  "nCount_RNA", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = F, features =  "nCount_RNA", label.size = 6, order = T) + 
                                      # scale_color_manual(values = sp_col_new) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -1592,13 +880,17 @@ imap(all_ed_pref_w_mdata, possibly(~FeaturePlot(.x, label = F, features =  "nCou
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(nFeature_RNA <100 , status)
      )
 
 ```
 
 
+
+```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
+gogo()
+```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
@@ -1608,7 +900,7 @@ soupc_status_cols <- c(singlet = "#f79256", doublet = "#048ba8", unassigned = "#
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "status", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "status", label.size = 6, order = T) + 
                                      scale_color_manual(values = soupc_status_cols) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -1621,7 +913,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "status",
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
-soupc_status_barp <- imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+soupc_status_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(nFeature_RNA <100 , status) %>%
        rename("gn_less100" = `nFeature_RNA < 100`) %>%
        group_by(gn_less100) %>%
@@ -1652,7 +944,7 @@ soupc_status_barp+
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
-soupc_scdblf_barp <- imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+soupc_scdblf_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(class , status) %>%
        rename("sdbfindr" = class) %>%
        group_by(sdbfindr) %>%
@@ -1676,7 +968,7 @@ soupc_scdblf_barp
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
-soupc_scdblf_barp <- imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+soupc_scdblf_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count( status) %>%
        mutate(prop_n = round(n/sum(n), 2))
      ) %>%
@@ -1698,7 +990,7 @@ soupc_scdblf_barp
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
-fn_stg_barp <- imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+fn_stg_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(nFeature_RNA <100 , fine_stg) %>%
        rename("gn_less100" = `nFeature_RNA < 100`) %>%
        group_by(gn_less100) %>%
@@ -1728,7 +1020,7 @@ fn_stg_barp+
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=4}
 ## in cellbender but not in edrops
-soupc_stg_barp <- imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+soupc_stg_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(status, fine_stg) %>%
        group_by(status) %>%
        mutate(prop_n = round(n/sum(n), 2))
@@ -1749,7 +1041,7 @@ soupc_stg_barp
 ```
 
 ```{r, fig.width = 14, fig.height = 3, message=FALSE, warning=FALSE}
-imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(nFeature_RNA <100 , fine_stg) %>%
        rename("gn_less100" = `nFeature_RNA < 100`) %>%
        group_by(gn_less100) %>%
@@ -1792,7 +1084,7 @@ dblt_cols <- c(Singlet = "#ffd9b4", Doublet ="#6A5ACD")
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
                                      scale_color_manual(values = dblt_cols) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -1804,7 +1096,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "class", 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, ~.x@meta.data %>% 
+imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
        count(nFeature_RNA <100 , fine_stg)
      )
 
@@ -1813,7 +1105,7 @@ imap(all_ed_pref_w_mdata, ~.x@meta.data %>%
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height=4}
 ## in both edrops and cellbender
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>% 
     count(labels, class, Strain)
 })
@@ -1823,7 +1115,7 @@ imap(all_ed_pref_w_mdata, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
 ## ccp4
-imap(all_ed_pref_w_mdata, ~DimPlot(.x, label = T, group.by = c("labels", "class", "status", "seurat_clusters"), ncol = 4) + 
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, label = T, group.by = c("labels", "class", "status", "seurat_clusters"), ncol = 4) + 
        labs(title = .y) )
 
 ```
@@ -1832,7 +1124,7 @@ imap(all_ed_pref_w_mdata, ~DimPlot(.x, label = T, group.by = c("labels", "class"
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
     ggplot(aes(x = seurat_clusters, y= actl_score, color = class)) + 
     geom_boxplot() + 
@@ -1845,7 +1137,7 @@ imap(all_ed_pref_w_mdata, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
     ggplot(aes(x = seurat_clusters, y= actl_score, color = class)) + 
     geom_boxplot() + 
@@ -1860,7 +1152,7 @@ imap(all_ed_pref_w_mdata, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
 
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
     # filter(nFeature_RNA < 300) %>%
     ggplot(aes(x = log10(nFeature_RNA), y= log10(nCount_RNA), color = labels)) + 
@@ -1882,7 +1174,7 @@ imap(all_ed_pref_w_mdata, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
 
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
     filter(nFeature_RNA < 300) %>%
     ggplot(aes(x = log10(nFeature_RNA), y= log10(nCount_RNA), color = labels)) + 
@@ -1904,7 +1196,7 @@ imap(all_ed_pref_w_mdata, ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
 ## in cellbender but not in edrops
-imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
                                      scale_color_manual(values = dblt_cols) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -1916,7 +1208,7 @@ imap(all_ed_pref_w_mdata, possibly(~DimPlot(.x, label = F, group.by =  "class", 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
-imap(all_ed_pref_w_mdata, ~{
+imap(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
     ggplot(aes(x = nFeature_RNA > 100, y= actl_score, color = status)) + 
     geom_sina() + 
@@ -1940,15 +1232,10 @@ imap(all_ed_pref_norm, ~DimPlot(.x, label = T) + labs(title = .y))
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-## ap2g
-imap(all_ed_pref, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", order = T) + labs(title = .y)}, "missing"))
-imap(all_ed_pref, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
-```
 
 ```{r, warning=FALSE, message=FALSE}
-table(all_ed_pref[[5]]@assays[["SCT"]]@counts["PF3D7-1222600",] > 0)
-table(all_ed_pref[[5]]@assays[["SCT"]]@data["PF3D7-1222600",] > 0)
+# table(all_ed_pref[[5]]@assays[["SCT"]]@counts["PF3D7-1222600",] > 0)
+# table(all_ed_pref[[5]]@assays[["SCT"]]@data["PF3D7-1222600",] > 0)
 
 ``` 
 
@@ -2502,7 +1789,7 @@ nms_all_ed_pref_no_m24 <- names(all_ed_pref)[!names(all_ed_pref) %in% "MSC24"]
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
 
 # cellassign_predictions <- list.files("data/processed/Pf", pattern = "cellassign_predictions.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
@@ -2689,7 +1976,7 @@ nms_all_ed_pref_resc_100 <- c("MSC40", "MSC48", "MSC49", "MSC54", "MSC55", "MSC6
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
 
 all_resc_sct <- list.files("data/processed/Pf", pattern = "ed_cr_dropd_resc.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
@@ -3236,7 +2523,7 @@ gogo()
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "*seu_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
 
 all_resc_asex_sct <- list.files("data/processed/Pf", pattern = "ed_cr_dropd_resc_asex.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
