@@ -435,37 +435,9 @@ imap(all_seu_prelim_stg, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y,
 ```{r, eval=T}
 gogo()
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_bsub.sh
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_sct_CbEdCr_bsub.sh
 ```
 
-
-```{r, eval=T}
-gogo()
-## Run standard normalisation on farm like below
-## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_cr.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC48,MSC68,MSC14}/seu_obj/bpc_seu_150.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume 
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_edrops50.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_cbendr.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
-```
-
-SCT for the evaluation of raw counts
-```{r, eval=T}
-gogo()
-## Run standard normalisation on farm like below
-## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC48,MSC68,MSC14,MSC49,MSC70}/seu_obj/bpc_seu_cr.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume 
-# 
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC48,MSC68,MSC14,MSC49,MSC70}/seu_obj/bpc_seu_raw_150.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --resume
-#  
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_edrops50.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
-
-# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_cbendr.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
-```
 
 
 
