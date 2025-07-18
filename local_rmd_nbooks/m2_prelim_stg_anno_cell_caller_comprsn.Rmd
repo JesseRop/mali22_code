@@ -54,6 +54,7 @@ suppressPackageStartupMessages({
   library(scran)
   library(SingleR)
   library(scDblFinder)
+  library(duckplyr)
   
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
@@ -455,19 +456,6 @@ all_ed_pref_w_mdata <- list(all_seu, all_pref_pred_df_com_scores_fnl) %>%
 
 ```
 
-```{r, message=FALSE}
-##Doublet removal
-# all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
-all_ed_pref_w_mdata <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, scf_outputs, str_remove(names(all_ed_pref_norm), "_(cbendr|edrops50)")) %>%
-  pmap(~ {
-    ..2 %>%
-      left_join(., ..3, by = "bcode") %>%
-      left_join(., soupo_kselect %>% filter(str_remove(sample_k, "_[0-9]+") == ..4), by = c("bcode" = "barcode")) %>%
-      column_to_rownames("bcode") %>%
-      AddMetaData(..1, .)
-       })
-
-```
 ##################################################  END - SingleR use markers to id cells ##################################################
 
 
@@ -1375,6 +1363,47 @@ all_pref_pred_df <- map(all_pref_pred, ~.x[, c("scores", "labels", "pruned.label
                           as.data.frame() %>% 
                           rename_with(~str_replace_all(., c("\\.\\."="_", "\\."="_", "_$"="")), contains("score")) %>%
                           rownames_to_column("bcode"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+all_pref_pred_df <- map2(all_pref_pred_df, all_pref_pred, ~{
+  df <- .x %>% 
+    mutate(sr_score_ref = paste0("scores_", names(.y@listData$orig.results)[reference], "_scores"),
+           sr_labl_ref = paste0("scores_", names(.y@listData$orig.results)[reference], "_labels")) 
+    
+  # df$sR_actl_score <- mapply(function(row, colname) df[row, colname], row = seq_len(nrow(df)), colname = df$sr_score_ref) ## baseR
+
+  df <- df %>% 
+    mutate(actl_score = purrr::map2_dbl(row_number(), sr_score_ref, ~df[.x, .y]),
+           actl_labl = purrr::map2_chr(row_number(), sr_labl_ref, ~df[.x, .y]),
+           MaleFem_consistency = case_when(if_any(ends_with("_labels"), ~str_detect(., "Female")) & if_any(ends_with("_labels"), ~str_detect(., "Male")) ~ "MaleFem",
+                                              T ~ labels))
+    
+
+  return(df)
+  
+  
+})
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+map(all_pref_pred_df, ~.x %>% count(labels, sR_actl_labl, sR_MaleFem_consistency, sR_MaleFem_consistencym1314) %>% filter(sR_MaleFem_consistency == "MaleFem"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+all_pref_pred_df_fnl <- map(all_pref_pred_df, ~.x %>% 
+                                         # filter(!is.na(actl_score)) %>% 
+                                         select("bcode", "labels", "pruned.labels", "reference", "actl_labl", "actl_score", "MaleFem_consistency") %>% 
+                                         mutate(fine_stg = case_when(is.na(pruned.labels) ~ "weak_score",
+                                                                     MaleFem_consistency == "MaleFem" ~ "discrepantFM",
+                                                                     T ~ pruned.labels)) %>%
+                                         rename_with(~paste0("sR_", .), .cols = -c(bcode)))
+  
 ```
 
 
