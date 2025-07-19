@@ -42,7 +42,7 @@ suppressPackageStartupMessages({
   library(ggh4x)
   library(SingleCellExperiment)
   # library(scmap)
-  # library(ggsankey)
+  library(ggsankey)
   # library(findPC)
   library(BPCells)
   # library(furrr)
@@ -377,7 +377,7 @@ all_pref_pred_df <- map2(all_pref_pred_df, all_pref_pred, ~{
 
 ```{r, message=FALSE, warning=FALSE}
 
-map(all_pref_pred_df, ~.x %>% count(labels, sR_actl_labl, sR_MaleFem_consistency, sR_MaleFem_consistencym1314) %>% filter(sR_MaleFem_consistency == "MaleFem"))
+map(all_pref_pred_df, ~.x %>% count(labels, actl_labl, MaleFem_consistency) %>% filter(MaleFem_consistency == "MaleFem"))
 ```
 
 
@@ -393,7 +393,106 @@ all_pref_pred_df_fnl <- map(all_pref_pred_df, ~.x %>%
   
 ```
 
+
+```{r, message=FALSE, warning=FALSE}
+
+mtcars %>%
+  make_long(cyl, vs, am, gear, carb)
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+all_pref_pred_df_fnl[1] %>% head
+  
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+all_pref_pred_df_fnl_merge <- map(all_pref_pred_df_fnl, ~.x %>% 
+      select(bcode, sR_fine_stg) ) %>%
+  bind_rows(.id = "don_caller") %>% 
+  separate_wider_regex(don_caller, c(donor = "MSC.*", "_", caller = "[a-z].*")) %>%
+  pivot_wider(names_from = caller, values_from = sR_fine_stg) %>%
+  split(., f = factor(.$donor))
+
+all_pref_pred_df_fnl_snky <- map(all_pref_pred_df_fnl_merge , ~.x %>%  
+      mutate(across(c(cr, edrops50, cbendr), ~str_replace_all(., c("discrepantFM" = "dFM", "weak_score" = "WS", "Early " = "E", "Late " = "L", "ring" = "R", "trophozoite" = "T", "Female" = "F", "Male" = "M", " \\(LE\\)" = "LE", "Gametocyte \\(developing\\)" = "Gd")))) 
+)
+
+  
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+sp_col_new_abrv <- sp_col_new
+names(sp_col_new_abrv) <- str_replace_all(names(sp_col_new), c("discrepantFM" = "dFM", "weak_score" = "WS", "Early " = "E", "Late " = "L", "ring" = "R", "trophozoite" = "T", "Female" = "F", "Male" = "M", " \\(LE\\)" = "LE", "Gametocyte \\(developing\\)" = "Gd"))
+
+sp_col_new_abrv
+```
+
+
+
+```{r, fig.width=4, fig.height=4}
+
+snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), labls = paste0("K=", opt_clusters_nms[[3]][1:2]), bp_face = c("bold", "plain"), ttl = "plot", strain_colours = strain_cols_n) {
+  decod_tbl %>% 
+        mutate(across(contains("train"), ~str_replace_all(., c("Doublet" = "Dbt", "Negative" = "Neg")))) %>%
+        make_long(all_of(strns_2_plt)) %>% 
+        add_count(x,node, "n") %>%
+        ggplot(., aes(x = x, next_x = next_x,node = node,next_node = next_node,fill = factor(node),label = paste0(node,": ",n))) +
+            geom_sankey() +
+        theme_void()+
+        scale_fill_manual(values = strain_colours) +
+        scale_x_discrete(labels=labls)+
+        geom_sankey_label(size = 3.6, color = 1, fill = "white") +
+        labs(title = ttl) +
+        theme_sankey(base_size = 9) +
+        theme(legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 15, face = bp_face))
+      
+}
+
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+
+imap(all_pref_pred_df_fnl_snky, ~snk_pt_fn(., strns_2_plt = c("cbendr", "edrops50", "cr"), labls = c("cbendr", "edrops50", "cr"), bp_face = c("bold", "bold", "bold"), ttl = .y, strain_colours = sp_col_new_abrv))
+  
+```
+
 ################## END evaluate singleR MAnually
+
+#### for pseudobulk genotyping
+
+```{r, eval = F}
+# !!!!NOTE - MOVE A NOTEBOOK UP
+all_seu_prelim_stg_norm_cb_mdata <- map(all_pref_pred_df_fnl_merge, ~.x %>% mutate(sR_fine_stg = coalesce(cbendr, edrops50, cr)) %>% select(bcode, sR_fine_stg)) 
+# saveRDS(all_seu_prelim_stg_norm_cb_mdata, "data/processed/Pf/all_seu_prelim_stg_norm_cb_mdata.csv")
+species <- "Pf"
+sv_dir <- "pbulk_gtypes_preQC_resc"
+system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
+
+saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata.csv"))
+
+```
+
+
+```{r, eval = F}
+# # !!!!NOTE - MOVE A NOTEBOOK UP
+# all_seu_prelim_stg_norm_cb_mdata <- map(all_seu_prelim_stg_norm, ~.x@meta.data)
+# # saveRDS(all_seu_prelim_stg_norm_cb_mdata, "data/processed/Pf/all_seu_prelim_stg_norm_cb_mdata.csv")
+# species <- "Pf"
+# sv_dir <- "pbulk_gtypes_preQC_resc"
+# system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
+# 
+# saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata.csv"))
+
+```
+
+###############
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
@@ -432,7 +531,7 @@ imap(all_seu_prelim_stg, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y,
 !!!NB - FARM CODE - DONT DELETE
 
 ```{r, eval=T}
-gogo()
+# gogo()
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_bsub.sh
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_sct_CbEdCr_bsub.sh
 ```
@@ -475,13 +574,14 @@ imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T) + labs(titl
 
 ```
 
+
 ```{r, warning=FALSE, message=FALSE}
-imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "sR_fine_stg") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "sR_fine_stg") + labs(title = .y) +scale_color_manual(values = sp_col_new))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-## ccp4
+## ap2g
 imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", order = T) + labs(title = .y)}, "missing"))
 imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1222600", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
 ```
@@ -493,17 +593,6 @@ imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-12155
 imap(all_seu_prelim_stg_norm, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
 ```
 
-```{r, warning=FALSE, message=FALSE}
-## remove the _150
-all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm[!str_detect(names(all_seu_prelim_stg_norm), "_150")]
-
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y))
-imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "pca") + labs(title = .y))
-```
 
 ```{r, warning=FALSE, message=FALSE}
 ## Pfs16
@@ -532,6 +621,11 @@ imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0903800") + lab
 imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "PF3D7-0903800", reduction = "pca") + labs(title = .y))
 ```
 
+
+```{r, warning=FALSE, message=FALSE}
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "pca") + labs(title = .y))
+```
 
 
 ```{r}
@@ -562,7 +656,7 @@ std_theme <- theme(axis.text=element_text(size=18),
 ```
 
 ```{r, results='asis'}
-gogo()
+# gogo()
 ```
 
 ## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
@@ -629,8 +723,8 @@ all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
 
 ```{r, results='asis'}
 pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
-    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "seurat_clusters", pt.size = 1)+ 
-      scale_color_manual(values = sp_fld_colors) +
+    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "sR_fine_stg", pt.size = 1)+ 
+      scale_color_manual(values = sp_col_new) +
       geom_hline(yintercept = ..2)  +
       labs(title = ..3) +
       std_theme
@@ -643,7 +737,7 @@ pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-plts_seu <- imap(all_ed_pref_norm, possibly(~DimPlot(.x, label = T) +  theme_void() + theme(legend.position = "none") + labs(title = .y), "no cells"))
+plts_seu <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T) +  theme_void() + theme(legend.position = "none") + labs(title = .y), "no cells"))
 
 ```
 
@@ -662,7 +756,7 @@ plot_grid(plotlist = plts_seu[29:56], ncol = 4)
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-plts <- imap(all_ed_pref_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$nFeature_RNA <100]), sizes.highlight = 0.05) + 
+plts <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$nFeature_RNA <100]), sizes.highlight = 0.05) + 
                                      theme(legend.position = "none",
                                            axis.text = element_blank(),
                                            axis.title = element_blank()) +
@@ -688,21 +782,10 @@ plts[[29]]
 ```
 
 
-```{r}
-# !!!!NOTE - MOVE A NOTEBOOK UP
-all_seu_prelim_stg_norm_cb_mdata <- map(all_seu_prelim_stg_norm, ~.x@meta.data)
-# saveRDS(all_seu_prelim_stg_norm_cb_mdata, "data/processed/Pf/all_seu_prelim_stg_norm_cb_mdata.csv")
-species <- "Pf"
-sv_dir <- "pbulk_gtypes_preQC_resc"
-system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
-
-saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata.csv"))
-
-```
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-# imap(all_ed_pref_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4, dims = c(1,3)) + 
+# imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4, dims = c(1,3)) + 
 #        labs(title = .y) )
 
 ```
@@ -889,7 +972,7 @@ imap(all_seu_prelim_stg_norm, ~.x@meta.data %>%
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
-gogo()
+# gogo()
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
@@ -1228,7 +1311,7 @@ imap(all_ed_pref, ~DimPlot(.x, label = T) + labs(title = .y))
 
 ```{r, warning=FALSE, message=FALSE}
 ## ccp4
-imap(all_ed_pref_norm, ~DimPlot(.x, label = T) + labs(title = .y))
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, label = T) + labs(title = .y))
 
 ```
 
