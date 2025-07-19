@@ -574,7 +574,6 @@ imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T) + labs(titl
 
 ```
 
-
 ```{r, warning=FALSE, message=FALSE}
 imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T, group.by = "sR_fine_stg") + labs(title = .y) +scale_color_manual(values = sp_col_new))
 
@@ -693,10 +692,9 @@ mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent
 
 
 ```{r, results='asis'}
-
 pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
-    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "seurat_clusters", pt.size = 1)+ 
-      scale_color_manual(values = sp_fld_colors) +
+    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "sR_fine_stg", pt.size = 1)+ 
+      scale_color_manual(values = sp_col_new) +
       geom_hline(yintercept = ..2)  +
       labs(title = ..3) +
       std_theme
@@ -721,17 +719,6 @@ all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
 ```
 
 
-```{r, results='asis'}
-pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
-    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "sR_fine_stg", pt.size = 1)+ 
-      scale_color_manual(values = sp_col_new) +
-      geom_hline(yintercept = ..2)  +
-      labs(title = ..3) +
-      std_theme
-
-  })
-
-```
 
 
 
@@ -917,7 +904,7 @@ imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$status == "unassigned"]), sizes.highlight = 0.05) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$sR_fine_stg %in% c("weak_score", "discrepantFM")]), sizes.highlight = 0.05) + 
                                      theme(legend.position = "none",
                                            text = element_text(size =20)) +
                                      labs(title = .y), "no cells"))
@@ -927,7 +914,7 @@ imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "fine_stg", label.size = 6) + 
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "sR_fine_stg", label.size = 6) + 
                                      scale_color_manual(values = sp_col_new) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20)) +
@@ -938,7 +925,7 @@ imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "fine
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = F, features =  "actl_score", label.size = 6, order = T) + 
+imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = F, features =  "sR_actl_score", label.size = 6, order = T) + 
                                      # scale_color_manual(values = sp_col_new) +
                                      theme(legend.position = "none",
                                            text = element_text(size =20), 
@@ -964,7 +951,7 @@ imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = F, features =  "
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
 imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
-       count(nFeature_RNA <100 , status)
+       count(nFeature_RNA <100 , sR_fine_stg)
      )
 
 ```
@@ -981,95 +968,6 @@ soupc_status_cols <- c(singlet = "#f79256", doublet = "#048ba8", unassigned = "#
 ```
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
-## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "status", label.size = 6, order = T) + 
-                                     scale_color_manual(values = soupc_status_cols) +
-                                     theme(legend.position = "none",
-                                           text = element_text(size =20), 
-                                           axis.title = element_blank(), 
-                                           axis.text = element_blank()) +
-                                     labs(title = .y), "no cells"))
-
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
-## in cellbender but not in edrops
-soupc_status_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
-       count(nFeature_RNA <100 , status) %>%
-       rename("gn_less100" = `nFeature_RNA < 100`) %>%
-       group_by(gn_less100) %>%
-       mutate(prop_n = round(n/sum(n), 2))
-     ) %>%
-  bind_rows(., .id = "donor") %>%
-  filter(str_detect(donor, "cbendr")) %>%
-  ungroup() %>%
-  ggplot(aes(x = gn_less100, y = prop_n, fill = status)) +
-  geom_col(position = position_dodge()) +
-  geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
-  scale_fill_manual(values = soupc_status_cols) +
-  facet_grid(. ~donor)+
-  theme_classic() + 
-  theme(text = element_text(size =20))
-
-soupc_status_barp
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=40, fig.height=5}
-## in cellbender but not in edrops
-soupc_status_barp+ 
-  theme(legend.position = "bottom")
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
-## in cellbender but not in edrops
-soupc_scdblf_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
-       count(class , status) %>%
-       rename("sdbfindr" = class) %>%
-       group_by(sdbfindr) %>%
-       mutate(prop_n = round(n/sum(n), 2))
-     ) %>%
-  bind_rows(., .id = "donor") %>%
-  filter(str_detect(donor, "cbendr")) %>%
-  ungroup() %>%
-  ggplot(aes(x = sdbfindr, y = prop_n, fill = status)) +
-  geom_col(position = position_dodge()) +
-  geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
-  scale_fill_manual(values = soupc_status_cols) +
-  facet_grid(. ~donor)+
-  theme_classic() + 
-  theme(text = element_text(size =20))
-
-soupc_scdblf_barp
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
-## in cellbender but not in edrops
-soupc_scdblf_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
-       count( status) %>%
-       mutate(prop_n = round(n/sum(n), 2))
-     ) %>%
-  bind_rows(., .id = "donor") %>%
-  filter(str_detect(donor, "cbendr")) %>%
-  ungroup() %>%
-  ggplot(aes(x = status, y = prop_n, fill = status)) +
-  geom_col(position = position_dodge()) +
-  geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.15))) +
-  scale_fill_manual(values = soupc_status_cols) +
-  facet_grid(. ~donor)+
-  theme_classic() + 
-  theme(text = element_text(size =20), 
-        axis.text.x = element_blank())
-
-soupc_scdblf_barp
-```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
 ## in cellbender but not in edrops
@@ -1101,27 +999,6 @@ fn_stg_barp+
 ```
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=4}
-## in cellbender but not in edrops
-soupc_stg_barp <- imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
-       count(status, fine_stg) %>%
-       group_by(status) %>%
-       mutate(prop_n = round(n/sum(n), 2))
-     ) %>%
-  bind_rows(., .id = "donor") %>%
-  filter(str_detect(donor, "cbendr")) %>%
-  ungroup() %>%
-  ggplot(aes(x = status, y = prop_n, fill = fine_stg)) +
-  geom_col(position = position_dodge()) +
-  # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 4.4, show.legend = F) +
-  scale_fill_manual(values = sp_col_new) +
-  facet_grid(. ~donor)+
-  theme_classic() + 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(size =20, angle = 90))
-
-soupc_stg_barp
-```
 
 ```{r, fig.width = 14, fig.height = 3, message=FALSE, warning=FALSE}
 imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
@@ -1165,18 +1042,6 @@ imap(all_seu_prelim_stg_norm, ~.x@meta.data %>%
 dblt_cols <- c(Singlet = "#ffd9b4", Doublet ="#6A5ACD")
 ```
 
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
-## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
-                                     scale_color_manual(values = dblt_cols) +
-                                     theme(legend.position = "none",
-                                           text = element_text(size =20), 
-                                           axis.title = element_blank(), 
-                                           axis.text = element_blank()) +
-                                     labs(title = .y), "no cells"))
-
-```
-
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
 imap(all_seu_prelim_stg_norm, ~.x@meta.data %>% 
@@ -1186,14 +1051,6 @@ imap(all_seu_prelim_stg_norm, ~.x@meta.data %>%
 
 ```
 
-```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height=4}
-## in both edrops and cellbender
-imap(all_seu_prelim_stg_norm, ~{
-  .x@meta.data %>% 
-    count(labels, class, Strain)
-})
-
-```
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
@@ -1205,31 +1062,6 @@ imap(all_seu_prelim_stg_norm, ~DimPlot(.x, label = T, group.by = c("labels", "cl
 
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
-
-imap(all_seu_prelim_stg_norm, ~{
-  .x@meta.data %>%
-    ggplot(aes(x = seurat_clusters, y= actl_score, color = class)) + 
-    geom_boxplot() + 
-    geom_hline(yintercept = 0.85) + 
-    facet_wrap(. ~ labels, nrow = 1, scales = "free_x") +
-    labs(title = .y)
-    })
-
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
-
-imap(all_seu_prelim_stg_norm, ~{
-  .x@meta.data %>%
-    ggplot(aes(x = seurat_clusters, y= actl_score, color = class)) + 
-    geom_boxplot() + 
-    geom_hline(yintercept = 0.85) + 
-    facet_wrap(. ~ labels, nrow = 1, scales = "free_x") +
-    labs(title = .y)
-    })
-
-```
 
 
 
@@ -1277,18 +1109,6 @@ imap(all_seu_prelim_stg_norm, ~{
 
 ```
 
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.8}
-## in cellbender but not in edrops
-imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = F, group.by =  "class", label.size = 6, order = T) + 
-                                     scale_color_manual(values = dblt_cols) +
-                                     theme(legend.position = "none",
-                                           text = element_text(size =20), 
-                                           axis.title = element_blank(), 
-                                           axis.text = element_blank()) +
-                                     labs(title = .y), "no cells"))
-
-```
-
 ```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
 
 imap(all_seu_prelim_stg_norm, ~{
@@ -1302,111 +1122,10 @@ imap(all_seu_prelim_stg_norm, ~{
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-## ccp4
-imap(all_ed_pref, ~DimPlot(.x, label = T) + labs(title = .y))
-
-```
-
 
 ```{r, warning=FALSE, message=FALSE}
 ## ccp4
 imap(all_seu_prelim_stg_norm, ~DimPlot(.x, label = T) + labs(title = .y))
 
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-# table(all_ed_pref[[5]]@assays[["SCT"]]@counts["PF3D7-1222600",] > 0)
-# table(all_ed_pref[[5]]@assays[["SCT"]]@data["PF3D7-1222600",] > 0)
-
-``` 
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-dense_mtx <- subset(all_ed[[5]], subset = `PF3D7-1222600` > 0)
-dense_mtx
-colnames(dense_mtx)
-``` 
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-a = subset(all_ed_pref[[5]], subset = `PF3D7-1222600` > 0)
-a
-colnames(a)
-``` 
-
-dense_mtx
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-colnames(a) %in% colnames(dense_mtx)
-``` 
-
-!!!!NOTE - VERY VERY STRANGE RESULTS - RERUNNING SCT SEEMS TO CHANGE THE SCT RAW COUNTS???????? SOME INFORMATION ON RECLUSTERING  https://github.com/satijalab/seurat/issues/2014 , https://github.com/satijalab/seurat/issues/4967 
-implemented by SCTransform argument 'do.correct.umi -Place corrected UMI matrix in assay counts slot; default is TRUE'
-This correction made some ap2g counts in some cells to be zero (is it 0.something??)
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-data.frame("reclst" = a[, "TCGACGGAGGCGACAT-1"]@assays$SCT$counts) %>% 
-  rownames_to_column("bcode") %>% 
-  left_join(., data.frame("unclst" = dense_mtx[, "TCGACGGAGGCGACAT-1"]@assays$SCT$counts) %>% rownames_to_column("bcode")) %>%
-  ggplot(aes(x = reclst, y = unclst)) +
-  geom_point()
-``` 
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-crd_rclst_m5 <- all_ed_pref[[5]]
-DefaultAssay(crd_rclst_m5) <- "RNA"
-crd_rclst_m5[["SCT"]] <- NULL
-crd_rclst_m5[["RNA"]]$counts <- as(object = crd_rclst_m5[["RNA"]]$counts, Class = "dgCMatrix")
-
-crd_rclst_m5_v3 <- CreateAssayObject(counts = crd_rclst_m5[["RNA"]]$counts)
-
-crd_rclst_m5[["RNA"]] <- crd_rclst_m5_v3
-
-crd_rclst_m5
-``` 
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-table(crd_rclst_m5[["RNA"]]$counts["PF3D7-1222600",] > 0)
-
-crd_rclst_m5_ap2g <- crd_rclst_m5[,crd_rclst_m5[["RNA"]]$counts["PF3D7-1222600",] > 0]
-crd_rclst_m5_ap2g
-``` 
-
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-data.frame(crd_m5_tr_ap2g[, "TCGACGGAGGCGACAT-1"]@assays$RNA@counts) %>% 
-  rownames_to_column("bcode") %>% 
-  left_join(., data.frame(crd_rclst_m5_ap2g[, "TCGACGGAGGCGACAT-1"]@assays$RNA@counts) %>% rownames_to_column("bcode"), by = "bcode") %>%
-  ggplot(aes(x = TCGACGGAGGCGACAT.1.x, y = TCGACGGAGGCGACAT.1.y)) +
-  geom_point()
-``` 
-
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-dense_mtx
-``` 
-
-```{r, warning=FALSE, message=FALSE}
-## male le marker
-imap(all_ed_pref, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", order = T) + labs(title = .y)}, "missing"))
-imap(all_ed_pref, possibly(~{FeaturePlot(.x, features = "PF3D7-1215500", reduction = "pca", order = T) + labs(title = .y)}, "missing"))
-```
-
-```{r, warning=FALSE, message=FALSE}
-imap(all_ed_pref, ~DimPlot(.x, label = T)+ labs(title = .y))
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-## ap2g
-all_ed_pref_m70 <- all_ed_pref[[5]]
-Idents(all_ed_pref_m70) <- "seurat_clusters"
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-DimPlot(all_ed_pref_m70, label = T)
-```
-
-```{r, warning=FALSE, message=FALSE, eval=FALSE}
-DimPlot(all_ed_pref_m70, label = T)
 ```
 
