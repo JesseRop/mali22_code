@@ -98,7 +98,9 @@ source("mali22_code_lnk/pf_common_vars.R")
 
 ```{r setup}
 
-optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+# optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =5, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
 
 optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 
@@ -108,15 +110,15 @@ optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 read in files 
 clean objects all donors
 ```{r}
-msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
+# msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
 ```
 
 ```{r, eval=T}
-imap(msc_w_cln_strns, ~DimPlot(.x, group.by = "StrainDon")  + labs(title = .y))
+# imap(msc_w_cln_strns, ~DimPlot(.x, group.by = "StrainDon")  + labs(title = .y))
 ```
 
 ```{r, eval=T}
-imap(msc_w_cln_strns, ~DimPlot(.x, group.by = "stage")  + labs(title = .y) + scale_color_manual(values = sp_fld_colors))
+# imap(msc_w_cln_strns, ~DimPlot(.x, group.by = "stage")  + labs(title = .y) + scale_color_manual(values = sp_fld_colors))
 ```
 
 !!!NOTE - Reading in the metadata to add to the mixed species samples which were missed in the initial step - Will need to redo adding to the source
@@ -128,7 +130,7 @@ mrc_sk21_summary_mxd <- mrc_sk21_summary %>% filter(Sample_Name %in% c("MSC25" ,
 
 Remove mixed infections for now
 ```{r}
-msc_w_cln_strns <- msc_w_cln_strns %>% .[!(names(msc_w_cln_strns) %in% c("MSC25" ,"MSC41", "MSC51"))]
+# msc_w_cln_strns <- msc_w_cln_strns %>% .[!(names(msc_w_cln_strns) %in% c("MSC25" ,"MSC41", "MSC51"))]
 # msc_w_cln_strns <- msc_w_cln_strns %>% .[!(names(msc_w_cln_strns) %in% c("MSC25" , "MSC51"))] ## Retain MSC41 since it is mostly Pf with few Po
 # msc_w_cln_strns <- msc_w_cln_strns %>% .[!(names(msc_w_cln_strns) %in% c("MSC25" , "MSC41"))] ## Retain MSC51 since MSC41 is pseudotime outlier with mostly trophs
 # msc_w_cln_strns <- msc_w_cln_strns  ## Retain all to assess how they look
@@ -145,7 +147,21 @@ Integrated asexual
 ```{r}
 ## subset where field parasites are for slingshot
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
-v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+v3_m2_asex_cr_filt_norm_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+v3_m2_asex_cr_filt_norm_harmony_pt <- v3_m2_asex_cr_filt_norm_harmony_pt[, !v3_m2_asex_cr_filt_norm_harmony_pt$Strain_DN %in% c("Doublet", "Negative")]
+
+```
+
+
+Integrated asexual
+```{r}
+v3_m2_asex_harmony_ss_res_fld_pt <- v3_m2_asex_cr_filt_norm_harmony_pt
+
+```
+
+```{r}
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% glimpse
 
 ```
 
@@ -154,8 +170,9 @@ v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex
 v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
   rownames_to_column("bcode") %>% 
   left_join(., mrc_sk21_summary_mxd, by = "donor") %>%
-  mutate(Symptomatic = coalesce(Symptomatic.x, Symptomatic.y), Hb_Type = coalesce(Hb_Type.x, Hb_Type.y)) %>% 
-  select(bcode, Symptomatic, Hb_Type) %>% 
+  # mutate(Symptomatic = coalesce(Symptomatic.x, Symptomatic.y), Hb_Type = coalesce(Hb_Type.x, Hb_Type.y)) %>% 
+  # select(bcode, Symptomatic, Hb_Type) %>% 
+  select(bcode,  Hb_Type) %>% 
   column_to_rownames("bcode") %>% 
   AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
 ```
@@ -163,7 +180,7 @@ v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt@meta.
 
 Remove 1 early ring
 ```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,!(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$StageFL == "Early ring")]
+# v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,!(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$StageFL == "Early ring")]
 ```
 
 Remove msc12
@@ -174,7 +191,7 @@ v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp
 
 ```{r}
 v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% 
-  mutate(across(Symptomatic, ~case_when(donor == "MSC14" ~ "No", T ~ .)),
+  mutate(across(Symptomatic, ~case_when(donor %in% c("MSC14", "MSC13", "MSC3", "MSC1") ~ "No", T ~ .)),
          across(Hb_Type, ~case_when(donor == "MSC14" ~ "HbC", T ~ .))) %>% 
   mutate(across(Symptomatic, ~factor(str_replace_all(.,  c("Yes" = "Symptomatic", "No" = "Asymptomatic")), levels=c("Symptomatic", "Asymptomatic")))) %>%
   select(Symptomatic, Hb_Type) %>% 
@@ -191,7 +208,6 @@ v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% count(stage, StageFL, Stage
 donor_mdata_slct <- readRDS("data/processed/Pf/m2_all/donor_mdata_slct.RDS")
 
 ```
-
 
 add metadata
 
