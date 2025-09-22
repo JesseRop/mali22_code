@@ -1,0 +1,2248 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(slingshot)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+})
+```
+
+
+
+
+
+
+
+# MSC Preprocessing
+
+
+## setup, read input files and exploratory visualizations and general functions
+
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+
+########START TRY SCT ########
+Integrated asexual to integrate with the rescued parasites
+```{r}
+## subset where field parasites are for slingshot
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_asex.RDS")
+
+# %in% c("MSC25" ,"MSC41", "MSC51")
+
+```
+
+
+
+
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# split layers
+# v3_m2_asex_cr_filt[["RNA"]] <- split(v3_m2_asex_cr_filt[["RNA"]], f = v3_m2_asex_cr_filt$donor)
+
+```
+
+
+############################
+
+
+```{r}
+## read in 
+# all_resc_asex_sct_ap2g <- readRDS("data/processed/Pf/m2_all/all_resc_asex_sct_ap2g.RDS")
+
+```
+
+Integrated asexual to integrate with the rescued parasites
+```{r}
+## subset where field parasites are for slingshot
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+# %in% c("MSC25" ,"MSC41", "MSC51")
+
+```
+
+
+########START TRY SCT ########
+
+Integrated asexual to integrate with the rescued parasites
+```{r}
+## subset where field parasites are for slingshot
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+# %in% c("MSC25" ,"MSC41", "MSC51")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% count(sR_fine_stg)
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_harmony_ss_res_fld_pt <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
+  rownames_to_column('bcode') %>%
+  mutate(dset_labmrg = "Field",
+         stage = sR_fine_stg,
+         donor = str_remove_all(orig.ident, ".mrna")) %>% 
+  add_count(donor, name = "don_count") %>%
+  select(bcode, dset_labmrg, donor, don_count, stage) %>%
+  column_to_rownames('bcode') %>%
+  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
+  
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% dplyr::count(donor, dset_labmrg)
+```
+
+```{r}
+## remove lab and M12
+v3_m2_asex_cr_filt <- v3_m2_asex_harmony_ss_res_fld_pt[, !v3_m2_asex_harmony_ss_res_fld_pt@meta.data$dset_labmrg %in% c("Lab", "MSC12")]
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt@meta.data %>% count(donor, sR_fine_stg) %>% group_by(donor) %>% mutate(prop = round(n/sum(n), 3)) %>% filter(sR_fine_stg == "Gametocyte (developing)")
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt@meta.data %>% add_count(sR_fine_stg, name = "stg_n") %>% group_by() %>% dplyr::count(donor)
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt@meta.data %>% filter(sR_fine_stg == "Gametocyte (developing)") %>% dplyr::count(donor)
+```
+
+```{r, eval=T}
+## Making list of objects and renaming before integrating
+# v3_m2_asex_cr_filt <- subset(v3_m2_asex_cr_filt, subset = donor != "MSC55")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt@meta.data %>% dplyr::count(donor, dset_labmrg)
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt@meta.data %>% add_count(donor) %>% dplyr::filter( n < 100)
+```
+
+```{r}
+## remove weird 2 cells with >9000 ncountRNA
+VlnPlot(v3_m2_asex_cr_filt, features = "nCount_RNA") + geom_hline(yintercept = 9000)
+```
+
+```{r}
+## remove weird 2 cells with >9000 ncountRNA
+table(v3_m2_asex_cr_filt@meta.data$nCount_RNA >9000)
+v3_m2_asex_cr_filt <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$nCount_RNA >9000]
+```
+
+```{r}
+## remove any donor with less than 100 cells
+v3_m2_asex_cr_filt <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$don_count < 150]
+```
+
+
+```{r}
+## remove any donor with less than 100 cells
+saveRDS(v3_m2_asex_cr_filt, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# split layers
+# v3_m2_asex_cr_filt[["RNA"]] <- split(v3_m2_asex_cr_filt[["RNA"]], f = v3_m2_asex_cr_filt$donor)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+v3_m2_asex_cr_filt_sct <- SCTransform(v3_m2_asex_cr_filt, verbose = FALSE, variable.features.n = 400)
+# v3_m2_asex_cr_filt_sct <- SCTransform(v3_m2_asex_cr_filt, verbose = FALSE, variable.features.n = 300)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+v3_m2_asex_cr_filt_sct <- RunPCA(v3_m2_asex_cr_filt_sct, verbose = FALSE, npcs = 20)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+DimPlot(v3_m2_asex_cr_filt_sct, reduction = "pca")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Error in getGlobalsAndPackages(expr, envir = envir, globals = globals) : 
+options(future.globals.maxSize = 1000 * 1024^2)  # 1000 MiB (or 1 GiB)
+
+v3_m2_asex_cr_filt_sct_int <- IntegrateLayers(
+  object = v3_m2_asex_cr_filt_sct,
+  method = RPCAIntegration,
+  normalization.method = "SCT",
+  verbose = F,
+  # k.weight = 90,
+)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+v3_m2_asex_cr_filt_sct_int <- FindNeighbors(v3_m2_asex_cr_filt_sct_int, dims = 1:5, reduction = "integrated.dr")
+v3_m2_asex_cr_filt_sct_int <- FindClusters(v3_m2_asex_cr_filt_sct_int, resolution = 0.5)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+v3_m2_asex_cr_filt_sct_int <- RunUMAP(v3_m2_asex_cr_filt_sct_int, dims = 1:5, verbose = FALSE, n.components = 3, seed.use = 867)
+v3_m2_asex_cr_filt_sct_int <- FindNeighbors(v3_m2_asex_cr_filt_sct_int, dims = 1:5, verbose = FALSE)
+v3_m2_asex_cr_filt_sct_int <- FindClusters(v3_m2_asex_cr_filt_sct_int, verbose = FALSE, resolution = 0.1)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# saveRDS(v3_m2_asex_cr_filt_sct_int, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_sct_int.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_sct_int <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_sct_int.RDS")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, reduction = "pca")
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T)
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage") + scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_cr_filt_sct_int, group.by = "donor")
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nFeature_RNA")
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA")
+VlnPlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA", group.by = "seurat_clusters")
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_sct_int@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= v3_m2_asex_cr_filt_sct_int@meta.data$sR_fine_stg,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage", dims = c(2,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, dims = c(1,3))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, dims = c(1,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(v3_m2_asex_cr_filt_sct_int) <- "RNA"
+v3_m2_asex_cr_filt_sct_int <- NormalizeData(v3_m2_asex_cr_filt_sct_int) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "PF3D7-1222600", order = T) 
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "PF3D7-1222600", reduction = "pca", order = T) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+v3_m2_asex_cr_filt_sct_int_ap2g <- subset(v3_m2_asex_cr_filt_sct_int, subset = `PF3D7-1222600` > 0, slot = 'counts')
+
+table(v3_m2_asex_cr_filt_sct_int_ap2g$donor)
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "PF3D7-1215500", order = T) 
+FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "PF3D7-1215500", reduction = "pca", order = T) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+DefaultAssay(v3_m2_asex_cr_filt_sct_int) <- "SCT"
+```
+
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_integration_bsub.sh
+
+```
+
+```{r, eval=T}
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_intgrtn_pc_harmony_bsub.sh
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# v3_m2_asex_cr_filt_norm_harmony <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony.RDS")
+v3_m2_asex_cr_filt_norm_harmony <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_pc_man.RDS")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_elbo <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_elbo.RDS")
+v3_m2_asex_cr_filt_norm_harmony_elbo
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "integrated.harmony_pc_man")
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "umap.harmony_pc_man")
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, group.by = "stage", reduction = "umap.harmony_pc_man") + scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, group.by = "donor", reduction = "umap.harmony_pc_man")
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, features = "nFeature_RNA", reduction = "umap.harmony_pc_man")
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, features = "nCount_RNA", reduction = "umap.harmony_pc_man")
+# VlnPlot(v3_m2_asex_cr_filt_norm_harmony, features = "nCount_RNA", group.by = "seurat_clusters", reduction = "umap.harmony_pc_man")
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, group.by = "stage", reduction = "umap.harmony_pc_man") + scale_color_manual(values = sp_col_new)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width= 15, fig.height=4}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, split.by = "stage", reduction = "umap.harmony_pc_man", pt.size = 0.0001) 
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=12, fig.height=3}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "umap.harmony_pc_man", split.by = 'donor')
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony@reductions[["umap.harmony_pc_man"]]@cell.embeddings),
+        x = ~umapharmonypcman_1, y = ~umapharmonypcman_2, z = ~umapharmonypcman_3,
+        color= v3_m2_asex_cr_filt_norm_harmony@meta.data$sR_fine_stg,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+############# START find all markers to test for merozoites #############
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters", dims = c(1,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, label = T, reduction = "integrated.harmony_pc_man", group.by = "harmony_pc_man_clusters", dims = c(2,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+gogo()
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_jnd <- JoinLayers(v3_m2_asex_cr_filt_norm_harmony)
+DefaultAssay(v3_m2_asex_cr_filt_norm_harmony_jnd)
+unique(Idents(v3_m2_asex_cr_filt_norm_harmony_jnd))
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_jnd[["RNA"]]$data <- as(v3_m2_asex_cr_filt_norm_harmony_jnd[["RNA"]]$data, Class = "dgCMatrix")
+```
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(v3_m2_asex_cr_filt_norm_harmony_jnd, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_jnd.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de <- FindAllMarkers(v3_m2_asex_cr_filt_norm_harmony_jnd, assay = "RNA", slot = "data")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot <- cb_asex_de %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+cb_asex_de_anot
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot %>% filter(cluster == "13" & avg_log2FC >0)
+```
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot %>% filter(cluster %in% c("5", "13") & avg_log2FC >0) %>% arrange(desc(avg_log2FC))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", label = T, features = "PF3D7-1222600", order = T)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", label = T, features = "PF3D7-1222600", order = T)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# pfs16 gexp02
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", label = T, features = "PF3D7-0406200")
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", label = T, features = "PF3D7-1102500")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# gene_count
+VlnPlot(v3_m2_asex_cr_filt_norm_harmony, features = c( "nCount_RNA"), pt.size = 0) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+# pfs16 gexp02
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", label = T, features = "nFeature_RNA")
+FeaturePlot(subset(v3_m2_asex_cr_filt_norm_harmony, subset = nCount_RNA <2500), reduction = "umap.harmony_pc_man", label = T, features = "nCount_RNA")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot %>% filter(cluster %in% c("15") & avg_log2FC >0)
+```
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot %>% filter(gene %in% gns) %>% arrange(desc(avg_log2FC)) %>% filter(p_val_adj< 0.05) %>% group_by(Gene) %>% slice_max(order_by = avg_log2FC)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+cb_asex_de_anot %>% filter(gene %in% ap2g_gns_down) %>% arrange(avg_log2FC) %>% filter(p_val_adj< 0.05) %>% group_by(Gene) %>% slice_min(order_by = avg_log2FC)
+```
+
+```{r}
+library(GGally)
+
+lowerfun <- function(data, mapping) {
+  ggplot(data = data, mapping = mapping) +
+    geom_point(size = 0.3, alpha = 0.3) +
+    geom_abline(slope = 1, intercept = 0, color = "blue")
+}
+
+```
+
+```{r}
+FetchData(object = v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm_harmony_jnd$harmony_pc_man_clusters %in% c("13", "5", "12", "2")], 
+          vars = c("PF3D7-1467600", "PF3D7-1472200", "PF3D7-1473200", "PF3D7-1222600", "PF3D7-0406500", "PF3D7-0424400", "PF3D7-1102500"),
+          slot = "data") %>% 
+  select(where(~!all(is.na(.x)))) %>%
+  ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+          upper = list(continuous = wrap("cor", size = 5)),
+          progress = FALSE)
+  
+```
+
+
+```{r}
+FetchData(object = v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm_harmony_jnd$harmony_pc_man_clusters %in% c("13", "5", "12", "2")], 
+          vars = c("PF3D7-1467600", "PF3D7-1472200", "PF3D7-1473200", "PF3D7-1222600", "PF3D7-0406500", "PF3D7-0424400"),
+          slot = "data") %>% 
+  select(where(~!all(is.na(.x)))) %>%
+  ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+          upper = list(continuous = wrap("cor", size = 5)),
+          progress = FALSE)
+  
+```
+
+
+############# END find all markers to test for merozoites #############
+
+############# START SK21 gene likely commited vs non-commited #############
+
+```{r, warning=FALSE, message=FALSE}
+# pfs16
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony_jnd[, !v3_m2_asex_cr_filt_norm_harmony_jnd$harmony_pc_man_clusters %in% c("13", "5", "12", "2","15")], reduction = "umap.harmony_pc_man", label = T, features = "nCount_RNA")
+
+```
+
+
+```{r}
+v3sex <- v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm_harmony_jnd$harmony_pc_man_clusters %in% c("13", "5", "12", "2","15")]
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# gene_count
+VlnPlot(v3sex, features = "nFeature_RNA") + geom_hline(yintercept = 600)
+VlnPlot(v3sex, features = "nCount_RNA") + geom_hline(yintercept = 2000)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# gene_count
+v3sex <- subset(v3sex, subset = nFeature_RNA < 600)
+v3sex <- subset(v3sex, subset = nCount_RNA < 2500)
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3sex, label = T, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters")
+DimPlot(v3sex, label = T, reduction = "integrated.harmony_pc_man", group.by = "harmony_pc_man_clusters")
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+v3sex <- FindNeighbors(v3sex, dims = 1:10, reduction = "integrated.harmony_pc_man")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+v3sex <- RunUMAP(v3sex, dims = 1:10, verbose = FALSE, n.components = 3, seed.use = 867, reduction = "integrated.harmony_pc_man")
+# v3sex <- FindNeighbors(v3sex, dims = 1:6, verbose = FALSE)
+# v3sex <- FindClusters(v3sex, verbose = FALSE, resolution = 0.1)
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3sex <- FindClusters(v3sex, resolution = 0.2)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=5.3, fig.height=3.65}
+DimPlot(v3sex, label = T, reduction = "umap", group.by = "seurat_clusters")
+DimPlot(v3sex, label = T, reduction = "umap", group.by = "seurat_clusters", dims = c(1,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3sex, label = T, reduction = "integrated.harmony_pc_man", group.by = "seurat_clusters", dims = c(2,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3sex@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= v3sex@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# gene_count
+VlnPlot(v3sex, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0) 
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=5, fig.height=3.5}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-1222600", order = T)
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-0406200", order = T)
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-1102500", order = T)
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "nFeature_RNA", order = T)
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "nCount_RNA", order = T)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=5, fig.height=3.5}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-1222600", order = T, dims = c(1,3))
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-0406200", order = T, dims = c(1,3))
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "PF3D7-1102500", order = T, dims = c(1,3))
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "nFeature_RNA", order = T, dims = c(1,3))
+FeaturePlot(v3sex, reduction = "umap",  label = T, features = "nCount_RNA", order = T, dims = c(1,3))
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g pfs16 gene_count
+FeaturePlot(subset(v3sex, subset = nCount_RNA < 600), reduction = "umap",  label = T, features = "nCount_RNA", order = T)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=12, fig.height=3}
+# ap2-g pfs16 gene_count
+DimPlot(v3sex, split.by =  "donor", reduction = "umap", pt.size = 0.01)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=3}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(v3sex, reduction = "umap", split.by =  "donor", label = T, features = "PF3D7-1222600", order = T, pt.size = 0.01)
+FeaturePlot(v3sex, reduction = "umap", split.by =  "donor", label = T, features = "PF3D7-0406200", order = T, pt.size = 0.01)
+# FeaturePlot(v3sex, reduction = "umap", split.by =  "donor", label = T, features = "PF3D7-1102500", order = T)
+# FeaturePlot(v3sex, reduction = "umap", split.by =  "donor", label = T, features = "nFeature_RNA", order = T)
+# FeaturePlot(v3sex, reduction = "umap", split.by =  "donor", label = T, features = "nCount_RNA", order = T)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+commited_de <- FindAllMarkers(v3sex, assay = "RNA", slot = "data", test.use = "MAST", latent.vars = "donor")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+commited_de_anot <- commited_de %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+commited_de_anot
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+commited_de_anot %>% filter(cluster %in% c("0") & avg_log2FC >0) %>% arrange(p_val_adj)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+commited_de_anot %>% filter(cluster %in% c("1") & avg_log2FC >0) %>% arrange(p_val_adj)
+```
+
+```{r, warning=FALSE, message=FALSE}
+commited_de_anot %>% filter(cluster %in% c("2") & avg_log2FC >0) %>% arrange(p_val_adj)
+```
+
+
+#### female high vs female low DE visualization
+```{r, fig.height=6, fig.width=6}
+
+
+vlcano <- map(c(0:2), ~{
+  
+  EnhancedVolcano(commited_de_anot %>% filter(cluster == .x),
+                lab = commited_de_anot %>% filter(cluster == .x) %>% pull(Gene),
+                # selectLab = .y,
+                x = 'avg_log2FC',
+                y = 'p_val_adj',
+                pCutoff = 0.05,
+                FCcutoff = 2,
+                pointSize = 1.5,
+                labSize = 4.0,
+                title = '',
+                subtitle = "",
+                titleLabSize = 0,
+                subtitleLabSize = 0,
+                axisLabSize = 22,
+                drawConnectors = TRUE,
+                # boxedLabels = TRUE,
+                # legendLabels =c( "p_val_adj"),
+                gridlines.minor = FALSE
+                ) +
+    theme(legend.position = "none")
+
+}) 
+vlcano
+
+##Save the above image for plot grid in functional_GO_n_lit_comparison.RMD for manuscript
+# saveRDS(fh_fl_vlcano, "plots/figS26/fh_fl_vlcano.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3sex, label = T, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters")
+
+```
+
+```{r}
+ap2g_gns_up
+```
+
+
+```{r}
+# Idents(v3sex) <- "stagenew"
+# ls <- subset(v3sex, idents = c("late stalk"))
+
+# lsm <- as.data.frame(colSums(v3sex@assays$RNA$data[ap2g_gns_up %in% rownames(v3sex),]))
+# 
+# colnames(lsm) <- "lsm"
+# lsm$rank <- c(1:nrow(lsm))
+# mcells <- lsm[order(lsm$lsm, decreasing = TRUE),]
+# mcells$rank <- c(1:nrow(mcells))
+# mcellsx <- mcells[which(mcells$lsm >= mean(lsm$lsm)),] %>% rownames()
+# fcellsx <- tail(rownames(mcells), length(mcellsx))
+# 
+# lsf <- as.data.frame(colSums(v3sex@assays$RNA$data[ap2g_gns_down %in% rownames(v3sex),]))
+# 
+# colnames(lsf) <- "lsf"
+# lsf$rank <- c(1:nrow(lsf))
+# fcells <- lsf[order(lsf$lsf, decreasing = TRUE),]
+# fcells$rank <- c(1:nrow(fcells))
+# fcellsy <- fcells[which(fcells$lsf >= mean(lsf$lsf)),] %>% rownames()
+# mcellsy <- tail(rownames(fcells), length(fcellsy))
+# 
+# 
+# base::intersect(mcellsx, fcellsy) %>% length()
+# mcellsz <- base::setdiff(mcellsx,fcellsy)
+# fcellsz <- base::setdiff(fcellsy,mcellsx)
+```
+
+```{r}
+v3sex@meta.data$fm <- "other"
+# v3sex@meta.data[which(v3sex@meta.data$stagenew == "late stalk"),]$fm <- "other late stak"
+v3sex@meta.data[which(colnames(v3sex) %in% mcellsz),]$fm <- "male-like"
+v3sex@meta.data[which(colnames(v3sex) %in% fcellsz),]$fm <- "female-like"
+
+```
+
+
+```{r}
+defm <- FindMarkers(v3sex, ident.1 = mcellsz, ident.2 = fcellsz, only.pos = FALSE, test.use = "MAST")
+
+# defm$geneid2 <- rownames(defm)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+defm_cln_anot <- defm %>% rownames_to_column("gene") %>% filter(p_val_adj < 0.05) %>% arrange(p_val_adj) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+defm_cln_anot
+```
+
+```{r}
+defm <- left_join(defm, pfdb56, by = "geneid2")
+#defm <- defm[which(defm$p_val_adj < 0.05),]
+defm <- defm %>% mutate(genename2 =
+                     case_when(genename == 'N/A' ~ geneid2,
+                     TRUE ~ genename))
+defm$updown <- "other"
+defm[which(defm$avg_log2FC > 0.4 & defm$p_val_adj < 0.05),]$updown <- "up"
+defm[which(defm$avg_log2FC < -0.4 & defm$p_val_adj < 0.05),]$updown <- "down"
+table(defm$updown)
+  
+```
+
+
+############# END SK21 gene likely commited vs non-commited #############
+
+
+############# START SCTtransform #######################################
+
+```{r, warning=FALSE, message=FALSE}
+## Add those without rescued cells to the object above created after merging
+v3_m2_asex_cr_filt_no_resc <- v[non_resc_dons]
+all_asex_merged_list <- c(v3_m2_asex_cr_filt_no_resc, all_asex_rna)
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged <- merge(all_asex_merged_list[[1]], all_asex_merged_list[2:length(all_asex_merged_list)])
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3sex_sct <- v3sex
+v3sex_sct[["SCT"]] <- NULL
+v3sex_sct[["RNA"]]$data  <- NULL
+v3sex_sct[["RNA"]]$scale.data  <- NULL
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3sex_sct[["RNA"]]$counts <- as(object = v3sex_sct[["RNA"]]$counts, Class = "dgCMatrix")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3sex_sct[["RNA"]] <- split(v3sex_sct[["RNA"]], f = v3sex_sct$orig.ident)
+v3sex_sct
+```
+
+```{r, warning=FALSE, message=FALSE}
+# remove low n donors
+table(v3sex_sct$orig.ident)
+# v3sex_sct <- v3sex_sct[, !v3sex_sct$orig.ident %in% c("MSC48.mrna", "MSC67.mrna", "MSC14.mrna")]
+v3sex_sct <- v3sex_sct[, !v3sex_sct$orig.ident %in% c("MSC48.mrna", "MSC67.mrna", "MSC14.mrna", "MSC55.mrna")]
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+v3sex_sct <- SCTransform(v3sex_sct, verbose = FALSE, variable.features.n = 2000, vst.flavor = "v2")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+v3sex_sct <- RunPCA(v3sex_sct, verbose = FALSE, npcs = 30)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+options(future.globals.maxSize = 1e+09)
+
+v3sex_sct_int <- IntegrateLayers(
+  object = v3sex_sct,
+  method = RPCAIntegration,
+  normalization.method = "SCT",
+  verbose = F,
+  k.weight = 83,
+)
+
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+v3sex_sct_int <- RunUMAP(v3sex_sct_int, dims = 1:8, verbose = FALSE, n.components = 3, seed.use = 867)
+v3sex_sct_int <- FindNeighbors(v3sex_sct_int, dims = 1:8, verbose = FALSE)
+v3sex_sct_int <- FindClusters(v3sex_sct_int, verbose = FALSE, resolution = 0.2)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+DimPlot(v3sex_sct_int, reduction = "umap", c(1,2))
+
+```
+```{r, warning=FALSE, message=FALSE}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "PF3D7-1222600", order = T)
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "PF3D7-0406200", order = T)
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "PF3D7-1102500", order = T)
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "PF3D7-0406500", order = T)
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "nFeature_RNA", order = T)
+FeaturePlot(v3sex_sct_int, reduction = "umap",  label = T, features = "nCount_RNA", order = T)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3sex_sct_int@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= v3sex_sct_int@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r}
+v3sex_sct_int <- PrepSCTFindMarkers(v3sex_sct_int)
+
+```
+
+
+```{r}
+v3sex_sct_de <- FindAllMarkers(v3sex_sct_int, assay = "SCT", verbose = FALSE, test.use = "MAST")
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+v3sex_sct_de_anot <- v3sex_sct_de %>% dplyr::filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+v3sex_sct_de_anot
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+v3sex_sct_de_anot %>% dplyr::filter(cluster == "0" & avg_log2FC >0)
+v3sex_sct_de_anot %>% dplyr::filter(cluster == "1" & avg_log2FC >0)
+v3sex_sct_de_anot %>% dplyr::filter(cluster == "2" & avg_log2FC >0)
+v3sex_sct_de_anot %>% dplyr::filter(cluster == "3" & avg_log2FC >0)
+```
+
+```{r}
+
+head(v3sex_sct_de, n = 15)
+
+
+```
+
+```{r}
+
+gogo()
+
+```
+############# END SCTtransform #######################################
+
+############# START Average expression of genes #######################
+
+
+
+```{r}
+
+## Get the genes expressed in atleast 25% of cells in fhe,fle,mhe and mle
+
+cb_asex_gn_exp <- AggregateExpression(v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm_harmony_jnd$harmony_pc_man_clusters %in% c("13", "5", "12", "2")], group.by = "donor", assays = "RNA", return.seurat = T) 
+
+cb_asex_gn_exp_df <- cb_asex_gn_exp@assays$RNA$data
+
+cb_asex_gn_exp_df
+
+```
+
+
+```{r, fig.width=10, fig.height=10}
+
+## correlation between genes by stage
+cb_asex_gn_exp_df %>%
+  data.frame() %>%
+  # column_to_rownames('gene') %>% 
+  select(where(~!all(is.na(.x)))) %>%
+  ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+          upper = list(continuous = wrap("cor", size = 5)),
+          progress = FALSE)
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+
+asex_avg_exp_cln <- list(all_resc_sct_comp_m21_m22)  %>%
+  pmap(~makeSetScore(..1, top_asex_m14, assay = 'RNA') %>%  data.frame %>%  setNames('asx_avg_cln')  )
+
+mle_avg_exp_cln <- list(all_resc_sct_comp_m21_m22)  %>%
+  pmap(~makeSetScore(..1, top_mLE_m13_m14, assay = 'RNA') %>%  data.frame %>%  setNames('mle_avg_cln')  )
+
+fle_avg_exp_cln <- list(all_resc_sct_comp_m21_m22)  %>%
+  pmap(~makeSetScore(..1, top_fLE_m13_m14, assay = 'RNA') %>%  data.frame %>%  setNames('fle_avg_cln')  )
+
+asex2_avg_exp_cln <- list(all_resc_sct_comp_m21_m22)  %>%
+  pmap(~makeSetScore(..1, asex_2_m70, assay = 'RNA') %>%  data.frame %>%  setNames('asx2_avg_cln')  )
+
+
+markers_avg_exp_cln <- pmap(list(asex_avg_exp_cln, mle_avg_exp_cln, fle_avg_exp_cln, asex2_avg_exp_cln), ~ bind_cols(..1, ..2, ..3, ..4))
+# markers_avg_exp[[1]]
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+all_resc_sct_comp_m21_m22 <- list(all_resc_sct_comp_m21_m22, markers_avg_exp_cln) %>% pmap(~AddMetaData(..1, ..2))
+```
+
+Visualization of clusters with markers
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+## cells that contain 2 or more ap2g UMI
+imap(all_resc_sct_comp_m21_m22, ~DimPlot(.x, label = T)+ labs(title = .y))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=13, fig.height=4}
+imap(all_resc_sct_comp_m21_m22, ~FeaturePlot(.x, features = c("asx_avg_cln", "mle_avg_cln", "fle_avg_cln", "asx2_avg_cln"),  ncol = 4) + plot_annotation(title = .y))
+
+```
+
+####################### END Average expression of genes #######################
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony@reductions[["umap.harmony_pc_man"]]@cell.embeddings),
+        x = ~umapharmonypcman_1, y = ~umapharmonypcman_2, z = ~umapharmonypcman_3,
+        color= v3_m2_asex_cr_filt_sct_int@meta.data$sR_fine_stg,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony@reductions[["integrated.harmony"]]@cell.embeddings),
+        x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
+        color= v3_m2_asex_cr_filt_sct_int@meta.data$sR_fine_stg,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+
+################## START DE findmarkers
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(v3_m2_asex_cr_filt_norm_harmony) <- "RNA"
+v3_m2_asex_cr_filt_norm_harmony <- JoinLayers(v3_m2_asex_cr_filt_norm_harmony)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony[["RNA"]]$counts <- as(object = v3_m2_asex_cr_filt_norm_harmony[["RNA"]]$counts, Class = "dgCMatrix")
+v3_m2_asex_cr_filt_norm_harmony[["RNA"]]$data <- as(object = v3_m2_asex_cr_filt_norm_harmony[["RNA"]]$data, Class = "dgCMatrix")
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony[["RNA"]]["counts"]
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters", order = T, pt.size = 0.01, label = T) 
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height=4}
+VlnPlot(v3_m2_asex_cr_filt_norm_harmony, features = c("nFeature_RNA", "nCount_RNA"), group.by = "harmony_pc_man_clusters",pt.size = 0.001)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## DE
+Idents(v3_m2_asex_cr_filt_norm_harmony) <- "harmony_pc_man_clusters"
+de_gns_fmall_cln <- FindAllMarkers(v3_m2_asex_cr_filt_norm_harmony)
+# de_gns_fmall_cln <- de_gns_fmall_all %>% arrange(p_val_adj)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot <- de_gns_fmall_cln %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+de_gns_sig_cln_anot
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot %>% slice_head(n=5)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_cln_anot$cluster), ~de_gns_sig_cln_anot %>% filter(avg_log2FC > 0, cluster == .x))
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+## Dormant (d5MDPs) genes after artemisinin - https://www-nature-com.ezp.lib.cam.ac.uk/articles/s41467-024-51846-0
+d5MDP_up_gns <- c("PF3D7_1430900", "PF3D7_0928000", "PF3D7_0217100", "PF3D7_0412100", "PF3D7_1341100") %>% str_replace(., "_", "-")
+
+d5MDP_down_gns<- c("PF3D7_0202500", "PF3D7_1102800", "PF3D7_1401400", "PF3D7_0202000") %>% str_replace(., "_", "-")
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot %>% filter(gene %in% d5MDP_up_gns)
+de_gns_sig_cln_anot %>% filter(gene %in% d5MDP_down_gns)
+```
+
+
+
+
+################## END DE findmarkers
+
+
+Slingshot
+```{r, warning=FALSE, message=FALSE}
+DefaultAssay(v3_m2_asex_cr_filt_norm_harmony) <- "RNA"
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", group.by = "harmony_pc_man_clusters", order = T, pt.size = 0.01) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony <- FindClusters(v3_m2_asex_cr_filt_norm_harmony, resolution = 0.2, cluster.name = "harmony_clusters_ss") 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony, reduction = "umap.harmony_pc_man", group.by = "harmony_clusters_ss", order = T, pt.size = 0.01, label=T) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony@reductions[["umap.harmony_pc_man"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= v3_m2_asex_cr_filt_norm_harmony@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, eval=T}
+# gogo()
+v3_m2_asex_cr_filt_norm_harmony_sce <- as.SingleCellExperiment(v3_m2_asex_cr_filt_norm_harmony)
+
+```
+
+```{r, eval=T}
+rowData(v3_m2_asex_cr_filt_norm_harmony_sce)$feature_symbol <- rownames(v3_m2_asex_cr_filt_norm_harmony_sce)
+```
+
+!!!! NOTE -BEEN DOING SLINGSHOT WRONG. LOGCOUNTS SHOULD HAVE data values from seurat
+```{r, eval=T}
+# gogo()
+# Seurat_object <- m2_asex_harmony_res
+
+## Convert seurat object to SCE
+v3_m2_asex_cr_filt_norm_harmony_sce_ss <- slingshot(v3_m2_asex_cr_filt_norm_harmony_sce,
+            clusterLabels = "harmony_clusters_ss",
+            reducedDim = "UMAP.HARMONY_PC_MAN",
+            start.clus = 1,
+            end.clus = 3,
+            # shrink =1,
+            # stretch = 1,
+            # allow.break = F
+            )
+
+
+```
+
+
+```{r}
+##Prepare slingshot dataset (SDS) object
+v3_m2_asex_cr_filt_norm_harmony_sce_ss_sds <- SlingshotDataSet(v3_m2_asex_cr_filt_norm_harmony_sce_ss)
+
+# plot(reducedDims(v3_m2_asex_cr_filt_norm_harmony_sce_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(v3_m2_asex_cr_filt_norm_harmony_sce_ss$stage)], pch=16, asp = 0.7)
+plot(reducedDims(v3_m2_asex_cr_filt_norm_harmony_sce_ss)$UMAP.HARMONY_PC_MAN[,c(1,2)], col = brewer.pal(9,"Set1")[base::as.factor(v3_m2_asex_cr_filt_norm_harmony_sce_ss$harmony_clusters_ss)], pch=16, asp = 0.7, )
+
+lines(v3_m2_asex_cr_filt_norm_harmony_sce_ss_sds, lwd=2, col="black",dims = c(1,2))
+```
+
+
+```{r}
+## Add pseudotime metadata to the object
+v3_m2_asex_cr_filt_norm_harmony_pt <- AddMetaData(v3_m2_asex_cr_filt_norm_harmony, 
+                                                      data.frame(v3_m2_asex_cr_filt_norm_harmony_sce_ss@colData[, c("slingPseudotime_1"), drop = F]) #%>%
+                                                        # rename("pseudotime" = slingPseudotime_1)
+                                                      ) 
+
+```
+
+
+```{r}
+FeaturePlot(v3_m2_asex_cr_filt_norm_harmony_pt, features = "slingPseudotime_1", reduction = "umap.harmony_pc_man")
+
+```
+
+
+
+```{r, eval = FALSE}
+## Save pseudotime objects
+saveRDS(v3_m2_asex_cr_filt_norm_harmony_pt, "data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+saveRDS(v3_m2_asex_cr_filt_norm_harmony_sce_ss, "data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_sce_ss.RDS")
+saveRDS(v3_m2_asex_cr_filt_norm_harmony_sce_ss_sds, "data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_sce_ss_sds.RDS")
+
+### GOTO m22_raw_tseq_MAST_intradon_DE for tradeseq
+```
+
+######################## START Test age between asympto and sympto ########################
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct <- readRDS( "data/processed/Pf/m2_all/donor_mdata_slct.RDS")
+
+```
+
+
+```{r}
+## Save pseudotime objects
+v3_m2_asex_cr_filt_norm_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+
+v3_m2_asex_cr_filt_norm_harmony_pt_mdata <-  v3_m2_asex_cr_filt_norm_harmony_pt[, !v3_m2_asex_cr_filt_norm_harmony_pt$orig.ident == "MSC55.mrna"] 
+# v3_m2_asex_cr_filt_norm_harmony_pt_mdata <-  v3_m2_asex_cr_filt_norm_harmony_pt
+
+v3_m2_asex_cr_filt_norm_harmony_pt_mdata <-  v3_m2_asex_cr_filt_norm_harmony_pt_mdata@meta.data %>%
+  mutate(short_name = str_remove(donor, "_SLO|_MACS")) %>%
+  left_join(., donor_mdata_slct, by = c("short_name" = "short_name")) %>%
+  select(short_name, sympto_groups, symptomatic, condition, fever, temperature_c) %>% 
+  AddMetaData(v3_m2_asex_cr_filt_norm_harmony_pt_mdata, .)
+```
+
+
+```{r, fig.width=15, fig.height=5}
+DimPlot(v3_m2_asex_cr_filt_norm_harmony_pt_mdata, split.by = "sympto_groups")
+```
+
+
+```{r}
+v3_m2_asex_cr_filt_norm_harmony_pt_mdata@meta.data %>%
+  ggplot(aes(x = sympto_groups, y = slingPseudotime_1)) +
+  geom_boxplot() 
+```
+
+
+```{r, fig.width=16, fig.height=3}
+v3_m2_asex_cr_filt_norm_harmony_pt_mdata@meta.data %>%
+  filter(!Strain_DN %in% c("Doublet", "Negative")) %>%
+  ggplot(aes(x = donor, y = slingPseudotime_1, colour = Strain_DN)) +
+  geom_boxplot() +
+  facet_nested(. ~ sympto_groups + donor, space = "free_x", scales = "free_x")
+```
+
+```{r, fig.width=16, fig.height=3}
+v3_m2_asex_cr_filt_norm_harmony_pt_mdata@meta.data %>%
+  filter(!Strain_DN %in% c("Doublet", "Negative")) %>%
+  ggplot(aes(x = donor, y = slingPseudotime_1, colour = Strain_DN)) +
+  geom_sina(size = 0.001) +
+  facet_nested(. ~ sympto_groups + donor, space = "free_x", scales = "free_x")
+```
+
+
+```{r, fig.width=16, fig.height=3}
+gogo()
+```
+
+######################## END Test age between asympto and sympto ########################
+
+
+
+######################## START integrate cellranger filtered with rescued asexuals ########################
+
+
+######################## START integration including LassePortugal et al ########################
+```{r}
+##Read lasse et al harmony integration of atlas and natural infections
+lasse_natural_infcns_seu_harmony <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/lasse_natural_infcns_seu_harmony.RDS")
+
+```
+
+```{r}
+## Convert from Seurat to SCE 
+lasse_seu_harmony_dons <- lasse_natural_infcns_seu_harmony[, str_detect(lasse_natural_infcns_seu_harmony@meta.data$orig.ident, "endDry|MAL")]
+lasse_seu_harmony_dons
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_jnd <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_jnd.RDS")
+```
+
+```{r}
+v3_m2_asex_cr_filt_norm_harmony_dcMtx <- v3_m2_asex_cr_filt_norm_harmony_jnd
+```
+
+```{r}
+v3_m2_asex_cr_filt_norm_harmony_dcMtx[["RNA"]]$counts <- as(v3_m2_asex_cr_filt_norm_harmony_dcMtx[["RNA"]]$counts, Class = "dgCMatrix")
+v3_m2_asex_cr_filt_norm_harmony_dcMtx[["RNA"]]$data <- NULL
+v3_m2_asex_cr_filt_norm_harmony_dcMtx[["RNA"]]$scale.data <- NULL
+v3_m2_asex_cr_filt_norm_harmony_dcMtx[["SCT"]] <- NULL
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_dcMtx_list <- SplitObject(v3_m2_asex_cr_filt_norm_harmony_dcMtx, split.by = "orig.ident")
+```
+
+
+```{r}
+lasse_seu_harmony_dons_jnd <- JoinLayers(lasse_seu_harmony_dons)
+
+lasse_seu_harmony_dons_jnd[["RNA"]]$data <- NULL
+lasse_seu_harmony_dons_jnd[["RNA"]]$scale.data <- NULL
+
+lasse_seu_harmony_dons_jnd <- SplitObject(lasse_seu_harmony_dons_jnd, split.by = "orig.ident")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+m2_lasse_asex <- c(v3_m2_asex_cr_filt_norm_harmony_dcMtx_list, lasse_seu_harmony_dons_jnd)
+m2_lasse_asex <- merge(m2_lasse_asex[[1]], m2_lasse_asex[2:length(m2_lasse_asex)] )
+m2_lasse_asex
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(m2_lasse_asex, "data/processed/Pf/m2_all/m2_lasse_asex.RDS")
+```
+
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_integration_bsub.sh
+
+```
+
+```{r, eval=T}
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_intgrtn_pc_harmony_bsub.sh
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+m2_lasse_asex_norm_harmony <- readRDS("data/processed/Pf/m2_all/m2_lasse_asex_norm_harmony.RDS")
+# m2_lasse_asex_norm_harmony_pc <- readRDS("data/processed/Pf/m2_all/m2_lasse_asex_norm_harmony_pc.RDS")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+m2_lasse_asex_norm_harmony_elbo <- readRDS("data/processed/Pf/m2_all/m2_lasse_asex_norm_harmony_elbo.RDS")
+m2_lasse_asex_norm_harmony_elbo
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony", group.by = "harmony_clusters", order = T, pt.size = 0.01, label=T) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(m2_lasse_asex_norm_harmony_pc, reduction = "umap.harmony_pc", group.by = "harmony_pc_clusters", order = T, pt.size = 0.01, label=T) 
+DimPlot(m2_lasse_asex_norm_harmony_pc, reduction = "umap.harmony_pc", group.by = "harmony_pc_clusters", order = T, pt.size = 0.01, label=T, dims = c(1,3)) 
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_lasse_asex_norm_harmony_pc@reductions[["umap.harmony_pc"]]@cell.embeddings),
+        x = ~umapharmonypc_1, y = ~umapharmonypc_2, z = ~umapharmonypc_3,
+        color= m2_lasse_asex_norm_harmony_pc@meta.data$harmony_pc_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony", group.by = "orig.ident", order = T, pt.size = 0.01, label=T) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+m2_lasse_asex_norm_harmony <- m2_lasse_asex_norm_harmony@meta.data %>% 
+  mutate(across(pseudotime.stages, ~str_replace_all(., c("Ring" = " ring", "Trophozoite" = " trophozoite", "DevelopingGametocyte" = "Gametocyte (developing)", "FemaleGametocyte" = "Female"))),
+         stage = coalesce(sR_fine_stg, pseudotime.stages),
+         group = case_when(str_detect(orig.ident, "MSC") ~ "MCA",
+                           T ~ group)) %>%
+  select(stage, group) %>%
+  AddMetaData(m2_lasse_asex_norm_harmony, .)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 8, fig.height=3}
+DimPlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony", split.by = "group", order = T, pt.size = 0.01, label=T) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 10, fig.height=3.5}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-1222600", order = T, split.by = "group")
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-0406200", order = T, split.by = "group")
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-1102500", order = T, split.by = "group")
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "nFeature_RNA", order = T, split.by = "group")
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "nCount_RNA", order = T, split.by = "group")
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 10, fig.height=3.5}
+# ap2-g pfs16 gexp02 gene_count
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-1222600", order = T, split.by = "group", dims = c(1,3))
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-0406200", order = T, split.by = "group", dims = c(1,3))
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "PF3D7-1102500", order = T, split.by = "group", dims = c(1,3))
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "nFeature_RNA", order = T, split.by = "group", dims = c(1,3))
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "umap.harmony",  label = T, features = "nCount_RNA", order = T, split.by = "group", dims = c(1,3))
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 10, fig.height=3.5}
+# gexp02 gene_count
+FeaturePlot(m2_lasse_asex_norm_harmony, reduction = "integrated.harmony",  label = T, features = "PF3D7-1102500", order = T, split.by = "group", dims = c(2,4))
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_lasse_asex_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+        x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
+        color= m2_lasse_asex_norm_harmony@meta.data$harmony_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_lasse_asex_norm_harmony@reductions[["integrated.harmony"]]@cell.embeddings),
+        x = ~harmony_2, y = ~harmony_3, z = ~harmony_4,
+        color= m2_lasse_asex_norm_harmony@meta.data$stage,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+m2_lasse_asex_norm_harmony_jnd <- JoinLayers(m2_lasse_asex_norm_harmony)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(m2_lasse_asex_norm_harmony_jnd@reductions[["integrated.harmony"]]@cell.embeddings),
+        x = ~harmony_2, y = ~harmony_3, z = ~harmony_4,
+        color= m2_lasse_asex_norm_harmony_jnd["PF3D7-1102500",][["RNA"]]@layers$data,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.01, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+# v3_m2_asex_cr_filt_norm_harmony_dcMtx_norm <- NormalizeData(v3_m2_asex_cr_filt_norm_harmony_dcMtx)
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# # Display the combined datasets as an interactive 3D plot
+# 
+# plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony_dcMtx_norm@reductions[["integrated.harmony_pc_man"]]@cell.embeddings),
+#         x = ~harmony_2, y = ~harmony_3, z = ~harmony_5,
+#         color= v3_m2_asex_cr_filt_norm_harmony_dcMtx_norm["PF3D7-1102500",][["RNA"]]@layers$data,
+#         # colors = c('blue', 'red'),
+#         opacity = 0.8,
+#         size = 0.01, 
+#         type = 'scatter3d'
+# )
+
+```
+
+
+######################## END integration including LassePortugal et al ########################
+
+
+
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+# run sctransform
+all_resc_asex_rna <-  all_resc_asex_sct
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+## change default assay to RNA for getting cells with ap2g reads
+for (i in 1:length(all_resc_asex_rna)) {
+  DefaultAssay(all_resc_asex_rna[[i]]) <- "RNA"
+  all_resc_asex_rna[[i]]@assays$SCT <- NULL
+  all_resc_asex_rna[[i]]@project.name <- "SeuratProject"
+}
+
+all_resc_asex_rna
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+v3_m2_asex_cr_filt_list <-  SplitObject(v3_m2_asex_cr_filt, split.by = "donor")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Donors with cells in the rescued object
+resc_dons <- names(v3_m2_asex_cr_filt_list)[names(v3_m2_asex_cr_filt_list) %in% names(all_resc_asex_rna)]
+non_resc_dons <- names(v3_m2_asex_cr_filt_list)[!names(v3_m2_asex_cr_filt_list) %in% names(all_resc_asex_rna)]
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Donors with cells in the rescued object
+all_asex_rna <- list()
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## for those with rescued cells merge these with cell ranger qcd cells
+for (i in resc_dons) {
+  all_asex_rna[i] <- merge(v3_m2_asex_cr_filt_list[[i]], all_resc_asex_rna[[i]])
+  
+}
+
+all_asex_rna
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Add those without rescued cells to the object above created after merging
+v3_m2_asex_cr_filt_no_resc <- v3_m2_asex_cr_filt_list[non_resc_dons]
+all_asex_merged_list <- c(v3_m2_asex_cr_filt_no_resc, all_asex_rna)
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged <- merge(all_asex_merged_list[[1]], all_asex_merged_list[2:length(all_asex_merged_list)])
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged <- JoinLayers(all_asex_merged)
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged[["RNA"]] <- split(all_asex_merged[["RNA"]], f = all_asex_merged$donor)
+all_asex_merged
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+all_asex_merged <- SCTransform(all_asex_merged, verbose = FALSE, variable.features.n = 200)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged <- RunPCA(all_asex_merged, verbose = FALSE, npcs = 20)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+DimPlot(all_asex_merged, reduction = "pca")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+options(future.globals.maxSize = 1e+09)
+
+all_asex_merged_int <- IntegrateLayers(
+  object = all_asex_merged,
+  method = RPCAIntegration,
+  normalization.method = "SCT",
+  verbose = F,
+  k.weight = 98,
+)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+all_asex_merged_int <- FindNeighbors(all_asex_merged_int, dims = 1:6, reduction = "integrated.dr")
+all_asex_merged_int <- FindClusters(all_asex_merged_int, resolution = 0.5)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged_int <- RunUMAP(all_asex_merged_int, dims = 1:6, verbose = FALSE, n.components = 3, seed.use = 867)
+all_asex_merged_int <- FindNeighbors(all_asex_merged_int, dims = 1:6, verbose = FALSE)
+all_asex_merged_int <- FindClusters(all_asex_merged_int, verbose = FALSE, resolution = 0.1)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(all_asex_merged_int, "data/processed/Pf/m2_all/all_asex_merged_int.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# all_asex_merged_int <- readRDS("data/processed/Pf/m2_all/all_asex_merged_int.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int, label = T, reduction = "pca")
+DimPlot(all_asex_merged_int, label = T)
+DimPlot(all_asex_merged_int, label = T, group.by = "stage") + scale_color_manual(values = sp_fld_colors)
+DimPlot(all_asex_merged_int, group.by = "donor")
+FeaturePlot(all_asex_merged_int, features = "nFeature_RNA")
+FeaturePlot(all_asex_merged_int, features = "nCount_RNA")
+VlnPlot(all_asex_merged_int, features = "nCount_RNA", group.by = "seurat_clusters")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(all_asex_merged_int, label = T, group.by = "stage", dims = c(2,3))
+DimPlot(all_asex_merged_int, label = T, dims = c(2,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(all_asex_merged_int, label = T, dims = c(1,3))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int, label = T, group.by = "stage", dims = c(1,3))
+DimPlot(all_asex_merged_int, label = T, dims = c(1,3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+FeaturePlot(all_asex_merged_int, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+```
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int) <- "RNA"
+FeaturePlot(all_asex_merged_int, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+DefaultAssay(all_asex_merged_int) <- "SCT"
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+all_asex_merged_int_ap2g <- subset(all_asex_merged_int, subset = `PF3D7-1222600` > 0, slot = 'counts')
+
+table(all_asex_merged_int_ap2g$donor)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ## change ident to ap2g
+# for (i in 1:length(all_asex_merged_int)) {
+#   Idents(all_asex_merged_int[[i]]) <- "ap2_clst_finer"
+# }
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int) <- "RNA"
+all_asex_merged_int <- JoinLayers(all_asex_merged_int)
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+# de_gns_fmall_all <- FindAllMarkers(all_asex_merged_int, test.use = "MAST")
+de_gns_fmall_all <- FindAllMarkers(all_asex_merged_int)
+de_gns_fmall_all <- de_gns_fmall_all %>% arrange(p_val_adj)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_anot <- de_gns_fmall_all %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+de_gns_sig_anot
+```
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(all_asex_merged_int, features = c("nFeature_RNA", "nCount_RNA"))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int, label = T)
+```
+
+
+
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+all_asex_merged_int@meta.data %>% filter(seurat_clusters == 4) %>% count(donor, seurat_clusters)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_anot$cluster), ~de_gns_sig_anot %>% filter(avg_log2FC > 0, cluster == .x))
+
+# Cluster 4 highly expressess truRNA which is switched on when temperature is lowered from 37C to 26C activates!!! https://www.sciencedirect.com/science/article/pii/S0378111923003578
+# https://pmc.ncbi.nlm.nih.gov/articles/PMC11597781/
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+gogo()
+```
+
+############ SCT2 -without activated asexuals
+Remove the low temperature activate asexuals and cluster the rest
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged_int_no_actv <- all_asex_merged_int[, all_asex_merged_int$seurat_clusters != 4]
+DimPlot(all_asex_merged_int_no_actv, label = T)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged_int_no_actv[["RNA"]] <- split(all_asex_merged_int_no_actv[["RNA"]], f = all_asex_merged_int_no_actv$donor)
+all_asex_merged_int_no_actv
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+all_asex_merged_int_no_actv <- SCTransform(all_asex_merged_int_no_actv, verbose = FALSE, variable.features.n = 100)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged_int_no_actv <- RunPCA(all_asex_merged_int_no_actv, verbose = FALSE, npcs = 20)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+DimPlot(all_asex_merged_int_no_actv, reduction = "pca")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+options(future.globals.maxSize = 1e+09)
+
+all_asex_merged_int_no_actv <- IntegrateLayers(
+  object = all_asex_merged_int_no_actv,
+  method = RPCAIntegration,
+  normalization.method = "SCT",
+  verbose = F,
+  k.weight = 98,
+)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+all_asex_merged_int_no_actv <- FindNeighbors(all_asex_merged_int_no_actv, dims = 1:5, reduction = "integrated.dr")
+all_asex_merged_int_no_actv <- FindClusters(all_asex_merged_int_no_actv, resolution = 0.5)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged_int_no_actv <- RunUMAP(all_asex_merged_int_no_actv, dims = 1:5, verbose = FALSE, n.components = 3, seed.use = 867)
+all_asex_merged_int_no_actv <- FindNeighbors(all_asex_merged_int_no_actv, dims = 1:5, verbose = FALSE)
+all_asex_merged_int_no_actv <- FindClusters(all_asex_merged_int_no_actv, verbose = FALSE, resolution = 0.1)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(all_asex_merged_int_no_actv, "data/processed/Pf/m2_all/all_asex_merged_int_no_actv.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# all_asex_merged_int_no_actv <- readRDS("data/processed/Pf/m2_all/all_asex_merged_int_no_actv.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv, label = T, reduction = "pca")
+DimPlot(all_asex_merged_int_no_actv, label = T)
+DimPlot(all_asex_merged_int_no_actv, label = T, group.by = "stage") + scale_color_manual(values = sp_fld_colors)
+DimPlot(all_asex_merged_int_no_actv, group.by = "donor")
+FeaturePlot(all_asex_merged_int_no_actv, features = "nFeature_RNA")
+FeaturePlot(all_asex_merged_int_no_actv, features = "nCount_RNA")
+VlnPlot(all_asex_merged_int_no_actv, features = "nCount_RNA", group.by = "seurat_clusters")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+FeaturePlot(all_asex_merged_int_no_actv, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int_no_actv, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int_no_actv) <- "RNA"
+FeaturePlot(all_asex_merged_int_no_actv, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int_no_actv, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+DefaultAssay(all_asex_merged_int_no_actv) <- "SCT"
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(all_asex_merged_int_no_actv@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= all_asex_merged_int_no_actv@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int_no_actv) <- "RNA"
+all_asex_merged_int_no_actv <- JoinLayers(all_asex_merged_int_no_actv)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+# de_gns_fmall_all <- FindAllMarkers(all_asex_merged_int, test.use = "MAST")
+de_gns_fmall_cln <- FindAllMarkers(all_asex_merged_int_no_actv)
+de_gns_fmall_cln <- de_gns_fmall_all %>% arrange(p_val_adj)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv, label = T)
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot <- de_gns_fmall_cln %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+de_gns_sig_cln_anot
+```
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_cln_anot$cluster), ~de_gns_sig_anot %>% filter(avg_log2FC > 0, cluster == .x))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Dormant (d5MDPs) genes after artemisinin - https://www-nature-com.ezp.lib.cam.ac.uk/articles/s41467-024-51846-0
+d5MDP_up_gns <- c("PF3D7_1430900", "PF3D7_0928000", "PF3D7_0217100", "PF3D7_0412100", "PF3D7_1341100") %>% str_replace(., "_", "-")
+
+d5MDP_down_gns<- c("PF3D7_0202500", "PF3D7_1102800", "PF3D7_1401400", "PF3D7_0202000") %>% str_replace(., "_", "-")
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot %>% filter(gene %in% d5MDP_up_gns)
+de_gns_sig_cln_anot %>% filter(gene %in% d5MDP_down_gns)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_cln_anot$cluster), ~de_gns_sig_anot %>% filter(avg_log2FC < 0, cluster == .x))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(all_asex_merged_int, features = c("nFeature_RNA", "nCount_RNA"))
+
+```
+
+############ Harmony -without activated asexuals
+Remove the low temperature activate asexuals and cluster the rest
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged_int_no_actv_harmony <- all_asex_merged_int[, all_asex_merged_int$seurat_clusters != 4]
+DimPlot(all_asex_merged_int_no_actv_harmony, label = T)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged_int_no_actv_harmony[["RNA"]] <- split(all_asex_merged_int_no_actv_harmony[["RNA"]], f = all_asex_merged_int_no_actv_harmony$donor)
+all_asex_merged_int_no_actv_harmony
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+# all_asex_merged_int_no_actv_harmony <- SCTransform(all_asex_merged_int_no_actv_harmony, verbose = FALSE, variable.features.n = 100)
+
+all_asex_merged_int_no_actv_harmony <- NormalizeData(all_asex_merged_int_no_actv_harmony)
+all_asex_merged_int_no_actv_harmony <- FindVariableFeatures(all_asex_merged_int_no_actv_harmony, selection.method = "vst", nfeatures = 300)
+all_asex_merged_int_no_actv_harmony <- ScaleData(all_asex_merged_int_no_actv_harmony, verbose = F)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged_int_no_actv_harmony <- RunPCA(all_asex_merged_int_no_actv_harmony, verbose = FALSE, npcs = 20)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+all_asex_merged_int_no_actv_harmony <- FindNeighbors(all_asex_merged_int_no_actv_harmony, dims = 1:5, reduction = "pca")
+all_asex_merged_int_no_actv_harmony <- FindClusters(all_asex_merged_int_no_actv_harmony, resolution = 0.5)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+DimPlot(all_asex_merged_int_no_actv_harmony, reduction = "pca")
+DimPlot(all_asex_merged_int_no_actv_harmony, reduction = "pca", group.by = "stage")
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(all_asex_merged_int_no_actv@reductions[["pca"]]@cell.embeddings),
+        x = ~PC_1, y = ~PC_2, z = ~PC_3,
+        color= all_asex_merged_int_no_actv@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+options(future.globals.maxSize = 1e+09)
+
+all_asex_merged_int_no_actv_harmony <- IntegrateLayers(
+  object = all_asex_merged_int_no_actv_harmony,
+  method = HarmonyIntegration,
+  orig.reduction = "pca", 
+  new.reduction = "harmony",
+  # normalization.method = "SCT",
+  verbose = F,
+  # k.weight = 98,
+)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+all_asex_merged_int_no_actv_harmony <- FindNeighbors(all_asex_merged_int_no_actv_harmony, dims = 1:5, reduction = "harmony")
+all_asex_merged_int_no_actv_harmony <- FindClusters(all_asex_merged_int_no_actv_harmony, resolution = 0.5)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+all_asex_merged_int_no_actv_harmony <- RunUMAP(all_asex_merged_int_no_actv_harmony, dims = 1:5, verbose = FALSE, n.components = 3, seed.use = 867, reduction = "harmony")
+# all_asex_merged_int_no_actv_harmony <- FindNeighbors(all_asex_merged_int_no_actv_harmony, dims = 1:5, verbose = FALSE, reduction = "harmony")
+# all_asex_merged_int_no_actv_harmony <- FindClusters(all_asex_merged_int_no_actv_harmony, verbose = FALSE, resolution = 0.1)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(all_asex_merged_int_no_actv_harmony, "data/processed/Pf/m2_all/all_asex_merged_int_no_actv_harmony.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+# all_asex_merged_int_no_actv_harmony <- readRDS("data/processed/Pf/m2_all/all_asex_merged_int_no_actv_harmony.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv_harmony, label = T, reduction = "harmony")
+DimPlot(all_asex_merged_int_no_actv_harmony, label = T)
+DimPlot(all_asex_merged_int_no_actv_harmony, label = T, group.by = "stage") + scale_color_manual(values = sp_fld_colors)
+DimPlot(all_asex_merged_int_no_actv_harmony, group.by = "donor")
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "nFeature_RNA")
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "nCount_RNA")
+VlnPlot(all_asex_merged_int_no_actv_harmony, features = "nCount_RNA", group.by = "seurat_clusters")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int_no_actv_harmony) <- "RNA"
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "PF3D7-1222600", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "PF3D7-1222600", reduction = "pca", order = T, pt.size = 0.5) 
+FeaturePlot(all_asex_merged_int_no_actv_harmony, features = "PF3D7-1222600", reduction = "harmony", order = T, pt.size = 0.5) 
+DefaultAssay(all_asex_merged_int_no_actv_harmony) <- "SCT"
+```
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv_harmony, reduction = "harmony", order = T, pt.size = 0.5) 
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(all_asex_merged_int_no_actv_harmony@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= all_asex_merged_int_no_actv_harmony@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(all_asex_merged_int_no_actv_harmony@reductions[["harmony"]]@cell.embeddings),
+        x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
+        color= all_asex_merged_int_no_actv_harmony@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+DefaultAssay(all_asex_merged_int_no_actv_harmony) <- "RNA"
+all_asex_merged_int_no_actv_harmony <- JoinLayers(all_asex_merged_int_no_actv_harmony)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## ap2g
+# de_gns_fmall_all <- FindAllMarkers(all_asex_merged_int, test.use = "MAST")
+de_gns_fmall_cln <- FindAllMarkers(all_asex_merged_int_no_actv_harmony)
+de_gns_fmall_cln <- de_gns_fmall_all %>% arrange(p_val_adj)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv_harmony, label = T)
+```
+
+```{r, warning=FALSE, message=FALSE}
+de_gns_sig_cln_anot <- de_gns_fmall_cln %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
+
+de_gns_sig_cln_anot
+```
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_cln_anot$cluster), ~de_gns_sig_anot %>% filter(avg_log2FC > 0, cluster == .x))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=TRUE}
+map(unique(de_gns_sig_cln_anot$cluster), ~de_gns_sig_anot %>% filter(avg_log2FC < 0, cluster == .x))
+
+```
+
+Slingshot
+```{r, warning=FALSE, message=FALSE}
+DefaultAssay(all_asex_merged_int_no_actv_harmony) <- "RNA"
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_asex_merged_int_no_actv_harmony <- FindClusters(all_asex_merged_int_no_actv_harmony, resolution = 0.05, cluster.name = "harmony_clusters_ss") 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_asex_merged_int_no_actv_harmony, reduction = "harmony", group.by = "harmony_clusters_ss", order = T, pt.size = 0.5) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(all_asex_merged_int_no_actv_harmony@reductions[["harmony"]]@cell.embeddings),
+        x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
+        color= all_asex_merged_int_no_actv_harmony@meta.data$seurat_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
+
+```
+
+
+```{r, eval=T}
+# gogo()
+all_asex_merged_int_no_actv_harmony_sce <- as.SingleCellExperiment(all_asex_merged_int_no_actv_harmony)
+
+```
+
+```{r, eval=T}
+rowData(all_asex_merged_int_no_actv_harmony_sce)$feature_symbol <- rownames(all_asex_merged_int_no_actv_harmony_sce)
+```
+
+!!!! NOTE -BEEN DOING SLINGSHOT WRONG. LOGCOUNTS SHOULD HAVE data values from seurat
+```{r, eval=T}
+# gogo()
+# Seurat_object <- m2_asex_harmony_res
+
+## Convert seurat object to SCE
+all_asex_merged_int_no_actv_harmony_sce_ss <- slingshot(all_asex_merged_int_no_actv_harmony_sce,
+            clusterLabels = "harmony_clusters_ss",
+            reducedDim = "HARMONY",
+            start.clus = 1,
+            end.clus = 0,
+            # shrink =1,
+            # stretch = 1,
+            # allow.break = F
+            )
+
+
+```
+
+
+```{r}
+##Prepare slingshot dataset (SDS) object
+all_asex_merged_int_no_actv_harmony_sce_ss_sds <- SlingshotDataSet(all_asex_merged_int_no_actv_harmony_sce_ss)
+
+# plot(reducedDims(all_asex_merged_int_no_actv_harmony_sce_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(all_asex_merged_int_no_actv_harmony_sce_ss$stage)], pch=16, asp = 0.7)
+plot(reducedDims(all_asex_merged_int_no_actv_harmony_sce_ss)$HARMONY[,c(1,2)], col = brewer.pal(9,"Set1")[as.factor(all_asex_merged_int_no_actv_harmony_sce_ss$seurat_clusters)], pch=16, asp = 0.7, )
+
+lines(all_asex_merged_int_no_actv_harmony_sce_ss_sds, lwd=2, col="black",dims = c(1,2))
+```
+
+
+```{r}
+## Add pseudotime metadata to the object
+all_asex_merged_int_no_actv_harmony_pt <- AddMetaData(all_asex_merged_int_no_actv_harmony, 
+                                                      data.frame(all_asex_merged_int_no_actv_harmony_sce_ss@colData[, c("slingPseudotime_1"), drop = F]) #%>%
+                                                        # rename("pseudotime" = slingPseudotime_1)
+                                                      ) 
+
+```
+
+```{r}
+## Save pseudotime objects
+saveRDS(all_asex_merged_int_no_actv_harmony_pt, "data/processed/Pf/all_asex_merged_int_no_actv_harmony_pt.RDS")
+saveRDS(all_asex_merged_int_no_actv_harmony_sce_ss, "data/processed/Pf/all_asex_merged_int_no_actv_harmony_sce_ss.RDS")
+saveRDS(all_asex_merged_int_no_actv_harmony_sce_ss_sds, "data/processed/Pf/all_asex_merged_int_no_actv_harmony_sce_ss_sds.RDS")
+
+```
+
