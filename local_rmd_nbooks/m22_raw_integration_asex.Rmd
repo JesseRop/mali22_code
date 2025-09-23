@@ -112,10 +112,38 @@ v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_cb
 ```
 
 
+########################################START## !!! CHEATING - SHORTCUT FOR REPLACING COUNTS WITH LATEST CELLRANGER COUNTS 
+THIS WILL BECOME REDUNDANT ONCE I DO A CLEAN ANALYSIS FROM THE START ########################################## 
+
+######## Replace the counts with new counts including pseudogenes and noncoding RNA among other features that were missing in the original
+
+```{r}
+all_msc_bp_raw_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+```
+
+```{r}
+v3_m2_asex_harmony_ss_res_fld_pt_list <- SplitObject(v3_m2_asex_harmony_ss_res_fld_pt, split.by = "donor")
+```
+
+```{r}
+m2_asex_raw_list <- map2(all_msc_bp_raw_noHsGns[names(v3_m2_asex_harmony_ss_res_fld_pt_list)], v3_m2_asex_harmony_ss_res_fld_pt_list, ~.x[,str_remove(colnames(.y), "M.*_")])
+```
+
+```{r}
+m2_asex_raw_list <- m2_asex_raw_list[unlist(map(m2_asex_raw_list, ~dim(.x)[2] >=50))]
+```
+
+```{r}
+m2_asex_raw_mrg <- merge(m2_asex_raw_list[[1]], m2_asex_raw_list[2:length(m2_asex_raw_list)], add.cell.ids = str_remove(names(m2_asex_raw_list), "SC"))
+```
 
 
+```{r}
+m2_asex_raw_mrg <- AddMetaData(m2_asex_raw_mrg, v3_m2_asex_harmony_ss_res_fld_pt@meta.data[,!colnames(v3_m2_asex_harmony_ss_res_fld_pt@meta.data) %in% colnames(m2_asex_raw_mrg@meta.data)])
+```
 
-
+########################################END## !!! CHEATING - SHORTCUT FOR REPLACING COUNTS WITH LATEST CELLRANGER COUNTS 
+THIS WILL BECOME REDUNDANT ONCE I DO A CLEAN ANALYSIS FROM THE START ########################################## 
 
 ```{r, warning=FALSE, message=FALSE}
 # split layers
@@ -226,8 +254,21 @@ v3_m2_asex_cr_filt <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$don_cou
 
 
 ```{r}
-## remove any donor with less than 100 cells
 saveRDS(v3_m2_asex_cr_filt, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt.RDS")
+```
+
+```{r}
+## remove any donor with less than 100 cells and donor MSC55
+v3_m2_asex_cr_filt_no_M55 <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$donor == "MSC55"]
+```
+
+```{r}
+## remove any donor with less than 100 cells and donor MSC55
+saveRDS(v3_m2_asex_cr_filt_no_M55, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_no_M55.RDS")
+```
+
+```{r}
+gogo()
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -384,6 +425,11 @@ gogo()
 ```{r, warning=FALSE, message=FALSE}
 # v3_m2_asex_cr_filt_norm_harmony <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony.RDS")
 v3_m2_asex_cr_filt_norm_harmony <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_pc_man.RDS")
+
+### 1. Run on asexuals after QC with PC specified manually
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm.RDS" \ 
+# --mthd_nm "harmony_pc_man" --cluster_resoln 0.4 --intgrtn_pc 6 --integrtd_pc_man "yes" \
+# --ncores "10" --mem "100 GB" --run_time="1.hour"
 
 ```
 
