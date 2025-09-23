@@ -122,7 +122,11 @@ all_msc_bp_raw_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsG
 ```
 
 ```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_list <- SplitObject(v3_m2_asex_harmony_ss_res_fld_pt, split.by = "donor")
+v3_m2_asex_harmony_ss_res_fld_pt_list <- SplitObject(v3_m2_asex_harmony_ss_res_fld_pt, split.by = "orig.ident")
+```
+
+```{r}
+names(v3_m2_asex_harmony_ss_res_fld_pt_list) <- str_remove(names(v3_m2_asex_harmony_ss_res_fld_pt_list), ".mrna")
 ```
 
 ```{r}
@@ -183,31 +187,32 @@ Integrated asexual to integrate with the rescued parasites
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% count(sR_fine_stg)
+m2_asex_raw_mrg@meta.data %>% count(sR_fine_stg)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_harmony_ss_res_fld_pt <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
+m2_asex_raw_mrg <- m2_asex_raw_mrg@meta.data %>% 
   rownames_to_column('bcode') %>%
   mutate(dset_labmrg = "Field",
-         stage = sR_fine_stg,
+         stage = case_when(sR_fine_stg == "Gametocyte (developing)" ~ "Early ring", 
+                           T ~ sR_fine_stg),
          donor = str_remove_all(orig.ident, ".mrna")) %>% 
   add_count(donor, name = "don_count") %>%
   select(bcode, dset_labmrg, donor, don_count, stage) %>%
   column_to_rownames('bcode') %>%
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
+  AddMetaData(m2_asex_raw_mrg, .)
   
 ```
 
 
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% dplyr::count(donor, dset_labmrg)
+m2_asex_raw_mrg@meta.data %>% dplyr::count(donor, dset_labmrg)
 ```
 
 ```{r}
 ## remove lab and M12
-v3_m2_asex_cr_filt <- v3_m2_asex_harmony_ss_res_fld_pt[, !v3_m2_asex_harmony_ss_res_fld_pt@meta.data$dset_labmrg %in% c("Lab", "MSC12")]
+v3_m2_asex_cr_filt <- m2_asex_raw_mrg[, !m2_asex_raw_mrg@meta.data$dset_labmrg %in% c("Lab", "MSC12")]
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -259,12 +264,19 @@ saveRDS(v3_m2_asex_cr_filt, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt.RDS")
 
 ```{r}
 ## remove any donor with less than 100 cells and donor MSC55
-v3_m2_asex_cr_filt_no_M55 <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$donor == "MSC55"]
+v3_m2_asex_cr_filt_noM55 <- v3_m2_asex_cr_filt[, !v3_m2_asex_cr_filt@meta.data$donor == "MSC55"]
 ```
 
 ```{r}
 ## remove any donor with less than 100 cells and donor MSC55
-saveRDS(v3_m2_asex_cr_filt_no_M55, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_no_M55.RDS")
+saveRDS(v3_m2_asex_cr_filt_noM55, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55.RDS")
+```
+
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_integration_bsub.sh
+
 ```
 
 ```{r}
