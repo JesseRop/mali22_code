@@ -100,91 +100,126 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 
 ```{r}
 # m2_seu_raw_cb_norm_harmony_PC_manl <-  readRDS("data/processed/Pf/m2_all/m2_seu_raw_cb_norm_harmony_PC_manl.RDS")
-all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10 <-  readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10.RDS")
-all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10@meta.data[,'donor'] <- str_remove(all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10@meta.data[,'orig.ident'], ".mrna")
+# all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10 <-  readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10.RDS")
+# all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10@meta.data[,'donor'] <- str_remove(all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10@meta.data[,'orig.ident'], ".mrna")
 ```
 
 
 ```{r}
-DimPlot(all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10, reduction = "umap.rpca_sct_PC10", group.by = "sR_fine_stg", cols = sp_col_new)
+m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg.RDS")
+```
 
+```{r}
+DimPlot(m2_all_raw_mrg, reduction = "umap.rpca_sct_PC10", group.by = "sR_fine_stg", cols = sp_col_new)
+
+```
+
+```{r}
+DimPlot(m2_all_raw_mrg, reduction = "umap.rpca_sct_PC10", group.by = "sR_fine_stg", cols = sp_col_new, dims = c(1,2))
+
+```
+
+```{r}
+DimPlot(m2_all_raw_mrg, reduction = "umap.rpca_sct_PC10", group.by = "sR_fine_stg", cols = sp_col_new, dims = c(1,3))
+
+```
+```{r, warning=FALSE, message=FALSE}
+VlnPlot(m2_all_raw_mrg, features = "nFeature_RNA", group.by = "stage", pt.size = 0) + geom_hline(yintercept = c(200, 400, 500, 1000))
+```
+
+```{r}
+all_sct_intgrtd_male <- m2_all_raw_mrg[, m2_all_raw_mrg$sR_fine_stg  == "Male"]
+all_sct_intgrtd_maleLE <- m2_all_raw_mrg[, m2_all_raw_mrg$sR_fine_stg  == "Male (LE)"]
+
+```
+
+```{r}
+all_sct_intgrtd_male_lst <- list(all_sct_intgrtd_male, all_sct_intgrtd_maleLE) %>% set_names(c("male", "maleLE"))
+
+```
+
+```{r}
+# names(all_sct_intgrtd_male_lst)
+
+```
+##############################START maleale DE ##########################
+
+```{r}
+map(all_sct_intgrtd_male_lst, ~DimPlot(.x, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = T))
 ```
 
 
 ```{r}
-DimPlot(all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10, reduction = "umap.rpca_sct_PC10", group.by = "sR_fine_stg", cols = sp_col_new, dims = c(1,3))
-
+pmap(list(all_sct_intgrtd_male_lst, c(0,5.1), c(-10.5,-2)),  ~DimPlot(..1, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = F, pt.size = 0.4) + geom_vline(xintercept =  ..2) + geom_hline(yintercept =  ..3))
 ```
 
-
 ```{r}
-all_sct_intgrtd_fem <- all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10[, all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10$sR_fine_stg  == "Female"]
-
+all_sct_intgrtd_male <- pmap(list(all_sct_intgrtd_male_lst, c(0,5.1), c(-10.5,-2)),  ~..1[, ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_1"] > ..2 & ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_2"] > ..3]
+)
 ```
 
-
-##############################START Male DE ##########################
-
-
-
 ```{r}
-all_sct_intgrtd_m <- all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10[, all_msc_cb_no_dbt_mrg_noM12_sct_rpca_sct_PC10$sR_fine_stg  == "Male"]
-
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "umap.rpca_sct_PC10", cells.highlight = colnames(.x[,.x$rpca_sct_PC10_clusters == "25"])))
 ```
 
-
 ```{r}
-DimPlot(all_sct_intgrtd_m, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = T)
-DimPlot(all_sct_intgrtd_m, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = T, c(1,3)) + geom_hline(yintercept = 0.9)
-```
-
-
-
-```{r}
-all_sct_intgrtd_m <- all_sct_intgrtd_m[, all_sct_intgrtd_m@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_3"] > 0.9]
-
-```
-
-
-```{r}
-DimPlot(all_sct_intgrtd_m, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = T)
-```
-
-
-```{r}
-DefaultAssay(all_sct_intgrtd_m) <- "RNA"
-all_sct_intgrtd_m[["SCT"]] <- NULL
-```
-
-
-```{r}
-table(all_sct_intgrtd_m$orig.ident)
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = T))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
+for (nm in names(all_sct_intgrtd_male)) {
+  DefaultAssay(all_sct_intgrtd_male[[nm]]) <- "RNA"
+  all_sct_intgrtd_male[[nm]][["SCT"]] <- NULL
+}
+```
+
+
+```{r}
+# DefaultAssay(all_sct_intgrtd_male) <- "RNA"
+# all_sct_intgrtd_male[["SCT"]] <- NULL
+```
+
+
+```{r}
+map(all_sct_intgrtd_male, ~table(.x$orig.ident))
+```
+
+```{r}
+## Donors with more than 50 cells
+don_50 <- map(all_sct_intgrtd_male, ~table(.x$donor) %>% data.frame() %>% filter(Freq >= 100) %>% pull(Var1) %>% as.character)
+```
+
+```{r}
+## Retain only donors with more than 50 cells
+all_sct_intgrtd_male <- map2(all_sct_intgrtd_male, don_50, ~subset(.x, subset = donor %in% .y))
+```
+
+## !!NOTE - NOT SURE WHY, I have to remove donors with less than 100 cells for FindVariableFeatures to work
+```{r, warning=FALSE, message=FALSE}
 # run standard seurat normalization
-all_sct_intgrtd_m <- NormalizeData(all_sct_intgrtd_m)
-all_sct_intgrtd_m <- FindVariableFeatures(all_sct_intgrtd_m, nfeatures = 1000)
-all_sct_intgrtd_m <- ScaleData(all_sct_intgrtd_m, verbose = F)
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~NormalizeData(.x))
+all_sct_intgrtd_male <- map2(all_sct_intgrtd_male, c(1000, 200), ~FindVariableFeatures(.x, nfeatures = .y))
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~ScaleData(.x, verbose = F))
+
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # These are now standard steps in the Seurat workflow for visualization and clustering
-all_sct_intgrtd_m <- RunPCA(all_sct_intgrtd_m, verbose = FALSE, npcs = 20)
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~RunPCA(.x, verbose = FALSE, npcs = 20))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 
-all_sct_intgrtd_m <- FindNeighbors(all_sct_intgrtd_m, dims = 1:10, reduction = "pca")
-all_sct_intgrtd_m <- FindClusters(all_sct_intgrtd_m, resolution = 0.3)
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~FindNeighbors(.x, dims = 1:10, reduction = "pca"))
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~FindClusters(.x, resolution = 0.3))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # run sctransform
-DimPlot(all_sct_intgrtd_m, reduction = "pca")
-DimPlot(all_sct_intgrtd_m, reduction = "pca", group.by = "orig.ident")
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "pca"))
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "pca", group.by = "orig.ident"))
 
 
 ```
@@ -194,56 +229,59 @@ DimPlot(all_sct_intgrtd_m, reduction = "pca", group.by = "orig.ident")
 ```{r, warning=FALSE, message=FALSE}
 options(future.globals.maxSize = 1e+09)
 
-all_sct_intgrtd_m <- IntegrateLayers(
-  object = all_sct_intgrtd_m,
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~IntegrateLayers(
+  object = .x,
   method = HarmonyIntegration,
   orig.reduction = "pca", 
   new.reduction = "harmony",
   # normalization.method = "SCT",
   verbose = F,
   # k.weight = 98,
-)
+))
 
 
 ```
 
+
 ```{r, warning=FALSE, message=FALSE}
 
-all_sct_intgrtd_m <- FindNeighbors(all_sct_intgrtd_m, dims = 1:10, reduction = "harmony")
-all_sct_intgrtd_m <- FindClusters(all_sct_intgrtd_m, resolution = 0.5)
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~FindNeighbors(.x, dims = 1:10, reduction = "harmony"))
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~FindClusters(.x, resolution = 0.3))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # These are now standard steps in the Seurat workflow for visualization and clustering
-all_sct_intgrtd_m <- RunUMAP(all_sct_intgrtd_m, dims = 1:10, verbose = FALSE, n.components = 3, seed.use = 867, reduction = "harmony")
+all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~RunUMAP(.x, dims = 1:6, verbose = FALSE, n.components = 3, seed.use = 867, reduction = "harmony"))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # run sctransform
-DimPlot(all_sct_intgrtd_m, reduction = "umap", label = T)
-DimPlot(all_sct_intgrtd_m, group.by = "orig.ident")
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "umap"))
+map(all_sct_intgrtd_male, ~DimPlot(.x, group.by = "orig.ident"))
 
-FeaturePlot(all_sct_intgrtd_m, reduction = "umap", features = "nCount_RNA")
+map(all_sct_intgrtd_male, ~FeaturePlot(.x, reduction = "umap", features = "nCount_RNA"))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # run sctransform
-DimPlot(all_sct_intgrtd_m, reduction = "harmony")
-DimPlot(all_sct_intgrtd_m, reduction = "harmony", dims = c(1,3))
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "harmony"))
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "harmony", dims = c(1,3)))
 
-# FeaturePlot(all_sct_intgrtd_m, reduction = "umap", features = "nCount_RNA")
+# FeaturePlot(all_sct_intgrtd_male, reduction = "umap", features = "nCount_RNA")
 
 ```
+
+
 
 ```{r, warning=FALSE, message=FALSE, eval=T}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(all_sct_intgrtd_m@reductions[["umap"]]@cell.embeddings),
+plot_ly(data = data.frame(all_sct_intgrtd_male[[1]]@reductions[["umap"]]@cell.embeddings),
         x = ~umap_1, y = ~umap_2, z = ~umap_3,
-        color= all_sct_intgrtd_m@meta.data$seurat_clusters,
+        color= all_sct_intgrtd_male[[1]]@meta.data$seurat_clusters,
         # colors = c('blue', 'red'),
         opacity = 0.8,
         size = 1, 
@@ -253,59 +291,159 @@ plot_ly(data = data.frame(all_sct_intgrtd_m@reductions[["umap"]]@cell.embeddings
 ```
 
 
-```{r, warning=FALSE, message=FALSE}
-all_sct_intgrtd_m@meta.data %>% count(seurat_clusters, orig.ident) %>% group_by(seurat_clusters) %>% arrange(desc(n), .by_group = T)
-```
+```{r, warning=FALSE, message=FALSE, eval=F}
+# Display the combined datasets as an interactive 3D plot
 
-```{r, warning=FALSE, message=FALSE}
-all_sct_intgrtd_m@meta.data %>% count(seurat_clusters) 
-```
-
-```{r, warning=FALSE, message=FALSE}
-all_sct_intgrtd_m_jnd <- JoinLayers(all_sct_intgrtd_m) 
-all_sct_intgrtd_m_jnd[["RNA"]]$counts <- as(all_sct_intgrtd_m_jnd[["RNA"]]$counts, Class = "dgCMatrix")
-all_sct_intgrtd_m_jnd[["RNA"]]$data <- as(all_sct_intgrtd_m_jnd[["RNA"]]$data, Class = "dgCMatrix")
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-Idents(all_sct_intgrtd_m_jnd) <- "seurat_clusters"
-m_mks <- FindAllMarkers(all_sct_intgrtd_m_jnd, assay = "RNA", slot = "data")
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-m_mks_anot <- m_mks %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))
-
-m_mks_anot
-```
-
-
-```{r, warning=FALSE, message=FALSE}
-m_mks_anot %>% filter(cluster == "4" & avg_log2FC >1) 
+plot_ly(data = data.frame(all_sct_intgrtd_male@reductions[["umap"]]@cell.embeddings),
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        color= all_sct_intgrtd_male@meta.data$donor,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 1, 
+        type = 'scatter3d'
+)
 
 ```
 
+```{r, warning=FALSE, message=FALSE}
+map(all_sct_intgrtd_male, ~.x@meta.data %>% filter(seurat_clusters %in% c(4,6)) %>% count(seurat_clusters, orig.ident) %>% group_by(seurat_clusters) %>% arrange(desc(n), .by_group = T))
+```
 
 ```{r, warning=FALSE, message=FALSE}
-m_mks_anot %>% filter(cluster == "5" & avg_log2FC >1) 
+map(all_sct_intgrtd_male, ~.x@meta.data %>% count(seurat_clusters, orig.ident) %>% group_by(seurat_clusters) %>% arrange(desc(n), .by_group = T))
+```
 
+
+
+```{r, warning=FALSE, message=FALSE}
+all_sct_intgrtd_male_jnd <- map(all_sct_intgrtd_male, ~JoinLayers(.x)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(all_sct_intgrtd_male_jnd)) {
+  all_sct_intgrtd_male_jnd[[nm]][["RNA"]]$counts <- as(all_sct_intgrtd_male_jnd[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
+  all_sct_intgrtd_male_jnd[[nm]][["RNA"]]$data <- as(all_sct_intgrtd_male_jnd[[nm]][["RNA"]]$data, Class = "dgCMatrix")
+  Idents(all_sct_intgrtd_male_jnd[[nm]]) <- "seurat_clusters"
+}
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_sct_intgrtd_male_jnd <- map(all_sct_intgrtd_male_jnd, ~FindClusters(.x, resolution = 0.35))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# run sctransform
+map(all_sct_intgrtd_male_jnd, ~DimPlot(.x, reduction = "umap", pt.size = 0.2, label = T, dims = c(1,3)))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+male_mks <- map(all_sct_intgrtd_male_jnd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # run sctransform
-DimPlot(all_sct_intgrtd_m, reduction = "umap", label = T, dims = c(1,3))
-DimPlot(all_sct_intgrtd_m, reduction = "umap", label = T)
-```
-
-```{r, warning=FALSE, message=FALSE}
-m_mks_anot %>% group_by(cluster) %>% filter(avg_log2FC > 0) %>% slice_min(order_by = p_val_adj, n = 20) %>% slice_min(order_by = pct.2, n = 10)
+map(all_sct_intgrtd_male_jnd, ~DimPlot(.x, reduction = "umap", pt.size = 0.1, label = T))
 
 ```
 
+
 ```{r, warning=FALSE, message=FALSE}
-m_mks_anot %>% group_by(cluster) %>% filter(avg_log2FC > 0) %>% slice_min(order_by = p_val_adj, n = 20)  %>% slice_max(order_by = avg_log2FC, n = 10)
+male_mks_anot <- map(male_mks, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+male_mks_anot
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+male_mks_anot[["male"]] %>% filter(cluster == "6" & avg_log2FC >0)# %>% filter( avg_log2FC >1)
+male_mks_anot[["male"]] %>% filter(cluster == "6" & avg_log2FC >0 & pct.2 < 0.1)# %>% filter( avg_log2FC >1)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=4}
+#KAHRP, HSP70x, GARP, HRPIII, 
+map(all_sct_intgrtd_male_jnd, ~FeaturePlot(.x, reduction = "umap", dims = c(1,3), pt.size = 0.15, label = T, features = c("PF3D7-0202000", "PF3D7-0831700", "PF3D7-0113000", "PF3D7-1372200"), ncol = 4))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+male_mks_anot[["male"]] %>% filter(cluster == "4" & avg_log2FC >0)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-fg, pfg
+male_mks_anot[["male"]] %>% filter(gene %in% c("PF3D7-1317200", "PF3D7-1146800") )
+```
+
+```{r, warning=FALSE, message=FALSE}
+male_mks_anot[["male"]] %>% filter(cluster == "5" & avg_log2FC >0)# %>% filter( avg_log2FC >1)
+# male_mks_anot[["male"]] %>% filter(cluster == "5" & avg_log2FC >0 & p_val_adj < 0.05) %>% arrange(desc(avg_log2FC))# %>% filter( avg_log2FC >1)
+
+## cluster 5 could be activated-ish https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1010510#ppat-1010510-g002 
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=18, fig.height=4}
+map(all_sct_intgrtd_male_jnd, ~FeaturePlot(.x, reduction = "umap", dims = c(1,3), pt.size = 0.15, label = T, features = c("PF3D7-0411000", "PF3D7-0628100", "PF3D7-0715200", "PF3D7-1143100", "nFeature_RNA"), ncol = 5))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+activated_gams_ngwa <- c("PF3D7-0827800", "PF3D7-1246200", "PF3D7-1218800", "PF3D7-1239400", "PF3D7-0704100", "PF3D7-0417400", "PF3D7-1321000")
+
+male_mks_anot[["male"]] %>% filter(gene %in% activated_gams_ngwa & avg_log2FC > 0)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=4}
+map(all_sct_intgrtd_male_jnd, ~FeaturePlot(.x, reduction = "umap", dims = c(1,3), pt.size = 0.15, label = T, features = c("PF3D7-0411000", "PF3D7-1143100", "PF3D7-1107800", "PF3D7-0209000", "nFeature_RNA"), ncol = 4))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=4}
+map(all_sct_intgrtd_male_jnd, ~FeaturePlot(.x, reduction = "umap", dims = c(1,3), pt.size = 0.15, label = T, features = c("PF3D7-1143100", "PF3D7-1107800", "PF3D7-0209000"), ncol = 3))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+male_mks_anot[["maleLE"]] %>% filter(cluster == "3" & avg_log2FC > 0) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# map(male_mks_anot, ~.x %>% filter(cluster == "6" & avg_log2FC >1))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# map(male_mks_anot, ~.x %>% filter(cluster == "6" & avg_log2FC >1 & pct.2 < 0.1))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+male_clustrs_w_asexuals <- c("6", "3") %>% set_names(c("male", "maleLE"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(all_sct_intgrtd_male_jnd, 'data/processed/Pf/m2_all/all_sct_intgrtd_male_jnd.RDS')
+
+```
+
+```{r}
+# REmove poor QC asexual like cluster 
+all_sct_intgrtd_male_jnd_no_asx_dblts_cln <- map2(all_sct_intgrtd_male_jnd, male_clustrs_w_asexuals, ~.x[, .x@meta.data %>% 
+                                               rownames_to_column('bcode') %>% 
+                                               filter(seurat_clusters != .y)%>% 
+                                               pull(bcode)])
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+saveRDS(all_sct_intgrtd_male_jnd_no_asx_dblts_cln, 'data/processed/Pf/m2_all/all_sct_intgrtd_male_jnd_no_asx_dblts_cln.RDS')
 
 ```
 
