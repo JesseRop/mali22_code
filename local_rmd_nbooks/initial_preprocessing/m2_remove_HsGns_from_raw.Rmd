@@ -1,0 +1,233 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+# Load required libraries and set conflict preferences
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  library(patchwork)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  library(ggvenn)
+  library(conflicted)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  library(BPCells)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+})
+```
+
+# MSC Preprocessing
+
+## Setup
+
+```{r, setup}
+# Set root directory for knitr
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+```
+
+## Common Functions
+
+```{r}
+# Source common functions, variables, and plotting functions
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+## EmptyDrops (reference only)
+
+```{r}
+# NOTE: Use raw_feature_bc_matrix.h5 for emptydrops, not the folder.
+# The hdf5 matrix is slow for emptydrops; convert to dgCMatrix if needed.
+# Example Nextflow command (not run here):
+# nextflow run ../mali22_code_lnk/nf_scripts/edrops.nf --scrpt ... --input_raw_mtx ... --o_path ... --retain_nm ... --retain_val ... --limt ... --fdr_l ... -resume
+```
+
+###################START- RAW READING#############
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+```
+
+## Write BPCells Matrices (Filtered)
+
+```{r, message=F, warning=F, eval=T}
+# Write BPCells matrices for filtered feature matrices
+list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", 
+           pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|/outs.*'))) %>% 
+  .[source_irods] %>%
+  set_names(names(source_irods)) %>%
+  map(~open_matrix_10x_hdf5(path = .)) %>% 
+  imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/counts_mtx'), overwrite = T))
+```
+
+## Read BPCells Matrices (Filtered)
+
+```{r, message=F, warning=F, eval=T}
+# Read BPCells matrices for filtered data - prepared in m2_QC_prelim_stage_anno.RMD
+
+all_msc_bp_filt <- list.files("data/processed/Pf", pattern = "^counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/bpcells.*'))) %>%
+  .[sample_name] %>%
+  map(~open_matrix_dir(dir = .)) %>% 
+  imap(., ~CreateSeuratObject(counts = .x, project = paste0(.y, ".mrna")))
+
+```
+
+
+```{r, eval=F}
+## List filtered cellranger h5 matrices into R
+list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", pattern = "raw_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T)
+```
+
+## Write BPCells Matrices (Raw)
+
+```{r, message=F, warning=F, eval=T}
+# Write BPCells matrices for raw feature matrices
+list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", 
+           pattern = "raw_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|/outs.*'))) %>% 
+  .[source_irods] %>%
+  set_names(names(source_irods)) %>%
+  map(~open_matrix_10x_hdf5(path = .)) %>% 
+  imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/raw_counts_mtx'), overwrite = T))
+```
+
+## Read BPCells Matrices (Raw)
+
+```{r, message=F, warning=F, eval=T}
+# Read BPCells matrices for raw data
+all_msc_bp_raw <- list.files("data/processed/", pattern = "raw_counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
+  .[sample_name] %>%
+  map(~open_matrix_dir(dir = .)) %>% 
+  imap(., ~CreateSeuratObject(counts = .x, project = paste0(.y, ".mrna"))) 
+```
+
+## Gene Counting and Human Gene Removal Function
+
+```{r}
+# Function to count PF and human genes, add to metadata, and remove human genes
+pf_hs_gene_sum_fn <- function(seurat_obj){
+  
+  # Identify human and pf genes
+  pf_genes <- grep("^PF3D7", rownames(seurat_obj), value = TRUE)
+  hs_genes <- grep("^ENSG", rownames(seurat_obj), value = TRUE)
+  print(head(hs_genes))
+  
+  # Extract expression matrix and subset to those genes
+   
+  pf_matrix <- as(GetAssayData(seurat_obj, layer = "counts")[pf_genes, , drop = FALSE], Class = "dgCMatrix")  
+  hs_matrix <- as(GetAssayData(seurat_obj, layer = "counts")[hs_genes, , drop = FALSE], Class = "dgCMatrix")  
+  
+  # sum the umis and genes across all genes per cell
+  pf_umi_count <- colSums(pf_matrix)
+  hs_umi_count <- colSums(hs_matrix)
+  pf_gn_count <- colSums(pf_matrix > 0)
+  hs_gn_count <- colSums(hs_matrix > 0)
+
+  # Store in metadata
+  seurat_obj[["pf_umi_count"]] <- pf_umi_count
+  seurat_obj[["hs_umi_count"]] <- hs_umi_count
+  seurat_obj[["pf_gn_count"]] <- pf_gn_count
+  seurat_obj[["hs_gn_count"]] <- hs_gn_count
+  
+  # Keep only pf genes
+  seurat_obj <- subset(seurat_obj, features = pf_genes)
+  
+  return(seurat_obj)
+}
+```
+
+## Process Filtered and Raw Sets
+
+```{r}
+## Count the pf and human genes and add to metadata for filtered set and also remove human genes
+all_msc_bp_filt_noHsGns <- map(all_msc_bp_filt, ~pf_hs_gene_sum_fn(seurat_obj = .x))
+saveRDS(all_msc_bp_filt_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS")
+```
+
+```{r}
+# Count the pf and human genes and add to metadata for raw set and also remove human genes
+all_msc_bp_raw_noHsGns <- map(all_msc_bp_raw, ~pf_hs_gene_sum_fn(seurat_obj = .x))
+saveRDS(all_msc_bp_raw_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+```
+
+## Save Metadata
+
+```{r}
+# Save metadata for filtered set
+all_msc_bp_filt_noHsGns_mdata <- map(all_msc_bp_filt_noHsGns, ~.x@meta.data) %>% .[sample_name]
+saveRDS(all_msc_bp_filt_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns_mdata.RDS")
+```
+
+```{r}
+# Save metadata for raw set
+all_msc_bp_raw_noHsGns_mdata <- map(all_msc_bp_raw_noHsGns, ~.x@meta.data) %>% .[sample_name]
+saveRDS(all_msc_bp_raw_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS")
+```
