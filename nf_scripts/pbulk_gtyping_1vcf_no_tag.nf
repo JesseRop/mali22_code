@@ -1,162 +1,261 @@
 #!/usr/bin/env nextflow
 
-// - Directory to store output - need to differentiate between preQC genotyping so as to verify souporcell assignments and postQC genotyping so as to perform relatedness analysis etc
-// params.sv_dir = "pbulk_gtypes_preQC"
-// params.sv_dir = "pbulk_gtypes_GE_postQC"
-// params.sv_dir = "pbulk_gtypes_preQC_cln"
+/*
+ * Pseudobulk genotyping of strain clusters from scRNAseq samples
+ * - Performs variant calling and allele counting for clusters across multiple samples
+ * - Uses FreeBayes, bcftools, and Vartrix
+ * - Downsampling and dry-run options for testing
+ */
+
+// =======================
+// PARAMETERS
+// =======================
+
+// Output directory for results
+params.odir = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/all/"
+
+// Directory for saving intermediate results (change as needed)
 params.sv_dir = "pbulk_gtypes_cln_1VCF"
 
-// Whether to publish subsetted bam files
-// params.save_bam_sset = false
+// Input BAM files (adjust glob as needed)
+params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/strain_k1_*/new_bams/*_sset_sorted_rg.bam"
 
-// - 2022 cellranger output
-// params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/soupc/*/parent/possorted_genome_bam.bam"
-params.bam = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/strain_k1_*/new_bams/*_sset_sorted_rg.bam"  
-			  
-// - cell barcodes
-// params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC50_SLO/${params.sv_dir}/bcodes/*/stage_afm_strain_k[0-9]*/*.tsv"
+// Input cell barcode files
 params.bcodes = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/${params.sv_dir}/bcodes/minmap/strain*/*.tsv"
 
-// - output directory
-params.odir= "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/all/"
+// Reference FASTA
+params.ref = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
 
-// ncores=10
-// params.mapper="minmap"
+// Downsampling BAMs for testing
+params.downsample_bam = true
+params.downsample_fraction = 01  // Fraction to downsample to (e.g. 01 = 1%)
 
-// - Standard scripts for running souporcell
-// params.scrpt = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts/cr_subset_bam_linux.sh"
+// FreeBayes ploidy
+params.ploidy = 1
 
-// - Reference fasta
-params.ref  = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/references_for_souporcell/PlasmoDB-66_Pfalciparum3D7_Genome.fasta"
+// FreeBayes and bcftools parameters
+fb_spec = Channel.value("-iXu -C 2 -q 20 -n 3 -E 1 -m 30 --min-coverage 6 --min-alternate-fraction 0.2")
+bcf_spec = Channel.value("view --max-alleles 2 -i 'QUAL>=75 && INFO/DP>=40'")
 
-// params.sv_dir = "pbulk_gtypes_postQC"
+// Vartrix dry-run options
+params.vartrix_dryrun = true
+params.vartrix_dryrun_n = 10    // Number of barcodes to use in dry run
 
-// - Create channels
+// =======================
+// INPUT CHANNELS
+// =======================
+
+// Channel for BAM files, extracting metadata from file path
 bam_ch = Channel
-				.fromPath(params.bam)
-				// .map { file -> tuple(file.getParent().toString().split('\\/')[13], file.getParent().toString().split('\\/')[15].split('_')[-1], file.getParent().toString().split('\\/')[15].split('_minmap')[0].split('_k')[0], file.baseName.toString().split('_sset_sorted_rg_don')[0].replaceFirst(/^MSC\d{2}_/, ''), file, file+'.bai') }
-                .map { file -> tuple(file.getParent().toString().split('\\/')[13], file.getParent().toString().split('\\/')[15].split('_')[-1], file.getParent().toString().split('\\/')[15].split('_minmap')[0].split('_k')[0], file.baseName.toString().split('_sset_sorted_rg_don')[0], file, file+'.bai') }
+    .fromPath(params.bam)
+    .map { file ->
+        tuple(
+            file.getParent().toString().split('/')[13], // sample name
+            file.getParent().toString().split('/')[15].split('_')[-1], // alignment name - minimap or hisat2
+            file.getParent().toString().split('/')[15].split('_minmap')[0].split('_k')[0], // group - strain or strain+stage
+            file.baseName.toString().split('_sset_sorted_rg_don')[0], // strain stage combination eg MSC1_SC1_Asexual
+            file, // bam file path
+            file + '.bai' // bam file path index
+        )
+    }
 
-// bam_ch.view()
-// fb_vcf_bi_ch = Channel
-// 				.fromPath("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pbulk_gtypes_preQC_cln/minmap/p1/fb_biallelic.vcf")
-//                 .map { file -> tuple(file, "minmap")}
-                
-// fb_vcf_bi_ch.view()
+//// bam_ch.view()
 
+// Channel for barcode files, extracting metadata from file path
 bcodes_ch = Channel
-				.fromPath(params.bcodes)
-				.map { file -> tuple(file.getParent().toString().split('\\/')[13], file.getParent().toString().split('\\/')[16], file.getParent().name.split('_k')[0], file.baseName, file) }
-                
+    .fromPath(params.bcodes)
+    .map { file ->
+        tuple(
+            file.getParent().toString().split('/')[13], // sample name
+            file.getParent().toString().split('/')[16], // alignment name
+            file.getParent().name.split('_k')[0],       // group
+            file.baseName,                              // strain stage
+            file
+        )
+    }
 
-// bcodes_ch.view()
+//// bcodes_ch.view()
 
-bcodes_tagd_bam_ch = bcodes_ch
-                .combine(bam_ch, by: [0,1,2,3])
-
-// bcodes_tagd_bam_ch.view()
-
-tagbam_ch_all = bcodes_tagd_bam_ch
-                        .map { file -> tuple(file[1], file[2], file[5], file[6]) }
-                        .groupTuple(by: [0,1]) 
-
-						
-tagbam_ch_all.view()
+// bcodes_tagd_bam_ch = bcodes_ch
+//                 .combine(bam_ch, by: [0,1,2,3])
 
 
-ref_ch = Channel.value(params.ref)
-params.ploidy=(1)
+// Reference FASTA and index
+ref_ch = Channel.fromPath(params.ref)
+    .map { file -> tuple(file, file + '.fai') }
 
-// freebayes parameters
-// fb_spec=Channel.of("-iXu -C 2 -q 20 -n 3 -E 1 -m 30 --min-coverage 6 --min-alternate-fraction 0.2" "-C 2 -q 20 -n 3 -E 3 -m 30 --min-coverage 6 --min-alternate-fraction 0.2 --theta 0.01")
-fb_spec=Channel.value("-iXu -C 2 -q 20 -n 3 -E 1 -m 30 --min-coverage 6 --min-alternate-fraction 0.2")
+// =======================
+// PROCESS DEFINITIONS
+// =======================
 
-// Bcftools vcf processing parameters
-// bcf_spec=Channel.of("view --max-alleles 2" "norm --multiallelics -")
-bcf_spec=Channel.value("view --max-alleles 2 -i 'QUAL>=75 && INFO/DP>=40'") // Retaining variants that have overall quality/depth across all samples of 75/40
+/*
+ * SPLIT_GENOME
+ * Split reference genome into regions for parallel variant calling
+ */
+process SPLIT_GENOME {
+    memory '30 GB'
+    cpus '1'
 
-// Run FreeBayes with the specified parameters using ploidy of 1 and other parameters specified above
-
-
-// - Processes
-
-process FREEBAYES {
-    memory '700 GB'
-    cpus '30'
-    queue 'hugemem'
-    // conda '/software/team222/jr35/miniconda3/envs/freebayes_para'
-
-
-    // errorStrategy 'ignore'
-
-    tag "Freebayes variant calling on ${params.sv_dir}"
-
-    // publishDir "$params.odir/${sample_nm}/${params.sv_dir}/${grp}_${algn_nm}/p${params.ploidy}/", mode: 'copy', pattern: "*.vcf", overwrite: true
-    publishDir "$params.odir/${params.sv_dir}/${strn_stg}_kfinal_${algn_nm}/p${params.ploidy}/", mode: 'copy', pattern: "*.vcf", overwrite: true
+    tag "Split fasta index reference into 1 MB regions"
 
     input:
-    tuple val(algn_nm), val(strn_stg), path(bam), path(bai)
+    tuple path(ref), path(ref_fai)
+
+    output:
+    path "regions.bed"
+
+    script:
+    """
+   
+    # Create 1 Mb genomic chunks (adjust size as needed)
+    /software/team222/jr35/freebayes/fasta_generate_regions.py ${ref_fai} 1000000 > regions.bed
+    """
+}
+
+/*
+ * DOWNSAMPLE_BAM
+ * Randomly downsample BAM files for testing
+ */
+process DOWNSAMPLE_BAM {
+    memory '20 GB'
+    cpus '1'
+    queue 'normal'
+
+    tag "Downsample the bam file for ${grp} pseudobulk cluster ${strn_stg} from ${sample_nm} aligned using ${algn_nm}"
+
+    input:
+    tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path(bam), path(bai), val(fraction)
+
+    output:
+    tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path("*.bam"), path("*.bai")
+
+    script:
+    """
+    module load samtools/1.20--h50ea8bc_0
+    samtools view -b -s 42.${fraction} ${bam} > \$(basename ${bam})_dsampled.bam
+    samtools index \$(basename ${bam})_dsampled.bam
+    """
+}
+
+/*
+ * FREEBAYES
+ * Variant calling for each region using FreeBayes and filtering with bcftools
+ */
+process FREEBAYES {
+    memory '50 GB'
+    cpus '2'
+    queue 'normal'
+
+    errorStrategy 'ignore'
+
+    tag "Freebayes variant calling between ${grp} pseudobulk clusters for region ${region} for ${algn_nm}"
+
+    input:
+    tuple val(algn_nm), val(grp), path(bam_files), path(bai_files), path(ref), path(ref_fai), val(region)
     val fb_s
     val bcf_s
 
     output:
-    tuple val(algn_nm), val(strn_stg), path('*_biallelic.vcf'), path('*_multiallelic.vcf')
+    tuple val(algn_nm), val(grp), path('*_biallelic_*.vcf.gz'), path('*_biallelic_*.vcf.gz.tbi'), path('*_multiallelic_*.vcf.gz'), path('*_multiallelic_*.vcf.gz.tbi')
 
     script:
     """
     module load samtools/1.20--h50ea8bc_0
     module load bcftools/1.20--h8b25389_0
-    # module load HGI/softpack/groups/team222/SNP_analysis/2
-    # module load ISG/singularity/3.11.4
-    # module load HGI/softpack/groups/team222/Variant_calling/2
-    module load HGI/common/freebayes/v1.2.0 
 
+    /software/team222/jr35/freebayes/freebayes_1.3.10 -f ${ref} ${fb_s} --ploidy ${params.ploidy} -r ${region} ${bam_files} | bgzip -c > fb_multiallelic_${region}.vcf.gz
+    tabix -p vcf fb_multiallelic_${region}.vcf.gz
 
-    
-    freebayes -f $params.ref $fb_s --ploidy $params.ploidy $bam > fb_multiallelic.vcf
-    #/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/bash_scripts/freebayes-parallel /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/python_nbooks/pf_region_68.txt 48 -f $params.ref $fb_s --ploidy $params.ploidy $bam > fb_multiallelic.vcf
-    bcftools $bcf_s fb_multiallelic.vcf -o fb_biallelic.vcf
+    bcftools ${bcf_s} fb_multiallelic_${region}.vcf.gz -Oz -o fb_biallelic_${region}.vcf.gz
+    tabix -p vcf fb_biallelic_${region}.vcf.gz
     """
 }
 
+/*
+ * MERGE_VCFS
+ * Merge VCFs from all regions into a single file per sample/strain
+ */
+process MERGE_VCFS {
+    memory '50 GB'
+    cpus '1'
+    queue 'normal'
+
+    tag "Merge VCFs across regions for ${grp} pseudobulk clusters"
+
+    publishDir "$params.odir/${params.sv_dir}/${grp}_kfinal_${algn_nm}/p${params.ploidy}/", mode: 'copy', pattern: "*.vcf", overwrite: true
+
+    input:
+    tuple val(algn_nm), val(grp), path(biallelic_vcfs), path(biallelic_vcfs_tbi), path(multiallelic_vcfs), path(multiallelic_vcfs_tbi)
+
+    output:
+    tuple val(algn_nm), val(grp), path("fb_biallelic.vcf"), path("fb_multiallelic.vcf")
+
+    script:
+    """
+    module load bcftools/1.20--h8b25389_0
+
+    bcftools concat -a -O v -o fb_biallelic.vcf ${biallelic_vcfs.join(' ')}
+    # tabix -p vcf fb_multiallelic.vcf.gz
+
+    bcftools concat -a -O v -o fb_multiallelic.vcf ${multiallelic_vcfs.join(' ')}
+    # tabix -p vcf fb_multiallelic.vcf.gz
+    """
+}
+
+/*
+ * VARTRIX_UMI
+ * Count alleles per barcode using Vartrix
+ */
 process VARTRIX_UMI {
-    memory '150 GB'
-    cpus '10'
+    memory '100 GB'
+    cpus '3'
     
     errorStrategy 'ignore'
 
-    tag "Vartrix allele counting on ${strn_stg} from ${grp} ${sample_nm}"
-        
+    tag "Vartrix allele counting on ${grp} ${strn_stg} from ${sample_nm}"
+
     input:
     tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path(bcodes), path(bam), path(bai), path(bi_vcf)
-    
+
     output:
     tuple val(sample_nm), val(algn_nm), val(grp), val(strn_stg), path ("${strn_stg}_*")
-    
+
     script:
     """
     export PATH="\$PATH:/software/team222/jr35/vartrix/vartrix-1.1.22/target/release"
 
-    vartrix --umi --out-variants ${strn_stg}_variants.txt --mapq 30 -b ${bam} -c ${bcodes} --scoring-method coverage --ref-matrix ${strn_stg}_ref.mtx --out-matrix ${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
-    
+    # Use subset of barcodes for dry run if enabled
+    if [ "${params.vartrix_dryrun}" = "true" ]; then
+        echo "Running Vartrix dry run: using first ${params.vartrix_dryrun_n} barcodes"
+        head -n ${params.vartrix_dryrun_n} ${bcodes} > subset_bcodes.tsv
+        use_bcodes=subset_bcodes.tsv
+    else
+        use_bcodes=${bcodes}
+    fi
+
+    vartrix --umi --out-variants ${strn_stg}_variants.txt --mapq 30 -b ${bam} -c \${use_bcodes} --scoring-method coverage --ref-matrix ${strn_stg}_ref.mtx --out-matrix ${strn_stg}_alt.mtx -v ${bi_vcf} --fasta ${params.ref}
     """
 }
 
+/*
+ * VARTRIX_COPY
+ * Organize Vartrix output files for downstream analysis
+ */
 process VARTRIX_COPY {
     memory '40 GB'
     cpus '1'
     debug true
 
-    tag "Vartrix copy"
-    
-    publishDir "$params.odir/${params.sv_dir}/${strn_stg}_kfinal_${algn_nm}/p${params.ploidy}/", mode: 'copy', pattern: "vartrix_biallelic", overwrite: true
-                
+    tag "Copy vartrix output for ${grp}"
+
+    publishDir "$params.odir/${params.sv_dir}/${grp}_kfinal_${algn_nm}/p${params.ploidy}/", mode: 'copy', pattern: "vartrix_biallelic", overwrite: true
+
     input:
-    tuple val(algn_nm), val(strn_stg), path(vtx_files)
-    
+    tuple val(algn_nm), val(grp), path(vtx_files)
+
     output:
-    tuple val(algn_nm), val(strn_stg), path ("vartrix_biallelic")
-    
+    tuple val(algn_nm), val(grp), path ("vartrix_biallelic")
+
     script:
     """
     mkdir vartrix_biallelic
@@ -164,40 +263,70 @@ process VARTRIX_COPY {
     """
 }
 
-// - Workflow
+// =======================
+// WORKFLOW DEFINITION
+// =======================
+
 workflow {
-    
-    fb_vcf_ch = FREEBAYES(tagbam_ch_all,  fb_spec, bcf_spec)
 
-    // fb_vcf_ch.view()
-    fb_vcf_bi_ch = fb_vcf_ch.map { file -> tuple(file[2], file[0], file[1]) }
-    fb_vcf_bi_ch.view()
+    // Split genome into regions for parallel variant calling
+    SPLIT_GENOME(ref_ch)
+    regions_ch = SPLIT_GENOME.out
+        .splitText()
+        .map { it.trim() }
+        .filter { it }
 
+    //regions_ch.view()
+
+    // Downsample BAMs if enabled
+    def downsample = params.downsample_bam.toString().toLowerCase() in ['true', '1', 'yes']
+    downsampled_ch = downsample ?
+        bam_ch.map { tuple(it[0], it[1], it[2], it[3], it[4], it[5], params.downsample_fraction) } | DOWNSAMPLE_BAM
+        :
+        bam_ch
+
+    // Group BAMs for each alignment/group
+    tagbam_ch_all = downsampled_ch
+        .map { file -> tuple(file[1], file[2], file[4], file[5]) }
+        .groupTuple(by: [0,1])
+
+    // Combine BAMs, reference, and regions for variant calling
+    bam_region_ch = tagbam_ch_all
+        .combine(ref_ch)
+        .combine(regions_ch)
+
+    // Run FreeBayes and filter variants to retain biallelic sites for vartrix and downstream analysis
+    fb_vcf_ch = FREEBAYES(bam_region_ch, fb_spec, bcf_spec)
+    fb_vcf_grouped_ch = fb_vcf_ch.groupTuple(by: [0, 1])
+
+    // Merge VCFs from all regions
+    fb_vcf_merge_ch = MERGE_VCFS(fb_vcf_grouped_ch)
+
+    // Prepare VCFs for Vartrix
+    fb_vcf_bi_ch = fb_vcf_merge_ch.map { file -> tuple(file[2], file[0], file[1]) }
+
+    // Match barcodes to BAMs and VCFs
+    bcodes_tagd_bam_ch = bcodes_ch.combine(downsampled_ch, by: [0,1,2,3])
     bcodes_fb_vcf_ch = bcodes_tagd_bam_ch
-                        // .combine(fb_vcf_bi_ch, by: [0, 1, 2])
-                        .combine(fb_vcf_bi_ch, by: [1,2])
-                        .map { file -> tuple(file[2], file[0], file[1], file[3], file[4], file[5], file[6], file[7]) }
-                        // .join(fb_vcf_bi_ch, by: [1])
+        .combine(fb_vcf_bi_ch, by: [1,2])
+        .map { file -> tuple(file[2], file[0], file[1], file[3], file[4], file[5], file[6], file[7]) }
 
-	// bcodes_fb_vcf_ch.view()
-
+    // Run Vartrix allele counting
     vartx_ch = VARTRIX_UMI(bcodes_fb_vcf_ch)
-                    .map { file -> tuple(file[0], file[1], file[2], file[4]) }
-                    .groupTuple(by: [0, 1, 2])
-                    .map { gt ->
-                            def keys = gt.take(3)
-                            def values = gt.drop(3).flatten().collect()
-                            return keys + [values]
-                        }
-                    .map { file -> tuple(file[1], file[2], file[3]) }
-                    .groupTuple(by: [0,1])
-                    .map { file -> tuple(file[0], file[1], file[2].flatten().collect()) }
-                    
 
-    // vartx_ch.view()
+    // Organize and group Vartrix outputs
+    vartx_clean_ch = vartx_ch
+        .map { file -> tuple(file[0], file[1], file[2], file[4]) }
+        .groupTuple(by: [0, 1, 2])
+        .map { gt ->
+            def keys = gt.take(3)
+            def values = gt.drop(3).flatten().collect()
+            return keys + [values]
+        }
+        .map { file -> tuple(file[1], file[2], file[3]) }
+        .groupTuple(by: [0,1])
+        .map { file -> tuple(file[0], file[1], file[2].flatten().collect()) }
 
-    vartx_cpy_ch =VARTRIX_COPY(vartx_ch)
-
-    vartx_cpy_ch.view()
-            
+    // Publish Vartrix outputs 
+    vartx_cpy_ch = VARTRIX_COPY(vartx_clean_ch)
 }
