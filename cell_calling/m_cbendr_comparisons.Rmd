@@ -268,9 +268,9 @@ cbender_std_yascpCr_mrg_syst <- pmap(
        cbender_mdata_std_yascp_syst[sample_name_LR], 
        cbender_mdata_std_yascp_syst[sample_name_pf_LR_mod], 
        cbender_mdata_std_yascp_syst[sample_name_pf] ), ~{
-       full_join(..1, ..2, by = "barcode", suffix = c("_lhs", "_yhs")) #%>%
-         # full_join(., ..3 %>% rename_with(~ paste0(.x, "_lpf"), -all_of("barcode")), by = "barcode") %>%
-         # full_join(., ..4 %>% rename_with(~ paste0(.x, "_ypf"), -all_of("barcode")), by = "barcode")
+       full_join(..1, ..2, by = "barcode", suffix = c("_lhs", "_yhs")) %>%
+         full_join(., ..3 %>% rename_with(~ paste0(.x, "_lpf"), -all_of("barcode")), by = "barcode") %>%
+         full_join(., ..4 %>% rename_with(~ paste0(.x, "_ypf"), -all_of("barcode")), by = "barcode")
        }) 
 
 names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir")
@@ -632,7 +632,7 @@ all_cbender_mdata_std_yascpCr_mrg %>%
 ##Read output from cellbender standard pipeline and cellbender yascp pipeline
 # cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_trial_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
 
-cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_default_pf_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
+cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_default_pfhs_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'/lustre.*ing/cellbender/|/cellbender-.*estimates-|_cutoff.tsv.gz'))) %>% 
   # .[c(sample_name, sample_name_yascp)] %>%
   .[!is.na(.)] %>%
