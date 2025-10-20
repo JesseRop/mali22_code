@@ -94,7 +94,22 @@ optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 
 ```{r}
 m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS") 
-# m2_all_raw_mrg <- m2_all_raw_mrg_list[["no_M55"]]
+```
+
+```{r}
+m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~subset(.x, subset = Strain_DN %in% c("Doublet", "Negative"), invert = T))
+```
+
+```{r}
+# map(m2_all_raw_mrg_list, ~.x@meta.data %>% head) 
+
+m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~.x@meta.data %>% 
+  # rownames_to_column("bcode_don") %>%
+  mutate("strain" = Strain_DN) %>% 
+  select(strain) %>%
+  AddMetaData(.x, .))
+  
+
 ```
 
 ```{r}
@@ -121,7 +136,7 @@ msc_w_cln_strns_mdata <- msc_w_cln_strns %>%
   mutate(across(donor, ~str_remove(., "SC"))) %>%
   mutate(bcode_don = paste0(donor, "_", bcode),
          # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes")) 
-         stage_ag = ifelse(stage == "Asexual", "Asexual", "Gametocytes"))  
+         stage_ag = ifelse(str_detect(stage, "ale"), "Gametocytes", "Asexual"))  
 
 ```
 
@@ -217,8 +232,8 @@ m2_seu_norm_harmony <-  m2_all_raw_mrg_list[["no_M55"]]
 ```{r}
 
 m2_seu_norm_harmony <- m2_seu_norm_harmony@meta.data %>% 
-  rownames_to_column("bcode_don") %>%
-  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  # rownames_to_column("bcode_don") %>%
+  mutate("donor_cln" = str_remove_all(donor, "SC|_SLO|_MACS")) %>% 
   left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
   AddMetaData(m2_seu_norm_harmony, .)
   
@@ -227,38 +242,48 @@ m2_seu_norm_harmony <- m2_seu_norm_harmony@meta.data %>%
 
 ```{r}
 
-DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r}
 
-DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("donor"), pt.size = 1, dims = c(1,2), raster = F)
+DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("donor"), pt.size = 0.01, dims = c(1,2), raster = F)
 
 ```
+
+```{r, fig.width=10, fig.height=10}
+
+DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", split.by = c("donor"), group.by = c("groups"),  ncol = 5, pt.size = 0.01, dims = c(1,2), raster = F)
+
+```
+
 
 ```{r, fig.width= 10, fig.height=4}
 
-DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
-
 
 ```{r}
-DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm_harmony, reduction = "umap.rpca_sct_PC10", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+```
+
+```{r}
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 ```
 
 
 ```{r, fig.width= 10, fig.height=4}
 
-DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(m2_seu_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(m2_seu_norm_harmony@reductions[["scvi_umap"]]@cell.embeddings),
         x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
         color= m2_seu_norm_harmony@meta.data$stage,
         # colors = c('blue', 'red'),
@@ -289,7 +314,7 @@ m2_seu_no_M12_norm_harmony <- m2_all_raw_mrg_list[["no_M55"]]
 
 m2_seu_no_M12_norm_harmony <- m2_seu_no_M12_norm_harmony@meta.data %>% 
   rownames_to_column("bcode_don") %>%
-  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+  mutate("donor_cln" = str_remove_all(donor, "SC|_SLO|_MACS")) %>% 
   left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
   AddMetaData(m2_seu_no_M12_norm_harmony, .)
   
@@ -298,19 +323,19 @@ m2_seu_no_M12_norm_harmony <- m2_seu_no_M12_norm_harmony@meta.data %>%
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("donor"), pt.size = 1, dims = c(1,2), raster = F)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("donor"), pt.size = 1, dims = c(1,2), raster = F)
 
 ```
 
 ```{r, fig.width= 8.5, fig.height=4}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -320,7 +345,7 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("st
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)+ theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)+ theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -328,23 +353,23 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("st
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r}
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), pt.size = 0.01, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 ```
 
 
 ```{r, fig.width= 8.5, fig.height=4}
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.rpca_sct_PC10", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -353,7 +378,7 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by =
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(m2_seu_no_M12_norm_harmony@reductions[["umap.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(m2_seu_no_M12_norm_harmony@reductions[["scvi_umap"]]@cell.embeddings),
         x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
         color= m2_seu_no_M12_norm_harmony@meta.data$stage,
         # colors = c('blue', 'red'),
@@ -365,16 +390,18 @@ plot_ly(data = data.frame(m2_seu_no_M12_norm_harmony@reductions[["umap.harmony"]
 ```
 
 ```{r}
-m2_seu_no_M12_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm.RDS")
+# m2_seu_no_M12_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm.RDS")
+m2_seu_no_M12_norm <-  m2_seu_no_M12_norm_harmony
 
 ```
 
 ```{r}
-m2_seu_no_M12_norm <- m2_seu_no_M12_norm@meta.data %>% 
-  rownames_to_column("bcode_don") %>%
-  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
-  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
-  AddMetaData(m2_seu_no_M12_norm, .)
+# m2_seu_no_M12_norm <- m2_seu_no_M12_norm@meta.data %>% 
+#   rownames_to_column("bcode_don") %>%
+#   mutate("donor_cln" = str_remove_all(donor, "SC|_SLO|_MACS")) %>% 
+#   left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+#   AddMetaData(m2_seu_no_M12_norm, .)
+
 ```
 
 ```{r}
@@ -382,12 +409,15 @@ m2_seu_no_M12_norm <- m2_seu_no_M12_norm@meta.data %>%
 DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) 
 
 DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+
 ```
 
 ```{r, fig.width=8, fig.height=6}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + 
+  theme(legend.position = "bottom") + 
+  guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
 ```
 
 ```{r, fig.width=16, fig.height=6}
@@ -397,7 +427,8 @@ DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = c("orig.ident", "stage
 ```
 
 ```{r, fig.width= 10, fig.height=4}
-DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + 
+  scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -406,29 +437,35 @@ END - NO M12
 Unintegrated object
 
 ```{r}
-m2_seu_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm.RDS")
+# m2_seu_norm <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm.RDS")
 ```
 
 
 
 ```{r}
-m2_seu_norm <- m2_seu_norm@meta.data %>% 
-  rownames_to_column("bcode_don") %>%
-  mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
-  left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
-  AddMetaData(m2_seu_norm, .)
+# m2_seu_norm <- m2_seu_norm@meta.data %>% 
+#   rownames_to_column("bcode_don") %>%
+#   mutate("donor_cln" = str_remove_all(donor, "_SLO|_MACS")) %>% 
+#   left_join(., donor_mdata_slct_deets, by = c("donor_cln" = "donor_cln")) %>%
+#   AddMetaData(m2_seu_norm, .)
+
+m2_seu_norm <- m2_seu_no_M12_norm
 ```
 
 ```{r}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) +
+  scale_color_manual(values = sp_fld_colors3)
 ```
 
 ```{r, fig.width=8, fig.height=6}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) +
+  scale_color_manual(values = sp_fld_colors3) + 
+  theme(legend.position = "bottom") + 
+  guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
 ```
 
 ```{r, fig.width=16, fig.height=6}
@@ -438,7 +475,8 @@ DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = c("orig.ident",
 ```
 
 ```{r, fig.width= 10, fig.height=4}
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + 
+  scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -611,6 +649,13 @@ print(chi_result)
 
 
 ```{r, fig.width= 8.2, fig.height=7}
+msc_w_cln_strns_w_don_mdata <- msc_w_cln_strns_w_don_mdata %>%
+  mutate("StrainDon" = paste0(donor, "_", strain))
+
+
+```
+
+```{r, fig.width= 8.2, fig.height=7}
 msc_w_cln_strns_w_don_mdata %>%
   filter(donor != "M12") %>%
   group_by(donor) %>%
@@ -663,7 +708,8 @@ fct_theme <- theme(text=element_text(size=14),
 ```{r, fig.height = 4, fig.width = 16}
 
 tp_counts_all <- msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   filter(donor != "M12") %>%
   group_by(donor,  StrainDon) %>%
   add_count(name = "ss_n") %>%
@@ -705,7 +751,8 @@ tp_counts_all
 #   mutate(across(c(sample), ~factor(., levels = don_lvls))) 
 
 tp_counts_gt <- msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   filter(donor != "M12") %>%
   group_by(donor,  strain) %>%
   add_count(name = "ss_n") %>%
@@ -741,7 +788,8 @@ tp_counts_gt
 ```{r, fig.height = 6, fig.width = 8}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts_corr1 <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -769,7 +817,8 @@ t_total_counts_corr1
 #   mutate(across(c(sample), ~factor(., levels = don_lvls))) 
 
 tp_counts <- msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   filter(donor != "M12") %>%
   group_by(donor,  StrainDon) %>%
   add_count(name = "ss_n") %>%
@@ -783,12 +832,11 @@ tp_counts <- msc_w_cln_strns_w_don_mdata %>%
   # scale_color_manual(values = strain_dset_lvls_don_col, name = "Strain")+
   scale_y_continuous(
     name = "Mean transcript\ncount (X1e3)",
-    sec.axis = sec_axis( trans=~.*10, name="Parasite count")
-  ) +
+    sec.axis = sec_axis( trans=~.*10, name="Parasite count")) +
   facet_wrap(donor ~ ., nrow = 1, scales = "free_x") +
   labs(x = "Strain") +
   theme_bw() + 
-  fct_theme+
+  fct_theme +
   theme(axis.text.x = element_blank(),
         legend.position = "bottom",
         axis.title.x = element_blank(),
@@ -801,7 +849,8 @@ tp_counts
 ```{r, fig.height = 4, fig.width = 14}
 # options(repr.plot.width=32, repr.plot.height=7)
 msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -814,7 +863,8 @@ msc_w_cln_strns_w_don_mdata %>%
 ```{r, fig.height = 4, fig.width = 14}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -843,7 +893,8 @@ t_total_counts
 ```{r, fig.height = 6, fig.width = 8}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -863,7 +914,8 @@ t_total_counts_corr
 ```{r, fig.height = 6, fig.width = 8}
 # options(repr.plot.width=32, repr.plot.height=7)
 msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   filter(donor != "M12") %>%
   group_by(donor,  StrainDon) %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -876,7 +928,8 @@ msc_w_cln_strns_w_don_mdata %>%
 ```{r, fig.height = 6, fig.width = 8}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -896,7 +949,8 @@ t_total_counts_corr
 ```{r, fig.height = 6, fig.width = 8}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts_corr <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -916,7 +970,8 @@ t_total_counts_corr
 ```{r, fig.height = 4, fig.width = 14}
 # options(repr.plot.width=32, repr.plot.height=7)
 t_total_counts <-  msc_w_cln_strns_w_don_mdata %>% 
-  filter(stage_c == "Asexual") %>%
+  filter(stage_ag == "Asexual") %>%
+  # filter(stage_c == "Asexual") %>%
   group_by(donor,  StrainDon) %>%
   filter(donor != "M12") %>%
   # summarise("sum_gn" = sum(nFeature_RNA)) %>%
@@ -967,8 +1022,14 @@ plot_grid(
 
 
 ```{r, fig.width= 4, fig.height=2}
+msc_w_cln_strns_mdata <- msc_w_cln_strns_mdata %>% 
+  mutate(StrainDon = paste0(donor, "_", strain))
+  
+```
 
-msc_w_cln_strns_mdata %>% group_by(donor) %>% mutate(n_strains = n_distinct(strain), n_strains2 = n_distinct(StrainDon)) %>% distinct(donor, Symptomatic, n_strains, n_strains2) %>% 
+```{r, fig.width= 4, fig.height=2}
+
+msc_w_cln_strns_w_don_mdata %>% group_by(donor) %>% mutate(n_strains = n_distinct(strain), n_strains2 = n_distinct(StrainDon)) %>% distinct(donor, Symptomatic, n_strains, n_strains2) %>% 
   mutate(condition_detld = case_when(Symptomatic == "Yes" ~ "Pf_symptomatic_22", 
                                Symptomatic == "No" ~ "Pf_asymptomatic_22", 
                                is.na(Symptomatic) & donor %in% c("MSC1", "MSC3", "MSC13", "MSC14") ~ "Pf_asymptomatic_21",  
@@ -1545,12 +1606,12 @@ map(c("slingPseudotime_1"), ~v3_m2_asex_umap_meta_df %>%
 #### Alternative subset for field + lab integrated slingshot with early asexual dataset that is working
 
 ```{r}
-DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), cells.highlight = colnames(v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res@meta.data$dset == "Field"]))
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "scvi_umap", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), cells.highlight = colnames(v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res@meta.data$dset == "Field"]))
 ```
 
 
 ```{r}
-DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters", label = T, dims = c(1,2))
+DimPlot(v3_m2_asex_harmony_res, pt.size = 0.4, reduction = "scvi_umap", group.by = "harmony_clusters", label = T, dims = c(1,2))
 ```
 
 ###### Integrate the lab with field asexuals
@@ -1576,11 +1637,11 @@ DimPlot(EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"], reduction = "um
 ```{r, fig.width=8, fig.height=5}
 # visualize by batch and cell type annotation
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
+DimPlot(v3_m2_asex_harmony_res, reduction = "scvi_umap", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 20))
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
+DimPlot(v3_m2_asex_harmony_res, reduction = "scvi_umap", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 20))
   
@@ -1589,7 +1650,7 @@ DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_
 
 ```{r, fig.width=8, fig.height=3.5}
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) +
+DimPlot(v3_m2_asex_harmony_res, reduction = "scvi_umap", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 4))) 
   
 ```
@@ -1602,14 +1663,14 @@ v3_m2_asex_harmony_res <- v3_m2_asex_harmony_res@meta.data %>% mutate(dsetC = if
 ```{r, fig.width=10, fig.height=4}
 # visualize by batch and cell type annotation
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", split.by = "dsetC", group.by = "harmony_clusters", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+DimPlot(v3_m2_asex_harmony_res, reduction = "scvi_umap", split.by = "dsetC", group.by = "harmony_clusters", label = T, dims = c(1,2)) + theme(legend.position = "none") +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
 ```
 
 ```{r, fig.width=10, fig.height=4}
 # visualize by batch and cell type annotation
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+DimPlot(v3_m2_asex_harmony_res, reduction = "scvi_umap", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
 ```
 
@@ -1617,20 +1678,20 @@ DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", split.by = "dsetC", 
 ```{r, fig.width=10, fig.height=4}
 # visualize by batch and cell type annotation
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.rpca_sct_PC10", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,2)) + theme(legend.position = "none") +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
 ```
 
 
 ```{r, fig.width=10, fig.height=4}
 # visualize by batch and cell type annotation
-DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,3)) + theme(legend.position = "none") +
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.rpca_sct_PC10", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(1,3)) + theme(legend.position = "none") +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
 ```
 
 ```{r, fig.width=10, fig.height=4}
 # visualize by batch and cell type annotation
-DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(2,3)) + theme(legend.position = "none") +
+DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.rpca_sct_PC10", split.by = "dsetC", group.by = "harmony_clusters_ss", label = T, dims = c(2,3)) + theme(legend.position = "none") +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 2))) 
 ```
 
@@ -1638,7 +1699,7 @@ DimPlot(v3_m2_asex_harmony_res, reduction = "integrated.harmony", split.by = "ds
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(v3_m2_asex_harmony_res@reductions[["integrated.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(v3_m2_asex_harmony_res@reductions[["integrated.rpca_sct_PC10"]]@cell.embeddings),
         x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
         color= v3_m2_asex_harmony_res@meta.data$dsetC,
         # colors = c('blue', 'red'),
@@ -1657,7 +1718,7 @@ v3_m2_asex_harmony_res@meta.data %>% dplyr::count(harmony_clusters, dset) %>% gr
 ```
 
 ```{r}
-# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("6", "3", "0", "2", "7", "11") & v3_m2_asex_harmony_res@reductions$umap.harmony@cell.embeddings[,"umapharmony_1"] < 2.5]
+# v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("6", "3", "0", "2", "7", "11") & v3_m2_asex_harmony_res@reductions$scvi_umap@cell.embeddings[,"umapharmony_1"] < 2.5]
 # v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("4", "0", "2", "6") ]
 # v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$harmony_clusters %in% c("0", "1", "3", "7", "8") ]
 
@@ -1666,7 +1727,7 @@ v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res[,v3_m2_asex_harmony_res$har
 
 
 ```{r}
-DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "scvi_umap", group.by = "harmony_clusters_ss", label = T, dims = c(1,2))
 ```
 
 
@@ -1676,7 +1737,7 @@ v3_m2_asex_harmony_res_fld <- v3_m2_asex_harmony_res_fld@meta.data %>% mutate(ds
 ```
 
 ```{r, fig.width=7.5, fig.height=4.5 }
-DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "scvi_umap", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1684,7 +1745,7 @@ DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "umap.harmony", g
 ```
 
 ```{r, fig.width=7.5, fig.height=4.5 }
-DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.rpca_sct_PC10", group.by = "harmony_clusters_ss", label = T, dims = c(1,2), split.by = "dsetC") + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1692,7 +1753,7 @@ DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmo
 ```
 
 ```{r, fig.width=7.5, fig.height=4.5 }
-DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmony", group.by = "harmony_clusters_ss", label = T, dims = c(2,3), split.by = "dsetC") + 
+DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.rpca_sct_PC10", group.by = "harmony_clusters_ss", label = T, dims = c(2,3), split.by = "dsetC") + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1700,7 +1761,7 @@ DimPlot(v3_m2_asex_harmony_res_fld, pt.size = 0.4, reduction = "integrated.harmo
 ```
 
 ```{r}
-DimPlot(v3_m2_asex_harmony_res_fld[,!v3_m2_asex_harmony_res_fld$donor %in% c("MSC12") & !is.na(v3_m2_asex_harmony_res_fld$donor)], pt.size = 0.4, reduction = "umap.harmony", group.by = "donor", label = T, dims = c(1,2))
+DimPlot(v3_m2_asex_harmony_res_fld[,!v3_m2_asex_harmony_res_fld$donor %in% c("MSC12") & !is.na(v3_m2_asex_harmony_res_fld$donor)], pt.size = 0.4, reduction = "scvi_umap", group.by = "donor", label = T, dims = c(1,2))
 ```
 
 
@@ -1726,7 +1787,7 @@ v3_m2_asex_harmony_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_ha
 
 
 ```{r, fig.width=6, fig.height=4.5 }
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c("StageFL_ND"), label = F) + scale_color_manual(values = sp_fld_colors3) + 
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "scvi_umap", group.by = c("StageFL_ND"), label = F) + scale_color_manual(values = sp_fld_colors3) + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1736,7 +1797,7 @@ DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c(
 
 
 ```{r, fig.width=3.75, fig.height=4.5 }
-FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", features = "pseudotime") + 
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "scvi_umap", features = "pseudotime") + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1746,12 +1807,12 @@ FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", features 
 
 ```{r, fig.width=6, fig.height=4}
 # visualize by batch and cell type annotation
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL"), label = F)
-FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", features = "pseudotime", label = F)
-FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", features = "pseudotime", label = F, dims = c(2,3))
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T)
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T, dims = c(2,3))
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL_ND"), label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors3)
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", group.by = c("StageFL"), label = F)
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", features = "pseudotime", label = F)
+FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", features = "pseudotime", label = F, dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", group.by = c("harmony_clusters_ss"), label = T)
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", group.by = c("harmony_clusters_ss"), label = T, dims = c(2,3))
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.rpca_sct_PC10", group.by = c("StageFL_ND"), label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -1759,7 +1820,7 @@ DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.b
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["integrated.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["integrated.rpca_sct_PC10"]]@cell.embeddings),
         x = ~harmony_1, y = ~harmony_2, z = ~harmony_3,
         color= v3_m2_asex_harmony_res_fld_pt@meta.data$harmony_clusters_ss,
         # colors = c('blue', 'red'),
@@ -1800,7 +1861,7 @@ plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["pca"]]@cell
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["umap.harmony"]]@cell.embeddings),
+plot_ly(data = data.frame(v3_m2_asex_harmony_res_fld_pt@reductions[["scvi_umap"]]@cell.embeddings),
         x = ~umapharmony_1, y = ~umapharmony_2, z = ~umapharmony_3,
         color= v3_m2_asex_harmony_res_fld_pt@meta.data$StageFL,
         # colors = c('blue', 'red'),
