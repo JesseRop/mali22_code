@@ -92,9 +92,24 @@ optimum_k_qcd <- c(optimum_k_qcd_21, optimum_k_qcd)
 optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 ```
 
+```{r}
+m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS") 
+# m2_all_raw_mrg <- m2_all_raw_mrg_list[["no_M55"]]
+```
 
 ```{r}
-msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
+# saveRDS(m2_all_raw_mrg@meta.data, "data/processed/Pf/m2_all/msc_w_cln_strns_mdata.RDS")
+```
+
+
+```{r}
+msc_w_cln_strns <- SplitObject(m2_all_raw_mrg_list[["no_M55"]], split.by = "donor")
+
+```
+
+
+```{r}
+# msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
 
 ```
 
@@ -105,7 +120,8 @@ msc_w_cln_strns_mdata <- msc_w_cln_strns %>%
   bind_rows(., .id = "donor") %>% 
   mutate(across(donor, ~str_remove(., "SC"))) %>%
   mutate(bcode_don = paste0(donor, "_", bcode),
-         stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes"))  
+         # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes")) 
+         stage_ag = ifelse(stage == "Asexual", "Asexual", "Gametocytes"))  
 
 ```
 
@@ -152,7 +168,7 @@ msc_w_cln_strns_w_don_mdata %>%
   ggplot(., aes(x=Donor, y = Proportion, fill = Stage)) + 
   geom_col(position = position_stack(reverse = TRUE)) +
   facet_grid(groups ~ ., scales = "free_y", space = "free") +
-  scale_fill_manual(values = sp_fld_colors) +
+  scale_fill_manual(values = sp_fld_colors3) +
   theme_classic() + 
   coord_flip()
 
@@ -174,7 +190,7 @@ msc_w_cln_strns_w_don_mdata %>%
   ggplot(., aes(x= `Coarse Stage`, y = Proportion, fill = stage)) + 
   geom_col(position = position_stack(reverse = TRUE)) +
   facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
-  scale_fill_manual(values = sp_fld_colors) +
+  scale_fill_manual(values = sp_fld_colors3) +
   theme_classic() +
   theme(strip.text.y.right = element_text(angle = 360)) +
   coord_flip()
@@ -185,11 +201,16 @@ msc_w_cln_strns_w_don_mdata %>%
 
 
 ```{r}
-m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
-m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
+m2_seu_norm_harmony <-  m2_all_raw_mrg_list[["no_M55"]]
 
-m2_seu_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony_elbo.RDS")
-m2_seu_norm_harmony_elbo
+```
+
+```{r}
+# m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
+# m2_seu_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony.RDS")
+# 
+# m2_seu_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_norm_harmony_elbo.RDS")
+# m2_seu_norm_harmony_elbo
 ```
 
 
@@ -206,7 +227,7 @@ m2_seu_norm_harmony <- m2_seu_norm_harmony@meta.data %>%
 
 ```{r}
 
-DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -218,19 +239,19 @@ DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("donor"), 
 
 ```{r, fig.width= 10, fig.height=4}
 
-DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 
 ```{r}
-DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 ```
 
 
 ```{r, fig.width= 10, fig.height=4}
 
-DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -252,10 +273,15 @@ START - NO M12
 
 ```{r}
 # m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
-m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
+m2_seu_no_M12_norm_harmony <- m2_all_raw_mrg_list[["no_M55"]] 
+```
 
-m2_seu_no_M12_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony_elbo.RDS")
-m2_seu_no_M12_norm_harmony_elbo
+```{r}
+# # m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
+# m2_seu_no_M12_norm_harmony <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony.RDS")
+# 
+# m2_seu_no_M12_norm_harmony_elbo <-  readRDS("data/processed/Pf/m2_all/m2_seu_no_M12_norm_harmony_elbo.RDS")
+# m2_seu_no_M12_norm_harmony_elbo
 ```
 
 
@@ -272,7 +298,7 @@ m2_seu_no_M12_norm_harmony <- m2_seu_no_M12_norm_harmony@meta.data %>%
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 1, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -284,7 +310,7 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by =
 
 ```{r, fig.width= 8.5, fig.height=4}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -294,7 +320,7 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("st
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)+ theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)+ theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -302,23 +328,23 @@ DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("st
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "umap.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r}
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 ```
 
 
 ```{r, fig.width= 8.5, fig.height=4}
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.1, dims = c(1,3), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
-DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme_void() + 
+DimPlot(m2_seu_no_M12_norm_harmony, reduction = "integrated.harmony", group.by = c("stage"), split.by = "groups", pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme_void() + 
   theme(text = element_text(size = 20, face ="bold"),
         title = element_blank())
 
@@ -353,15 +379,15 @@ m2_seu_no_M12_norm <- m2_seu_no_M12_norm@meta.data %>%
 
 ```{r}
 
-DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) 
+DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) 
 
-DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 ```
 
 ```{r, fig.width=8, fig.height=6}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
 ```
 
 ```{r, fig.width=16, fig.height=6}
@@ -371,7 +397,7 @@ DimPlot(m2_seu_no_M12_norm, reduction = "pca", group.by = c("orig.ident", "stage
 ```
 
 ```{r, fig.width= 10, fig.height=4}
-DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_no_M12_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -396,13 +422,13 @@ m2_seu_norm <- m2_seu_norm@meta.data %>%
 ```{r}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 ```
 
 ```{r, fig.width=8, fig.height=6}
 # visualize by batch and cell type annotation
 
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3) + theme(legend.position = "bottom") + guides(color = guide_legend(nrow = 3, override.aes = list(size =3), title = "Stage", title.position = "top"))
 ```
 
 ```{r, fig.width=16, fig.height=6}
@@ -412,7 +438,7 @@ DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = c("orig.ident",
 ```
 
 ```{r, fig.width= 10, fig.height=4}
-DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors)
+DimPlot(m2_seu_norm, reduction = "umap.unintegrated", group.by = "stage", split.by = "groups", label = F, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
@@ -1543,18 +1569,18 @@ EF_V3_ref_asx <- EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"]
 
 
 ```{r, fig.width=6, fig.height=3.5}
-DimPlot(EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"], reduction = "umap", group.by = "StageFL_ND", label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors)
+DimPlot(EF_V3_ref[, EF_V3_ref@meta.data$stagenew == "asexuals"], reduction = "umap", group.by = "StageFL_ND", label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
 ```{r, fig.width=8, fig.height=5}
 # visualize by batch and cell type annotation
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) + 
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "stage", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 20))
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) + 
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) + 
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 20))
   
@@ -1563,7 +1589,7 @@ DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_
 
 ```{r, fig.width=8, fig.height=3.5}
 
-DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors) +
+DimPlot(v3_m2_asex_harmony_res, reduction = "umap.harmony", group.by = "StageFL_ND", label = F, dims = c(1,2)) + scale_color_manual(values = sp_fld_colors3) +
   guides(color = guide_legend(title.position = "top", nrow =2, override.aes = list(size = 4))) 
   
 ```
@@ -1700,7 +1726,7 @@ v3_m2_asex_harmony_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_ha
 
 
 ```{r, fig.width=6, fig.height=4.5 }
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c("StageFL_ND"), label = F) + scale_color_manual(values = sp_fld_colors) + 
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "umap.harmony", group.by = c("StageFL_ND"), label = F) + scale_color_manual(values = sp_fld_colors3) + 
   theme(text = element_text(size = 18),
         axis.text = element_text(size = 14)
         )
@@ -1725,7 +1751,7 @@ FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", fea
 FeaturePlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", features = "pseudotime", label = F, dims = c(2,3))
 DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T)
 DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("harmony_clusters_ss"), label = T, dims = c(2,3))
-DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL_ND"), label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors)
+DimPlot(v3_m2_asex_harmony_res_fld_pt, reduction = "integrated.harmony", group.by = c("StageFL_ND"), label = F, dims = c(2,3)) + scale_color_manual(values = sp_fld_colors3)
 
 ```
 
