@@ -8,10 +8,14 @@ w_dir=/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data
 # raw_dir=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/filtered_cellranger_h5/Pf/
 # raw_dir_filt=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/filtered_cellranger_h5/Pf_all_genes/
 # raw_dir=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs_rmHsapiens/Pf_all_genes/
-raw_dir=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/
+# raw_dir=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/
 
-## With or without human gene removal
-# raw_dir=
+raw_dir=/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs
+
+## Specify and modify directory names as appropriate for the data with only Pf (Human reads removed) and with both human and Pf
+species_cranger=("_rmHsapiens" "") ## cellranger input directories
+species_cbender=("_rmHs" "_wHsPf") ## cellbender output directories
+yascp_dirs_species=("yascp_until_all" "yascp_until_all_hs") #yascp input directories for estimation of the number of droplets and expected cells
 
 ## Job submission variables
 # source_irods=("5736STDY11771536" "5736STDY11771545" "5736STDY11771544" "5736STDY11771535")
@@ -46,35 +50,36 @@ mem=80000
 
 # exp_cells=6000
 # exp_edrops=60000
+for s in "${!species_cranger[@]}"; do
+    for l_rate in "${l_rates[@]}"; do
+        for epoch in "${epochs[@]}"; do
+            for i in "${!sample_name[@]}";
+            do
+                echo "${sample_name[i]}"   
+                scrpt=/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts_lnk/cbender_cellNo_edropsNo.sh
+                input_raw_mtx=$raw_dir${species_cranger[s]}/Pf_all_genes/${source_irods[i]}/outs/raw_feature_bc_matrix.h5
+                # input_raw_mtx=$raw_dir_filt/${source_irods[i]}/outs/raw_feature_bc_matrix_rm_HS_gns.h5
 
-for l_rate in "${l_rates[@]}"; do
-    for epoch in "${epochs[@]}"; do
-        for i in "${!sample_name[@]}";
-        do
-            echo "${sample_name[i]}"   
-            scrpt=/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/multipurpose_scripts_lnk/cbender_cellNo_edropsNo.sh
-            input_raw_mtx=$raw_dir/${source_irods[i]}/outs/raw_feature_bc_matrix.h5
-            # input_raw_mtx=$raw_dir_filt/${source_irods[i]}/outs/raw_feature_bc_matrix_rm_HS_gns.h5
+                ##Original barcodes
+                # o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_${cb_sufx}/
+                # o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_custom/cb_LR${l_rate}_E${epoch}/
+                o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_custom${species_cbender[s]}/cb_LR${l_rate}_E${epoch}/
 
-            ##Original barcodes
-            # o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_${cb_sufx}/
-            # o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_custom/cb_LR${l_rate}_E${epoch}/
-            o_dir=$w_dir/processed/Pf/${sample_name[i]}/cbender_custom_hs/cb_LR${l_rate}_E${epoch}/
+                # o_file="${o_dir}/cb_${cb_sufx}.h5"
+                o_file="${o_dir}/cb.h5"
+                # exp_cells=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-expected_cells.txt")
+                # exp_edrops=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-total_droplets_included.txt")
 
-            # o_file="${o_dir}/cb_${cb_sufx}.h5"
-            o_file="${o_dir}/cb.h5"
-            # exp_cells=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-expected_cells.txt")
-            # exp_edrops=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-total_droplets_included.txt")
-
-            exp_cells=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all_hs/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-expected_cells.txt")
-            exp_edrops=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_until_all_hs/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-total_droplets_included.txt")
-
-
-            mkdir -p $o_dir/logs/
-            
-            eval $(echo "cd $o_dir & bash $scrpt $input_raw_mtx $o_dir $o_file $l_rate $epoch $exp_cells $exp_edrops $ncores $mem %J-%I")
+                exp_cells=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/${yascp_dirs_species[s]}/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-expected_cells.txt")
+                exp_edrops=$(cat "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/${yascp_dirs_species[s]}/results/preprocessing/cellbender/${sample_name[i]}/cellbender-estimate_ncells_nemptydroplets/umi_count_estimates-total_droplets_included.txt")
 
 
+                mkdir -p $o_dir/logs/
+                # echo "cd $o_dir & bash $scrpt $input_raw_mtx $o_dir $o_file $l_rate $epoch $exp_cells $exp_edrops $ncores $mem %J-%I"
+                eval $(echo "cd $o_dir & bash $scrpt $input_raw_mtx $o_dir $o_file $l_rate $epoch $exp_cells $exp_edrops $ncores $mem %J-%I")
+
+
+            done
         done
     done
 done
