@@ -221,46 +221,6 @@ cbender_mdata_std_yascp_syst <- list.files("data/processed/Pf", pattern = "cb_md
   map(read_csv) 
 ```
 
-#########################START - Read in MSC68 manual (expected cells = 10,000 and expected droplets = 50,000) #########################
-
-```{r, message=F, warning=F, eval=T}
-sample_name_LR_mod_man_msc68 <- paste0("MSC68", "_man_LRpt000005e250")
-sample_name_LR_msc68_man_msc68 <- paste0("MSC68", "_rmHS_man_LRpt000005e250")
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read cellbender output
-cbender_mdata_std_yascp_syst_msc68 <- list.files("data/processed/Pf/MSC68", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
-  .[c(sample_name_LR_mod_man_msc68, sample_name_LR_msc68_man_msc68)] %>%
-  .[!is.na(.)] %>%
-  map(read_csv)
-
-```
-
-## Replace MSC68 yascp learning rate and epochs settings with manual
-```{r, message=F, warning=F, eval=T}
-map(cbender_mdata_std_yascp_syst_msc68, ~.x %>% count(cell_probability > 0.5) )
-
-```
-
-## Replace MSC68 yascp learning rate and epochs settings with manual
-```{r, message=F, warning=F, eval=T}
-map(cbender_mdata_std_yascp_syst_msc68, ~.x %>% count(cell_probability > 0.5) )
-
-```
-
-
-## !!!!NOTE Replace MSC68 yascp learning rate and epochs settings with manual
-```{r, message=F, warning=F, eval=F}
-cbender_mdata_std_yascp_syst[["MSC68_LRpt000005e250"]] <- cbender_mdata_std_yascp_syst_msc68[["MSC68_man_LRpt000005e250"]]
-cbender_mdata_std_yascp_syst[["MSC68_rmHS_LRpt000005e250"]] <- cbender_mdata_std_yascp_syst_msc68[["MSC68_rmHS_man_LRpt000005e250"]]
-```
-
-
-#########################START - Read in MSC68 manual (expected cells = 10,000 and expected droplets = 50,000) #########################
-
-
 ```{r, message=F, warning=F, eval=T}
 
 cbender_std_yascpCr_mrg_syst <- pmap(
@@ -281,7 +241,7 @@ names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_
 gogo()
 ```
 
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 ##Read BPcells matrices
 # cbender_mdata_std_yascp <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
@@ -290,23 +250,15 @@ gogo()
 #   map(read_csv) 
 ```
 
+
 ```{r, message=F, warning=F, eval=F}
-all_cbender_mdata_mrg <- map2(cbender_mdata_std_yascp[sample_name],
-                              cbender_mdata_std_yascp[sample_name_rmHs], ~{
-                                full_join(.x, .y, by = "barcode", suffix = c("_wHs", "_rmHs"))
-                                })
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
 sample_name_yascpCranger_nms <- names(cbender_mdata_std_yascp)[str_detect(names(cbender_mdata_std_yascp), "yascpCr")]
 sample_name_yascpCranger_nms <- sample_name_yascpCranger_nms[!str_detect(sample_name_yascpCranger_nms, "MSC50_SLO_yascpCr")]
 
 ```
 
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 cbender_std_yascpCr_mrg <- pmap(
   list(cbender_mdata_std_yascp[str_remove(sample_name_yascpCranger_nms, "_yascpCr")],
        cbender_mdata_std_yascp[paste0(str_remove(sample_name_yascpCranger_nms, "_yascpCr"), "_rm_HS")],
@@ -320,10 +272,16 @@ cbender_std_yascpCr_mrg <- pmap(
 ```
 
 ```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_mrg %>%
+cbender_std_yascpCr_mrg_syst_don <- cbender_std_yascpCr_mrg_syst %>%
   bind_rows(., .id = "donor") %>%
-  # filter(!(cell_probability_wHs == 1 & cell_probability_rmHs ==1)) %>%
-  ggplot(aes(x=cell_probability_wHs, y = cell_probability_rmHs)) +
+  filter(!(cell_probability_lpf == 1 & cell_probability_ypf ==1 & cell_probability_lhs ==1 & cell_probability_yhs ==1))
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+cbender_std_yascpCr_mrg_syst_don %>%
+  ggplot(aes(x=cell_probability_lpf, y = cell_probability_ypf)) +
   geom_point(size = 0.0001) +
   geom_density2d() +
   facet_wrap(. ~ donor)
@@ -612,16 +570,6 @@ all_cbender_mdata_std_yascpCr_mrg %>%
 ## Count pf cells that are potentially missed by standard cellbender
 all_cbender_mdata_std_yascpCr_mrg %>%
   bind_rows(., .id = "donor") %>%
-  filter(cell_probability_yascpCr > 0.9) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by standard cellbender
-all_cbender_mdata_std_yascpCr_mrg %>%
-  bind_rows(., .id = "donor") %>%
   filter(cell_probability_std > 0.9) %>%
   # filter(cell_size_yascp >= 100) %>%
   count(donor)
@@ -796,14 +744,6 @@ cr_cbender_mdata_hmnz_syst_snky_gns <- map2(cr_cbender_mdata_hmnz_syst_snky[inte
 imap(cr_cbender_mdata_hmnz_syst_snky_gns, ~snk_pt_fn(., strns_2_plt = c("cr", "cb_yhs", "cb_lhs", "cb_ypf", "cb_lpf"), labls = c("cr", "cb_yhs", "cb_lhs", "cb_ypf", "cb_lpf"), bp_face = c("bold", "bold", "bold", "bold", "bold"), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')))
 
 ```
-
-```{r, message=FALSE, warning=FALSE}
-
-imap(cr_cbender_mdata_hmnz_syst_snky_gns, ~snk_pt_fn(., strns_2_plt = c("cr", "cb_dhs", "cb_lhs", "cb_dpf", "cb_lpf"), labls = c("cr", "cb_dhs", "cb_lhs", "cb_dpf", "cb_lpf"), bp_face = c("bold", "bold", "bold", "bold", "bold"), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')))
-
-
-```
-
 
 
 
