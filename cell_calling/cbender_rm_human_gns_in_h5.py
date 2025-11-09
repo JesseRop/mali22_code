@@ -54,33 +54,44 @@ def filter_h5_ensg(infile, outfile):
                     # dataset is global or metadata → copy as is
                     grp_features.create_dataset(key, data=ds)
 
-# --- Batch processing with preserved folder structure ---
+# --- Batch processing using irods_id from CSV ---
+import csv
+
 input_root = Path("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes")
-# output_root = Path("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/filtered_cellranger_h5/Pf_all_genes")
 output_root = Path("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs_rmHsapiens/Pf_all_genes")
 
-print("Starting ENSG gene removal from h5 files...")
+# Path to your CSV file
+csv_path = Path("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_jcode_merge_decode.csv")
 
-# Loop over both raw and filtered feature files
-for infile in input_root.glob("5736STDY*/outs/*_feature_bc_matrix.h5"):
-    # Compute relative path
-    rel_path = infile.relative_to(input_root)
-    print(f"Processing {infile}...")
+# Read irods_id values from CSV
+irods_ids = set()
+with open(csv_path, newline="") as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        val = row["irods_id"].strip()
+        if val:
+            irods_ids.add(val)
 
-    # Create corresponding output folder
-    out_dir = output_root / rel_path.parent
-    out_dir.mkdir(parents=True, exist_ok=True)
+print("Starting ENSG gene removal from h5 files for irods_id in CSV...")
 
-    # Keep the same filename (so YASCP recognises it)
-    outfile = out_dir / infile.name
+for irods_id in irods_ids:
+    # Some irods_id values are single, some are underscore-separated pairs
+    # Try to match both exact and partial (for pairs)
+    pattern = f"{irods_id}/outs/*_feature_bc_matrix.h5"
+    for infile in input_root.glob(pattern):
+        rel_path = infile.relative_to(input_root)
+        print(f"Processing {infile}...")
 
-    # Call your filtering function
-    filter_h5_ensg(infile, outfile)
-    print(f"Filtered {infile} -> {outfile}")
-    
-    # Copy metrics_summary.csv if it exists
-    csv_file = infile.parent / "metrics_summary.csv"
-    
-    shutil.copy2(csv_file, out_dir / csv_file.name)
-    print(f"Copied {csv_file.name} to {out_dir}")
+        out_dir = output_root / rel_path.parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outfile = out_dir / infile.name
+
+        filter_h5_ensg(infile, outfile)
+        print(f"Filtered {infile} -> {outfile}")
+
+        # Copy metrics_summary.csv if it exists
+        csv_file = infile.parent / "metrics_summary.csv"
+        if csv_file.exists():
+            shutil.copy2(csv_file, out_dir / csv_file.name)
+            print(f"Copied {csv_file.name} to {out_dir}")
    
