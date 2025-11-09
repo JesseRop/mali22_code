@@ -5,6 +5,7 @@
 
 # Load required modules and functions
 from pathlib import Path
+import argparse
 import h5py
 import numpy as np
 from scipy.sparse import csc_matrix
@@ -57,41 +58,78 @@ def filter_h5_ensg(infile, outfile):
 # --- Batch processing using irods_id from CSV ---
 import csv
 
-input_root = Path("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes")
-output_root = Path("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs_rmHsapiens/Pf_all_genes")
+def main():
+    parser = argparse.ArgumentParser(description="Remove ENSG (human) genes from CellRanger h5 matrices based on a list of irods_id in a CSV.")
+    parser.add_argument(
+        "--csv",
+        dest="csv_path",
+        default="/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_jcode_merge_decode.csv",
+        help="Path to CSV file with an 'irods_id' column (default: current project CSV)",
+    )
+    parser.add_argument(
+        "--input-root",
+        dest="input_root",
+        default="/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes",
+        help="Root folder containing Cell Ranger outputs (default: Pf_all_genes run root)",
+    )
+    parser.add_argument(
+        "--output-root",
+        dest="output_root",
+        default="/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs_rmHsapiens/Pf_all_genes",
+        help="Root folder where filtered h5 files will be written (default: rmHsapiens Pf_all_genes)",
+    )
+    args = parser.parse_args()
 
-# Path to your CSV file
-csv_path = Path("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_jcode_merge_decode.csv")
+    input_root = Path(args.input_root)
+    output_root = Path(args.output_root)
 
-# Read irods_id values from CSV
-irods_ids = set()
-with open(csv_path, newline="") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        val = row["irods_id"].strip()
-        if val:
-            irods_ids.add(val)
+    csv_path = Path(args.csv_path)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV not found: {csv_path}")
 
-print("Starting ENSG gene removal from h5 files for irods_id in CSV...")
+    # Read irods_id values from CSV
+    irods_ids = set()
+    with open(csv_path, newline="") as csvfile:
+        reader = csv.DictReader(csvfile)
+        if "irods_id" not in reader.fieldnames:
+            raise ValueError(f"CSV {csv_path} is missing required 'irods_id' column. Columns found: {reader.fieldnames}")
+        for row in reader:
+            val = (row.get("irods_id") or "").strip()
+            if val:
+                irods_ids.add(val)
 
-for irods_id in irods_ids:
-    # Some irods_id values are single, some are underscore-separated pairs
-    # Try to match both exact and partial (for pairs)
-    pattern = f"{irods_id}/outs/*_feature_bc_matrix.h5"
-    for infile in input_root.glob(pattern):
-        rel_path = infile.relative_to(input_root)
-        print(f"Processing {infile}...")
+    if not input_root.exists():
+        raise FileNotFoundError(f"Input root not found: {input_root}")
+    output_root.mkdir(parents=True, exist_ok=True)
 
-        out_dir = output_root / rel_path.parent
-        out_dir.mkdir(parents=True, exist_ok=True)
-        outfile = out_dir / infile.name
+    print(f"Starting ENSG gene removal from h5 files for irods_id in CSV: {csv_path}")
+    print(f"Found {len(irods_ids)} unique irods_id entries")
 
-        filter_h5_ensg(infile, outfile)
-        print(f"Filtered {infile} -> {outfile}")
+    for irods_id in irods_ids:
+        # Some irods_id values are single, some are underscore-separated pairs
+        # We expect directory names matching the irods_id exactly under input_root
+        pattern = f"{irods_id}/outs/*_feature_bc_matrix.h5"
+        matched = False
+        for infile in input_root.glob(pattern):
+            matched = True
+            rel_path = infile.relative_to(input_root)
+            print(f"Processing {infile}...")
 
-        # Copy metrics_summary.csv if it exists
-        csv_file = infile.parent / "metrics_summary.csv"
-        if csv_file.exists():
-            shutil.copy2(csv_file, out_dir / csv_file.name)
-            print(f"Copied {csv_file.name} to {out_dir}")
+            out_dir = output_root / rel_path.parent
+            out_dir.mkdir(parents=True, exist_ok=True)
+            outfile = out_dir / infile.name
+
+            filter_h5_ensg(infile, outfile)
+            print(f"Filtered {infile} -> {outfile}")
+
+            # Copy metrics_summary.csv if it exists
+            csv_file = infile.parent / "metrics_summary.csv"
+            if csv_file.exists():
+                shutil.copy2(csv_file, out_dir / csv_file.name)
+                print(f"Copied {csv_file.name} to {out_dir}")
+        if not matched:
+            print(f"Warning: No input h5 found for irods_id '{irods_id}' using pattern '{pattern}'")
+
+if __name__ == "__main__":
+    main()
    
