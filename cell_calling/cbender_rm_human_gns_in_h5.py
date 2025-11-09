@@ -1,19 +1,20 @@
-# This script reads the sample names from a CSV file and then iterates over each sample name to read the corresponding h5 file and save its metadata as a CSV file.
-# Run as below
-        ## source /software/team222/jr35/cellbender_gpu/cellbender_gpu_env/bin/activate
-        ## python cbender_rm_human_gns_in_h5.py
+#!/usr/bin/env python3
+"""
+Filter out human genes (ENSG*) from CellRanger outputs:
+- h5 matrices (*_feature_bc_matrix.h5)
+- MTX matrices (raw_feature_bc_matrix, filtered_feature_bc_matrix)
+"""
 
-# Load required modules and functions
 from pathlib import Path
 import argparse
 import h5py
 import numpy as np
-from scipy.sparse import csc_matrix
+import pandas as pd
+import gzip
 import shutil
-# import os
-
-## set working directory
-# os.chdir('/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf')
+import csv
+from scipy.sparse import csc_matrix
+from scipy.io import mmread, mmwrite
 
 def filter_h5_ensg(infile, outfile):
     with h5py.File(infile, "r") as f_in:
@@ -31,6 +32,11 @@ def filter_h5_ensg(infile, outfile):
 
         # Build mask to remove ENSG genes
         mask = np.array([not g.startswith("ENSG") for g in gene_ids_str])
+        
+        # Count genes
+        total_genes = len(gene_ids_str)
+        retained_genes = mask.sum()
+        removed_genes = total_genes - retained_genes
 
         # Filter matrix rows
         X_filtered = X[mask, :]
@@ -54,12 +60,40 @@ def filter_h5_ensg(infile, outfile):
                 else:
                     # dataset is global or metadata → copy as is
                     grp_features.create_dataset(key, data=ds)
+    
+    return total_genes, retained_genes, removed_genes
 
-# --- Batch processing using irods_id from CSV ---
-import csv
+def filter_mtx_ensg(src_dir, dest_dir, filter_prefix="ENSG"):
+    """Filter ENSG genes from MTX format (barcodes.tsv.gz, features.tsv.gz, matrix.mtx.gz)"""
+    required = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
+    if not all((src_dir / f).exists() for f in required):
+        return None, None, None
+    
+    # Read and filter features
+    features = pd.read_csv(src_dir / "features.tsv.gz", sep="\t", header=None)
+    features.columns = ["id", "name", "type"]
+    mask = ~features["id"].str.startswith(filter_prefix)
+    kept_features = features[mask].reset_index(drop=True)
+    
+    # Filter matrix
+    mtx = mmread(src_dir / "matrix.mtx.gz").tocsr()
+    filtered_mtx = mtx[mask.values, :]
+    
+    # Write filtered outputs
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    with gzip.open(dest_dir / "features.tsv.gz", "wt") as f:
+        kept_features.to_csv(f, sep="\t", header=False, index=False)
+    with gzip.open(dest_dir / "barcodes.tsv.gz", "wb") as f_out, \
+         gzip.open(src_dir / "barcodes.tsv.gz", "rb") as f_in:
+        f_out.write(f_in.read())
+    mmwrite(dest_dir / "matrix.mtx", filtered_mtx)
+    import os
+    os.system(f"gzip -f {dest_dir / 'matrix.mtx'}")
+    
+    return len(features), len(kept_features), len(features) - len(kept_features)
 
 def main():
-    parser = argparse.ArgumentParser(description="Remove ENSG (human) genes from CellRanger h5 matrices based on a list of irods_id in a CSV.")
+    parser = argparse.ArgumentParser(description="Remove ENSG (human) genes from CellRanger h5 and MTX matrices.")
     parser.add_argument(
         "--csv",
         dest="csv_path",
@@ -76,7 +110,12 @@ def main():
         "--output-root",
         dest="output_root",
         default="/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs_rmHsapiens/Pf_all_genes",
-        help="Root folder where filtered h5 files will be written (default: rmHsapiens Pf_all_genes)",
+        help="Root folder where filtered files will be written (default: rmHsapiens Pf_all_genes)",
+    )
+    parser.add_argument(
+        "--skip-mtx",
+        action="store_true",
+        help="Skip MTX format matrices (only process h5 files)",
     )
     args = parser.parse_args()
 
@@ -102,33 +141,53 @@ def main():
         raise FileNotFoundError(f"Input root not found: {input_root}")
     output_root.mkdir(parents=True, exist_ok=True)
 
-    print(f"Starting ENSG gene removal from h5 files for irods_id in CSV: {csv_path}")
+    print(f"Starting ENSG gene removal for irods_id in CSV: {csv_path}")
     print(f"Found {len(irods_ids)} unique irods_id entries")
 
     for irods_id in irods_ids:
-        # Some irods_id values are single, some are underscore-separated pairs
-        # We expect directory names matching the irods_id exactly under input_root
+        # Process h5 files
         pattern = f"{irods_id}/outs/*_feature_bc_matrix.h5"
         matched = False
         for infile in input_root.glob(pattern):
             matched = True
             rel_path = infile.relative_to(input_root)
-            print(f"Processing {infile}...")
+            print(f"\n[h5] Processing {infile.name} from {irods_id}...")
 
             out_dir = output_root / rel_path.parent
             out_dir.mkdir(parents=True, exist_ok=True)
             outfile = out_dir / infile.name
 
-            filter_h5_ensg(infile, outfile)
-            print(f"Filtered {infile} -> {outfile}")
+            total, retained, removed = filter_h5_ensg(infile, outfile)
+            print(f"  Genes: {total} total | {retained} retained | {removed} removed (ENSG)")
+            print(f"  Output: {outfile}")
 
             # Copy metrics_summary.csv if it exists
             csv_file = infile.parent / "metrics_summary.csv"
             if csv_file.exists():
                 shutil.copy2(csv_file, out_dir / csv_file.name)
-                print(f"Copied {csv_file.name} to {out_dir}")
+                print(f"  Copied: {csv_file.name}")
+        
         if not matched:
-            print(f"Warning: No input h5 found for irods_id '{irods_id}' using pattern '{pattern}'")
+            print(f"Warning: No h5 found for irods_id '{irods_id}'")
+        
+        # Process MTX files (default behavior, unless --skip-mtx flag is set)
+        if not args.skip_mtx:
+            sample_outs = input_root / irods_id / "outs"
+            if sample_outs.exists():
+                for folder in ["raw_feature_bc_matrix", "filtered_feature_bc_matrix"]:
+                    src_dir = sample_outs / folder
+                    if not src_dir.exists():
+                        continue
+                    
+                    dest_dir = output_root / irods_id / "outs" / folder
+                    print(f"\n[MTX] Processing {irods_id}/{folder}...")
+                    
+                    total, retained, removed = filter_mtx_ensg(src_dir, dest_dir)
+                    if total:
+                        print(f"  Genes: {total} total | {retained} retained | {removed} removed (ENSG)")
+                        print(f"  Output: {dest_dir}")
+                    else:
+                        print(f"  ⚠️  Missing required files, skipped")
 
 if __name__ == "__main__":
     main()
