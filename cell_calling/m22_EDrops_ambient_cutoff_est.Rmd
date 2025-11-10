@@ -1,0 +1,687 @@
+---
+title: "EmptyDrop with lower UMI limits"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float:
+      collapsed: true
+    code_folding: hide
+    df_print: paged
+    theme: cerulean
+---
+
+Refer to: https://support.bioconductor.org/p/9151199/#9151459 regarding choosing the right lower limit for emptyDrops
+
+
+
+# Setup
+```{r, warning=FALSE}
+library("knitr")
+library("ggplot2")
+library("DropletUtils")
+library("gridExtra")
+library(dplyr)
+library(stringr)
+library(readr)
+library(conflicted)
+library(tibble)
+library(purrr)
+library(tidyr)
+library(scales)
+library(ggh4x)
+
+
+conflict_prefer("select", "dplyr")
+conflict_prefer("filter", "dplyr")
+conflict_prefer("rename", "dplyr")
+conflict_prefer("map", "purrr")
+conflict_prefer("count", "dplyr")
+conflicts_prefer(dplyr::desc)
+conflicts_prefer(base::saveRDS)
+conflicts_prefer(SingleCellExperiment::colData)
+conflicts_prefer(base::as.data.frame)
+conflicts_prefer(base::intersect)
+```
+
+
+```{r, setup}
+
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+#### Source commong functions, varriables and tables
+
+```{r}
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+
+```
+## Input
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+Get the sample set for processing 
+```{r, eval=T}
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+
+## slct_sample_names[-c(sample_rm)]
+slct_sample_names <- slct_sample_names[!str_detect(slct_sample_names, paste(c(sample_rm, sample_mxd), collapse = "|"))]
+slct_sample_names
+
+
+# slct_sample_names <- c("MSC14", "MSC12")
+limits <- c(20, 50, 100, 150, 200)
+```
+
+## subset sample details for select samples
+
+```{r}
+
+## get relevant sample names
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+
+##Sample IDs
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
+
+```
+
+```{r, message=F, warning=F, eval=T}
+sample_nm_species <- paste0(rep(sample_name, each=2), c("_rmHs", "_wHsPf"))
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read bcrank results matrices
+all_bcrank <- list.files("data/processed/Pf", pattern = "bcrank_1_uniq.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/edrops|/bcrank_1.*'))) %>% 
+  # .[sample_name] %>%
+  .[sample_nm_species] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read bcrank results matrices
+map(all_bcrank, dim)
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.width=4, fig.height=4, eval = F}
+##Read bcrank results matrices
+imap(all_bcrank, ~{
+  # Only showing unique points for plotting speed.
+  uniq <- !duplicated(.x$rank)
+  plot(.x$rank[uniq], .x$total[uniq], log="xy", xlab="Rank", ylab="Total UMI count", cex.lab=1.2, main = .y)
+  
+  abline(h=metadata(.x)$inflection, col="darkgreen", lty=2)
+  abline(h=metadata(.x)$knee, col="dodgerblue", lty=2)
+  
+  legend("bottomleft", legend=c("Inflection", "Knee"), col=c("darkgreen", "dodgerblue"), lty=2, cex=1.2)
+})
+```
+
+
+```{r, message=F, warning=F, eval=T}
+rank_colours <- c("CellEd" = "red", "Non-Cell" = "black", "Below_Limit" = "grey60")
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+imap(all_bcrank, ~.x %>%
+    data.frame() %>%
+  # filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(yintercept = c(20, 50, 100, 150, 200)) +
+    labs(title = .y) +
+      geom_text(data = data.frame(lims = c(20, 50, 100, 150, 200), pos = rep(500, 5)), mapping = aes(x = pos, y = lims, label = lims), vjust = -0.2)
+)
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+imap(all_bcrank, ~.x %>%
+    data.frame() %>%
+  filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(yintercept = c(20, 50, 100, 150, 200)) +
+    labs(title = .y) +
+      geom_text(data = data.frame(lims = c(20, 50, 100, 150, 200), pos = rep(500, 5)), mapping = aes(x = pos, y = lims, label = lims), vjust = -0.2)
+)
+
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+## Manual selection of thresholds
+man_thresh <- c("MSC1" = 150, 
+                "MSC12" = 50, 
+                "MSC13" = 150, 
+                "MSC14" = 150, 
+                "MSC24" = 200, # should be higher 300
+                "MSC25" = 100, 
+                "MSC3" = 100, 
+                "MSC33" = 150, 
+                "MSC37" = 200, 
+                "MSC38" = 150, 
+                "MSC39" = 100, 
+                "MSC40" = 100, 
+                "MSC41" = 100, 
+                "MSC45" = 200, 
+                "MSC48" = 100, 
+                "MSC49" = 50, 
+                "MSC50_MACS" = 100,  
+                "MSC50_SLO" = 200, # should be higher 1000
+                "MSC51" = 200, 
+                "MSC53" = 200, 
+                "MSC54" = 100, 
+                "MSC55" = 100, # looks like 50 but overloaded so going for 100
+                "MSC57" = 200, 
+                "MSC60" = 100, # looks like 50 but going for more stringency 100
+                "MSC66" = 100, 
+                "MSC67" = 100, 
+                "MSC68" = 50, 
+                "MSC70" = 50)
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## Save manual selection of thresholds
+saveRDS(man_thresh, "data/processed/Pf/m2_all/man_thresh.RDS")
+```
+
+
+
+########################################################################### PICK UP FROM here
+
+
+```{r, message=F, warning=F, eval=T}
+sample_nm_umi_est <- paste0(rep(sample_nm_species, each=2), c("_cell_estimate", "_total_droplets"))
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read output from cellbender standard pipeline and cellbender yascp pipeline
+# cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_trial_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
+
+yascp_cbender_cutoffs <- list.files("data/processed/Pf", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = str_replace(str_remove_all(.,'data.*/Pf/|/cbender_custom|umi_estimates/umi_count_estimates-|_cutoff.tsv.gz'), "/", "_")) %>% 
+  # .[c(sample_name, sample_name_yascp)] %>%
+  .[sample_nm_umi_est] %>%
+  .[!is.na(.)] %>%
+  map(read_tsv) 
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## limit to hspf
+# cbender_cutoffs_wHsPf <- cbender_cutoffs[str_detect(names(cbender_cutoffs), "wHsPf")] 
+# names(cbender_cutoffs_wHsPf) <- str_remove(names(cbender_cutoffs_wHsPf) , "_[w|r].*")
+
+# Only in bcrank
+# cbender_cutoffs_wHsPf <- cbender_cutoffs_wHsPf[names(all_bcrank)]  %>%
+#   .[!is.na(.)]
+
+# all_bcrank_set <- all_bcrank[names(cbender_cutoffs_wHsPf)]  %>%
+#   .[!is.na(.)]
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read output from cellbender standard pipeline and cellbender yascp pipeline
+yascp_cbender_cutoffs_all <- yascp_cbender_cutoffs %>%
+  bind_rows(., .id = "donor_cutoff") %>%
+  mutate(across(method, ~str_remove(., "dropletutils::barcoderanks::")))
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read output from cellbender standard pipeline and cellbender yascp pipeline
+yascp_cbender_cutoffs_all_ncells_ndrops <- yascp_cbender_cutoffs_all %>%
+  filter(method %in% c('estimated_ncells', 'estimated_ndroplets', 'knee', 'inflection')) %>%
+  mutate(across(where(is.numeric), ~ ceiling(.x)))
+
+```
+
+```{r, message=F, warning=F, eval=T}
+yascp_cbender_cutoffs_all_ncells_ndrops <- yascp_cbender_cutoffs_all_ncells_ndrops %>% 
+  separate_wider_regex(donor_cutoff, c(sample = ".*(?:rmHs|wHsPf)", "_" , cell_or_droplet = ".*"), names_repair = "unique", cols_remove = TRUE) %>%
+  unite(., "method", cell_or_droplet, method, sep = "_", remove = T) %>%
+  pivot_wider(names_from = "method", values_from = c("umi_counts_cutoff", "n_cells"))
+```
+
+
+```{r, message=F, warning=F, eval=T}
+# yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(str_match(donor_cutoff, "MSC12.*")) %>% filter(method == "knee") %>% pull(n_cells)
+```
+
+```{r, message=F, warning=F, eval=T}
+all_bcrank_mrg <- map(all_bcrank, ~data.frame(.x)) %>% 
+  bind_rows(., .id = "sample") %>% 
+  mutate(donor = str_remove_all(sample, "C_.*|noJC_.*|_rmHs|_wHsPf"),
+         species = case_when(str_detect(sample, "_rmHs") ~ "rmHs",
+                              str_detect(sample, "_wHsPf") ~ "wHsPf"), 
+         jumpcode = case_when(str_detect(sample, "[0-9]C_|SLOC_|MACSC_") ~ "Combined",
+                              str_detect(sample, "noJC_") ~ "noJC",
+                              TRUE ~ "JC")) %>%
+  left_join(., yascp_cbender_cutoffs_all_ncells_ndrops)
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+don_names <- unique(str_remove_all(sample_name, "noJC$|C$"))
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+bcranks_cutoff_plot_fn <-  function(dset, hline_droplets = "umi_counts_cutoff_total_droplets_", hline_cells = "umi_counts_cutoff_cell_estimate_", hline_cells_lab = "umi_cutoff_cells:", hline_droplets_lab = "umi_cutoff_droplets:", line_part = "knee") {
+    label_data = distinct(dset, donor, species, jumpcode, !!rlang::sym(paste0(hline_cells, line_part)), !!rlang::sym(paste0(hline_droplets, line_part)))
+    
+    dset %>%
+    ggplot(., aes(x = rank, y = total)) +
+        geom_point(size = 0.3, alpha = 0.6) +
+        # scale_colour_manual(values = rank_colours) +
+        scale_x_log10() +
+        scale_y_log10() +
+      geom_hline(aes(yintercept = !!rlang::sym(paste0(hline_cells, line_part)))) +
+      geom_hline(aes(yintercept = !!rlang::sym(paste0(hline_droplets, line_part)))) +
+      geom_text(data = label_data,
+                aes(x = 500, 
+                    y = !!rlang::sym(paste0(hline_cells, line_part)), 
+                    label = paste(hline_cells_lab, !!rlang::sym(paste0(hline_cells, line_part)))),
+                vjust = -0.2) +
+      geom_text(data = label_data,
+                aes(x = 500, 
+                    y = !!rlang::sym(paste0(hline_droplets, line_part)), 
+                    label = paste(hline_droplets_lab, !!rlang::sym(paste0(hline_droplets, line_part)))),
+                vjust = -0.2) +
+      facet_wrap2(vars(donor, species, jumpcode), ncol = 6) +
+      labs(title = paste0(line_part)) 
+  
+  
+}
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+map(don_names, ~{
+  don = .x
+  map(c("knee", "inflection"), ~{
+    all_bcrank_mrg_sset <- all_bcrank_mrg %>% filter(donor == don)
+    
+    bcranks_cutoff_plot_fn(dset = all_bcrank_mrg_sset, hline_droplets = "umi_counts_cutoff_total_droplets_", hline_droplets_lab = "umi_cutoff_droplets:", hline_cells = "umi_counts_cutoff_cell_estimate_", hline_cells_lab = "umi_cutoff_cells:", line_part = .x)
+  
+  
+  })
+})
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+map(don_names, ~{
+  don = .x
+  map(c("knee", "inflection"), ~{
+    all_bcrank_mrg_sset <- all_bcrank_mrg %>% filter(donor == don)
+    
+    bcranks_cutoff_plot_fn(dset = all_bcrank_mrg_sset, hline_droplets = "n_cells_total_droplets_estimated_ndroplets", hline_droplets_lab = "umi_cutoff_droplets:", hline_cells = "n_cells_cell_estimate_estimated_ncells", hline_cells_lab = "umi_cutoff_cells:", line_part = .x)
+  
+  
+  })
+})
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+map(don_names, ~{
+  don = .x
+  map(c("knee", "inflection"), possibly(~{
+    all_bcrank_mrg_sset <- all_bcrank_mrg %>% filter(donor == don)
+    
+    print(dim(all_bcrank_mrg_sset))
+    
+    label_data = distinct(all_bcrank_mrg_sset, donor, species, jumpcode, !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)), !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)))
+    
+    all_bcrank_mrg_sset %>%
+    ggplot(., aes(x = rank, y = total)) +
+        geom_point(size = 0.3, alpha = 0.6) +
+        # scale_colour_manual(values = rank_colours) +
+        scale_x_log10() +
+        scale_y_log10() +
+      geom_hline(aes(yintercept = !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)))) +
+      geom_hline(aes(yintercept = !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)))) +
+      geom_text(data = label_data,
+                aes(x = 500, 
+                    y = !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)), 
+                    label = paste("umi_cutoff_cells:", !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)))),
+                vjust = -0.2) +
+      geom_text(data = label_data,
+                aes(x = 500, 
+                    y = !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)), 
+                    label = paste("umi_cutoff_droplets:", !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)))),
+                vjust = -0.2) +
+      facet_wrap2(vars(donor, species, jumpcode), ncol = 6) +
+      labs(title = paste0(.x)) 
+  
+  
+  }), 'k=1 so no groups to compare which is necessary for the heatmap')
+})
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height= 15, fig.width=10}
+##Read edrops results matrices
+map(c("knee", "inflection"), ~{
+
+  label_data = distinct(all_bcrank_mrg, donor, species, jumpcode, !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)), !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)))
+  
+  all_bcrank_mrg %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      # scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(aes(yintercept = !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)))) +
+    geom_hline(aes(yintercept = !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)))) +
+    geom_text(data = label_data,
+              aes(x = 500, 
+                  y = !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x)), 
+                  label = paste("cell_estimate:", !!rlang::sym(paste0("umi_counts_cutoff_cell_estimate_", .x))))) +
+    geom_text(data = label_data,
+              aes(x = 500, 
+                  y = !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x)), 
+                  label = paste("total_droplets:", !!rlang::sym(paste0("umi_counts_cutoff_total_droplets_", .x))))) +
+    facet_wrap2(vars(donor, species, jumpcode)) +
+    labs(title = paste0(.x)) 
+
+
+})
+
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+all_bcrank_umi_estimates <- map(c("knee", "inflection"), ~{
+
+  hlines_df = data.frame(lims = c(yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_cell_estimate")) %>% filter(method == knee_or_inlctn) %>% pull(umi_counts_cutoff),
+                                  yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_total_droplets")) %>% filter(method == knee_or_inlctn)  %>% pull(umi_counts_cutoff)),
+                         labls = c("cell_estimate", "total_droplets"),
+                         pos = rep(500, 2))
+  print(hlines_df)
+  
+  all_bcrank_mrg %>%
+    data.frame() %>%
+  # filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      # scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(yintercept = hlines_df$lims) +
+    pivot_longer()
+    labs(title = paste0(knee_or_inlctn)) +
+      geom_text(data = hlines_df, mapping = aes(x = pos, y = lims, label = labls), vjust = -0.2)
+
+   
+})
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+all_bcrank_umi_estimates <- map(c("knee", "inflection"), ~{
+  knee_or_inlctn <- .x
+  imap(all_bcrank, possibly(~{
+  hlines_df = data.frame(lims = c(yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_cell_estimate")) %>% filter(method == knee_or_inlctn) %>% pull(umi_counts_cutoff),
+                                  yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_total_droplets")) %>% filter(method == knee_or_inlctn)  %>% pull(umi_counts_cutoff)),
+                         labls = c("cell_estimate", "total_droplets"),
+                         pos = rep(500, 2))
+  print(hlines_df)
+  
+  .x %>%
+    data.frame() %>%
+  # filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      # scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(yintercept = hlines_df$lims) +
+    labs(title = paste0(.y, knee_or_inlctn)) +
+      geom_text(data = hlines_df, mapping = aes(x = pos, y = lims, label = labls), vjust = -0.2)
+
+    }), 'k=1 so no groups to compare which is necessary for the heatmap')
+})
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+imap(all_bcrank, possibly(~{
+  hlines_df = data.frame(lims = c(yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_wHsPf_cell_estimate")) %>% filter(method == "estimated_ncells") %>% pull(n_cells),
+                                  yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "_wHsPf_total_droplets")) %>% filter(method == "estimated_ndroplets") %>% pull(n_cells)),
+                         labls = c("cell_estimate", "total_droplets"),
+                         pos = rep(5, 2))
+  # print(hlines_df)
+  
+  .x %>%
+    data.frame() %>%
+  # filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      # scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_vline(xintercept = hlines_df$lims) +
+    labs(title = .y) +
+      geom_text(data = hlines_df, mapping = aes(y = pos, x = lims, label = labls), vjust = -0.2, angle = 90)+
+  theme_classic()
+
+    }), 'k=1 so no groups to compare which is necessary for the heatmap')
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+bcranks_ncells_ndrops_plot_fn <-  function(dset, don_nm) {
+    label_data = distinct(dset, donor, species, jumpcode, n_cells_cell_estimate_estimated_ncells, n_cells_total_droplets_estimated_ndroplets)
+    
+    dset %>%
+      data.frame() %>%
+      filter(!(duplicated(rank))) %>%
+      ggplot(., aes(x = rank, y = total)) +
+          geom_point(size = 0.3, alpha = 0.6) +
+          scale_x_log10() +
+          scale_y_log10() +
+        geom_vline(aes(xintercept = n_cells_cell_estimate_estimated_ncells)) +
+      geom_vline(aes(xintercept = n_cells_total_droplets_estimated_ndroplets)) +
+      labs(title = don_nm) +
+      geom_text(data = label_data,
+                aes(y = 5, 
+                    x = n_cells_cell_estimate_estimated_ncells, 
+                    label = "cell_estimate"),
+                vjust = -0.2, angle = 90) +
+      geom_text(data = label_data,
+                aes(y = 5, 
+                    x = n_cells_total_droplets_estimated_ndroplets, 
+                    label = "total_droplets"),
+                vjust = -0.2, angle = 90) +
+      facet_wrap2(vars(donor, species, jumpcode), ncol = 6, scales = "free_x") +
+      theme_classic()
+
+  
+  
+}
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+##Read edrops results matrices
+map(don_names, ~{
+  don = .x
+  all_bcrank_mrg_sset <- all_bcrank_mrg %>% filter(donor == don)
+ 
+  bcranks_ncells_ndrops_plot_fn(dset = all_bcrank_mrg_sset, don_nm = don)
+  
+})
+
+```
+
+```{r, message=F, warning=F, eval=T}
+gogo()
+```
+
+
+```{r}
+all_msc_bp_raw_noHsGns_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS")
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read edrops results matrices
+imap(all_msc_bp_raw_noHsGns_mdata, ~.x %>%
+    data.frame() %>%
+  # filter(total < 500) %>% 
+  filter(!(duplicated(rank))) %>%
+  # rename("total_umi" = detected) %>%
+  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
+  #                             is_cell_ed == "CellEd" ~ "CellEd",
+  #                             TRUE ~ "Non-Cell")) %>%
+  ggplot(., aes(x = rank, y = total)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+    geom_hline(yintercept = c(20, 50, 100, 150, 200)) +
+    labs(title = .y) +
+      geom_text(data = data.frame(lims = c(20, 50, 100, 150, 200), pos = rep(500, 5)), mapping = aes(x = pos, y = lims, label = lims), vjust = -0.2)
+)
+
+```
+
+
+```{r, fig.height= 4, fig.width= 4, eval=T}
+all_msc_bp_raw_noHsGns_mdata_mrg <- map2(all_msc_bp_raw_noHsGns_mdata, man_thresh[names(all_msc_bp_raw_noHsGns_mdata)], ~{
+  .x %>% 
+    # filter(!is.na(is_cell_cb)) %>%
+    mutate(rank = rank(desc(nCount_RNA), ties.method = "average"),
+           pf_rank = rank(desc(pf_umi_count), ties.method = "average"),
+           hs_rank = rank(desc(hs_umi_count), ties.method = "average"),
+           man_thresh = .y) #%>% 
+    # filter(!(duplicated(rank) & duplicated(pf_rank) & duplicated(hs_rank) ))
+}) %>%
+  bind_rows(., .id = "donor")
+
+
+```
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+kneeplt_facet_fn(ncount_tbl = all_msc_bp_raw_noHsGns_mdata_mrg %>% filter(!(duplicated(pf_rank)), .by = "donor") , cell_call_methd = "donor", donor_group = "donor", numbr_of_cols = 5, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(40,50))
+
+```
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+kneeplt_facet_fn(ncount_tbl = all_msc_bp_raw_noHsGns_mdata_mrg %>% filter(!(duplicated(pf_rank)), .by = "donor") , cell_call_methd = "donor", donor_group = "donor", numbr_of_cols = 5, rank_var = "hs_rank", cell_var = "hs_umi_count")
+
+```
+
+
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+kneeplt_facet_fn(ncount_tbl = all_msc_bp_raw_noHsGns_mdata_mrg %>% filter(!(duplicated(pf_rank)), .by = "donor") , cell_call_methd = "donor", donor_group = "donor", numbr_of_cols = 5, rank_var = "pf_rank", cell_var = "nCount_RNA")
+
+```
+
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+kneeplt_facet_fn(ncount_tbl = all_msc_bp_raw_noHsGns_mdata_mrg %>% filter(!(duplicated(pf_rank)), .by = "donor") , cell_call_methd = "donor", donor_group = "donor", numbr_of_cols = 5, rank_var = "hs_rank", cell_var = "nCount_RNA")
+
+```
+
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+all_msc_bp_raw_noHsGns_mdata_mrg %>% 
+  filter(nCount_RNA > 5) %>%
+  filter((duplicated(pf_rank) & duplicated(hs_rank) & (duplicated(rank))), .by = "donor") %>%
+  arrange(rank)
+
+```
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+all_msc_bp_raw_noHsGns_mdata_mrg %>% 
+  filter(!(duplicated(pf_rank) & duplicated(hs_rank) & (duplicated(rank))), .by = "donor") %>%
+  rename("all_rank" = rank) %>%
+  rename("all_umi_count" = nCount_RNA) %>%
+  pivot_longer(cols = c(pf_rank, hs_rank, all_rank, pf_umi_count, hs_umi_count, all_umi_count), names_to = c("species", ".value"), names_pattern = "(pf|hs|all)_(rank|umi_count)") %>%
+  kneeplt_facet_fn(ncount_tbl = . , donor_group = "donor", numbr_of_cols = 5, rank_var = "rank", cell_var = "umi_count", cell_call_methd = "species", mthd_col = c("pf" = "#007BFF", "all" = "#FFC107", "hs" = "#b2d8d8"), cut_offs = c(20,40,50))
+
+```
