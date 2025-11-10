@@ -1,5 +1,5 @@
 ---
-title: "MSC QC and preprocessing"
+title: "Mali 2022 Sample Decode File Preparation (JumpCode Integration)"
 date: '2022-07-11'
 author: 'Jesse Rop'
 output:
@@ -10,13 +10,11 @@ output:
     df_print: paged
 ---
 
-```{r}
+```{r load-libraries}
 suppressPackageStartupMessages({
   library(Seurat)
   library(sctransform)
-  # library(rgl)
   library(patchwork)
-  # library(DoubletFinder)
   library(ggrepel)
   library(ggpubr)
   library(dplyr) 
@@ -34,7 +32,6 @@ suppressPackageStartupMessages({
   library(Hmisc)
   library(rmarkdown)
   library(RColorBrewer)
-  # library(Platypus)
   library(ggvenn)
   library(conflicted)
   library(SoupX)
@@ -42,8 +39,6 @@ suppressPackageStartupMessages({
   library(ggh4x)
   library(SingleCellExperiment)
   library(scmap)
-  # library(ggsankey)
-  # library(findPC)
   library(BPCells)
   library(furrr)
   library(future.batchtools)
@@ -60,60 +55,58 @@ suppressPackageStartupMessages({
 ```
 
 
-```{r, setup}
-
-# knitr::opts_knit$set(root.dir = '/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/Mali2')
+```{r setup}
+# Set working directory
 knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
 ### Common functions
 
-#### Source commong functions, varriables and tables
-```{r}
-##Boxplot labeling function
+```{r source-functions}
+# Source common functions, variables and tables
 source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
 source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
+### Load sample metadata
 
-initialize variable for the sample names
-
-```{r}
+```{r load-sample-names}
+# Load sample metadata and extract sample names
 irods_id_sk21_mdata_cln <- read_csv("data/raw/irods_id_sk21_mdata_cln.csv") %>%
   mutate(sample_nm = str_remove_all(sample_name, "_JC")) %>%
   arrange(sample_nm)
 
-smpl_nms <-irods_id_sk21_mdata_cln$sample_nm
-#c("MSC24", "MSC33", "MSC37", "MSC38", "MSC39", "MSC40", "MSC45", "MSC48", "MSC49", "MSC50_MACS", "MSC50_SLO", "MSC53", "MSC54", "MSC55", "MSC57", "MSC60", "MSC66", "MSC67", "MSC68", "MSC70")
-# source_irods <- c("5736STDY11771545", "5736STDY11771544", "5736STDY11771536", "5736STDY11771546", "5736STDY11771535")
-# sample_name <- c("MSC1272", "MSC13", "MSC3", "MSC14", "MSC1")
+smpl_nms <- irods_id_sk21_mdata_cln$sample_nm
 ```
 
+### Process MRC sample analysis summary
 
-```{r}
-(mrc_sk21_summary <- read_csv("data/raw/MRC_Sample_Analysis_Summary_Summary.csv", skip = 1) )
+```{r load-mrc-summary}
+# Load MRC sample analysis summary (skip header row)
+(mrc_sk21_summary <- read_csv("data/raw/MRC_Sample_Analysis_Summary_Summary.csv", skip = 1))
 ```
 
-
-```{r}
-mrc_sk21_summary %>% filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72")) )
+```{r filter-pf-samples}
+# Filter for Pf-containing samples from SetB, SetC, and specific MSC samples
+mrc_sk21_summary %>% 
+filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72")) )
 ```
 
-```{r}
-## Preprocessing to count number of runs per sample JC + non_JC
+```{r count-runs-per-sample}
+# Count number of runs per sample (JumpCode + non-JumpCode)
 pf_22_jcode_run_num <- mrc_sk21_summary %>% 
   filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72") )) %>%
   mutate(sample_nm = str_remove_all(Sample_Name, "_JC|C72")) %>%
   group_by(sample_nm) %>%
   add_count(name = "runs") %>%
   rename('irods_id' = Sanger_SampleID)
-
 ```
 
+### Merge JumpCode and non-JumpCode runs
 
 ```{r}
-## Merging Jumpcode and non-jumpcode files for the same pair and including all the samples
+# Create wide format with separate columns for JumpCode and non-JumpCode irods_id
 pf_22_jcode_runs <- pf_22_jcode_run_num %>% 
   ungroup() %>%
   mutate(jc_sample = if_else(str_detect(Sample_Name, "JC"), "jcode_yes", "jcode_no")) %>%
@@ -125,29 +118,33 @@ pf_22_jcode_runs <- pf_22_jcode_run_num %>%
 
 ```
 
-```{r}
-## Merging Jumpcode and non-jumpcode files for the same pair and including all the samples
+```{r create-merged-decode}
+# Create decode files for merged and non-merged JumpCode samples
+# Merged: combined JC + non-JC (labeled with "C" suffix)
 pf_22_jcode_mergeYesNo <- pf_22_jcode_runs %>% 
   filter(!is.na(jcode_yes)) %>% 
   mutate("irods_samples" = irods_id_mrg)
 
+# Non-merged: non-JC only (labeled with "noJC" suffix)
 pf_22_jcode_No <- pf_22_jcode_runs %>% 
   filter(!is.na(jcode_yes)) %>% 
   mutate("irods_samples" = jcode_no)
 
+# Combine both versions and create final decode tables
 pf_solo_mixed_mdata_jcode_merge <- rbind(pf_22_jcode_No, pf_22_jcode_mergeYesNo) %>% 
   mutate(irods_id = str_replace(irods_samples, ",", "_"),
          sample_nm = case_when(str_detect(irods_id, "_") ~ paste0(sample_nm, "C"),
-                               T ~ paste0(sample_nm, "noJC")))
-  
+                               TRUE ~ paste0(sample_nm, "noJC")))
+
+# For CellRanger processing (includes irods_samples column)  
 pf_solo_mixed_jcode_merge_decode_cellranger <- pf_solo_mixed_mdata_jcode_merge %>%
   select(sample_nm, irods_id, mixed_infection2, irods_samples) 
 
+# For general use (simplified version)
 pf_solo_mixed_jcode_merge_decode <- pf_solo_mixed_mdata_jcode_merge %>%
   select(sample_nm, irods_id, mixed_infection2) 
-
-
 ```
+
 
 ```{r, eval=T}
 write_tsv(pf_solo_mixed_jcode_merge_decode_cellranger, "data/raw/pf_solo_mixed_jcode_merge_decode_cellranger.tsv")
@@ -155,17 +152,17 @@ write_csv(pf_solo_mixed_jcode_merge_decode, "data/raw/pf_solo_mixed_jcode_merge_
 
 ```
 
+### Filter samples for analysis
 
-```{r}
-## Getting only the jumpcode run where a sample was ran twice (non-jumpcode and jumpcode)
+```{r filter-jcode-runs}
+# Select JumpCode run when sample was run twice (prioritize JC over non-JC)
 pf_22_jcode <- pf_22_jcode_run_num %>%
-  filter(runs == 1 | runs ==2 & str_detect(Sample_Name, "JC")) 
-
+  filter(runs == 1 | (runs == 2 & str_detect(Sample_Name, "JC"))) 
 ```
 
-
-```{r}
-## Getting both pf solo infections and those mixed with other species
+```{r filter-pf-quality}
+# Filter Pf samples (solo and mixed infections) with quality thresholds
+# Exclude low-quality samples (MSC65, MSC69-71) and require >200 Pf reads
 pf_solo_mixed_mdata <- pf_22_jcode %>% 
   group_by(sample_nm) %>%
   add_count(name = "runs") %>%
@@ -179,7 +176,7 @@ pf_solo_mixed_mdata
 ```
 
 ```{r}
-## Getting  pf solo infections
+## Getting  pf solo species infections
 pf_solo_mdata <- pf_solo_mixed_mdata %>% 
   filter(str_detect(mixed_infection2, "solo")) 
 ```
@@ -190,10 +187,12 @@ pf_solo_mdata
 
 Copy the irods metadata file from local into farm
 ```{r, eval=T}
+## Write JC-prioritized pf solo and mixed species samples sets including additional metadata
 write_csv(pf_solo_mixed_mdata, "data/raw/pf_solo_mixed_mdata.csv")
 ```
 
 ```{r, eval=T}
+## Write JC-prioritized pf solo and mixed species samples sets including only the sample names and mixed infection status
 pf_solo_mixed_mdata_decode <- pf_solo_mixed_mdata %>% select(sample_nm, irods_id, mixed_infection2)
 
 write_csv(pf_solo_mixed_mdata_decode, "data/raw/pf_solo_mixed_mdata_decode.csv")
@@ -201,6 +200,7 @@ write_csv(pf_solo_mixed_mdata_decode, "data/raw/pf_solo_mixed_mdata_decode.csv")
 
 
 ```{r, eval=T}
+## Write JC-prioritized, nonJC, JC+nonJC all processing metadata
 pf_all_mdata <- rbind(pf_solo_mixed_mdata, pf_solo_mixed_mdata_jcode_merge %>% select(-c(irods_samples)))
 
 write_csv(pf_all_mdata, "data/raw/pf_all_mdata.csv")
@@ -208,25 +208,9 @@ write_csv(pf_all_mdata, "data/raw/pf_all_mdata.csv")
 
 
 ```{r, eval=T}
+## Write JC-prioritized, nonJC, JC+nonJC but only sample name decoding information and mixed infection status
 pf_all_id_decode <- pf_all_mdata %>% select(sample_nm, irods_id,  mixed_infection2)
 
 write_csv(pf_all_id_decode, "data/raw/pf_all_id_decode.csv")
-```
-
-## Genotype clustering for MSC
-
-Read in clusters.tsv files with assignment of cells to strains and PCA plots metrics
-
-Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
-
-```{r}
-
-##Sample ID
-sample_name <- str_sort(pf_solo_mixed_mdata$sample_nm)
-smpl_nms <-str_sort(pf_solo_mixed_mdata$sample_nm)
-
-##Sample IDs
-source_irods <- pf_solo_mixed_mdata[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
-
 ```
 
