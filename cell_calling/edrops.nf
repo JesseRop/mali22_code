@@ -12,16 +12,13 @@ params.qc_stats_scrpt = "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/q
 
 // - raw objects
 // ## !! NOTE - USE raw_feature_bc_matrix.h5 and not the folder raw_feature_bc_matrix/ since nextflow can't expand to all the donor paths when using the folder after specifying 5736STDY*
-params.input_raw_mtx = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/5736STDY*/outs/raw_feature_bc_matrix.h5"
+params.input_raw_mtx = "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/{cellranger_runs,cellranger_runs_rmHsapiens}/Pf_all_genes/5736STDY*/outs/raw_feature_bc_matrix.h5"
 
 // - output directory
 params.o_path = "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/"
 
-// - souporcell output folder
-params.o_dir = "edrops"
-params.o_prfx = "wo_retain"
-
-params.limt = ["50", "100", "150", "200"]
+// params.limt = ["50", "100", "150", "200"]
+params.limt = "50,100,150,200"
 limt_v = (params.limt instanceof List) ? params.limt : params.limt.toString().split(',')
 limt_v_bcranks = ['1'] + limt_v.flatten()
 
@@ -31,8 +28,10 @@ limt_bcranks_ch = Channel.from(limt_v_bcranks)
 // limt_ch.view()
 // limt_bcranks_ch.view()
 
-params.retain_nm = ["wo_retain", "w_retain"]
-params.retain_val = ["Inf", "NULL"]
+// params.retain_nm = ["wo_retain", "w_retain"]
+// params.retain_val = ["Inf", "NULL"]
+params.retain_nm = "wo_retain,w_retain"
+params.retain_val = "Inf,NULL"
 
 nms = (params.retain_nm instanceof List) ? params.retain_nm : params.retain_nm.toString().split(',')
 vals = (params.retain_val instanceof List) ? params.retain_val : params.retain_val.toString().split(',')
@@ -46,8 +45,8 @@ retain_ch = Channel.from( [nms, vals].transpose() )
 params.fdr_l= "0.01"
 
 // - compute resources for first process
-ncores="2"
-mem="10 GB"
+ncores="5"
+mem="20 GB"
 
 
 input_raw_ch = Channel
@@ -66,111 +65,58 @@ id_ch = Channel
 // id_ch.view()
 
 
-input_all_ch = id_ch
+// Combined input channel for all analyses
+combined_input_ch = id_ch
                     .combine(input_raw_ch, by:0)
-                    .combine(limt_ch) 
-                    .combine(retain_ch)
-                    .map { file -> tuple(file[1], file[2], "${params.o_path}"+file[1]+"/edrops", file[3], file[5], "edrops_"+file[3]+"_"+file[4]+".RDS", "edrops_"+file[3]+"_"+file[4]+"_slim.RDS") }
+                    .map { file ->
+                        def sample = file[1]
+                        def raw_p = file[2]
+                        def suffix = raw_p.toString().contains('cellranger_runs_rmHsapiens') ? 'edrops_rmHs' : 'edrops_wHsPf'
+                        def out_p = "${params.o_path}${sample}/"+suffix
+                        tuple(sample, raw_p, out_p)
+                    }
+
+combined_input_ch.view()
 
 
-// input_all_ch.view()
-
-input_bcrank_ch = id_ch
-                    .combine(input_raw_ch, by:0)
-                    .combine(limt_bcranks_ch) 
-                    .map { file -> tuple(file[1], file[2], "${params.o_path}"+file[1]+"/edrops", file[3], "bcrank_"+file[3]+".RDS", "bcrank_"+file[3]+"_knee.RDS", "bcrank_"+file[3]+"_inflctn.RDS", "bcrank_"+file[3]+"_uniq.RDS") }
-
-// input_bcrank_ch.view()
-
-qc_stats_ch = id_ch
-                    .combine(input_raw_ch, by:0)
-                    .map { file -> tuple(file[1], file[2], "${params.o_path}"+file[1]+"/edrops", "qc_stats.RDS") }
-
-qc_stats_ch.view()
-
-
-// - Run edrops
-process EDROPS {
+// - Combined process for all analyses
+process ALL_ANALYSES {
     memory "${mem}"
     cpus "${ncores}"
+    queue "small"
 
     errorStrategy 'ignore' 
 
-    tag "edrops on ${sample_nm} reads"
+    tag "analyses on ${sample_nm} reads"
 
-    // publishDir params.outdir_index_temp, mode: "copy"
     publishDir "${out_p}/", mode: 'copy', overwrite: true
 
     input:
-    tuple val(sample_nm), path(raw_p), val(out_p), val(limt), val(retain), val(out_nm), val(out_nm_slim)
+    tuple val(sample_nm), path(raw_p), val(out_p)
 	
     output:
     tuple val(sample_nm), path("*")
 
 	script:
 	"""
-    module load HGI/softpack/groups/team222/Pf_scRNAseq/32
+    module load HGI/softpack/groups/team222/Pf_scRNAseq/34
 
-    Rscript ${params.scrpt} ${raw_p} ${limt} ${retain} ${params.fdr_l} ${out_nm}  ${out_nm_slim}
-    
-	"""			
-    
-}
+    # Run EDROPS for all limit and retain combinations
+    ${limt_v.collect { limt ->
+        [nms, vals].transpose().collect { retain_pair ->
+            def retain_nm = retain_pair[0]
+            def retain_val = retain_pair[1]
+            "Rscript ${params.scrpt} ${raw_p} ${limt} ${retain_val} ${params.fdr_l} edrops_${limt}_${retain_nm}.RDS edrops_${limt}_${retain_nm}_slim.RDS"
+        }.join('\n    ')
+    }.join('\n    ')}
 
-ncores_bc="1"
-mem_bc="10 GB"
+    # Run BCRANK for all limits (including '1')
+    ${limt_v_bcranks.collect { limt ->
+        "Rscript ${params.bcrank_scrpt} ${raw_p} ${limt} bcrank_${limt}.RDS bcrank_${limt}_knee.RDS bcrank_${limt}_inflctn.RDS bcrank_${limt}_uniq.RDS"
+    }.join('\n    ')}
 
-// - Run edrops
-process BCRANK {
-    memory "${mem_bc}"
-    cpus "${ncores_bc}"
-
-    // errorStrategy 'ignore' 
-
-    tag "bcranks on ${sample_nm} reads"
-
-    // publishDir params.outdir_index_temp, mode: "copy"
-    publishDir "${out_p}/", mode: 'copy', overwrite: true
-
-    input:
-    tuple val(sample_nm), path(raw_p), val(out_p), val(limt), val(out_bcrank), val(out_bcrank_knee), val(out_bcrank_inflctn), val(out_bcrank_uniq)
-	
-    output:
-    tuple val(sample_nm), path("*")
-
-	script:
-	"""
-    module load HGI/softpack/groups/team222/Pf_scRNAseq/32
-
-    Rscript ${params.bcrank_scrpt} ${raw_p} ${limt} ${out_bcrank} ${out_bcrank_knee} ${out_bcrank_inflctn} ${out_bcrank_uniq}
-    
-	"""			
-    
-}
-
-// - Run edrops
-process QC_STATS {
-    memory "${mem_bc}"
-    cpus "${ncores_bc}"
-
-    // errorStrategy 'ignore' 
-
-    tag "qc stats on ${sample_nm} reads"
-
-    // publishDir params.outdir_index_temp, mode: "copy"
-    publishDir "${out_p}/", mode: 'copy', overwrite: true
-
-    input:
-    tuple val(sample_nm), path(raw_p), val(out_p), val(out_qc_stats)
-	
-    output:
-    tuple val(sample_nm), path("*")
-
-	script:
-	"""
-    module load HGI/softpack/groups/team222/Pf_scRNAseq/32
-
-    Rscript ${params.qc_stats_scrpt} ${raw_p} ${out_qc_stats}
+    # Run QC_STATS
+    Rscript ${params.qc_stats_scrpt} ${raw_p} qc_stats.RDS
     
 	"""			
     
@@ -178,14 +124,8 @@ process QC_STATS {
 
 workflow {
     
-    edrops_out_ch = EDROPS(input_all_ch)
-    // edrops_out_ch.view()
-
-    bcrank_out_ch = BCRANK(input_bcrank_ch)
-    // bcrank_out_ch.view()
-
-    stats_out_ch = QC_STATS(qc_stats_ch)
-    // stats_out_ch.view()
+    all_out_ch = ALL_ANALYSES(combined_input_ch)
+    // all_out_ch.view()
 
 }
 
