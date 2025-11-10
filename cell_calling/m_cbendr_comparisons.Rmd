@@ -204,21 +204,46 @@ sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
 # sample_name_pf_LR_mod <- paste0(sample_name, "_rmHS_LRpt000005e250")
 # sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
 
-sample_name_LR_mod <- paste0(sample_name, "_yascp_default_pfhs_dir")
-sample_name_LR <- paste0(sample_name, "_LRpt0001")
-sample_name_pf_LR_mod <- paste0(sample_name, "_yascp_default_pf_dir")
-sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
+# sample_name_LR_mod <- paste0(sample_name, "_yascp_default_pfhs_dir")
+# sample_name_LR <- paste0(sample_name, "_LRpt0001")
+# sample_name_pf_LR_mod <- paste0(sample_name, "_yascp_default_pf_dir")
+# sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
+
+sample_name_LR_mod <- paste0(sample_name, "_wHsPf_LR0.000005_E250")
+sample_name_LR <- paste0(sample_name, "_wHsPf_LR0.0001_E150")
+sample_name_pf_LR_mod <- paste0(sample_name, "_rmHs_LR0.000005_E250")
+sample_name_pf <- paste0(sample_name, "_rmHs_LR0.0001_E150")
 
 ```
 
 ```{r, message=F, warning=F, eval=T}
+dirs <- Sys.glob("data/processed/Pf/MSC*/cbender_custom_*/cb*")
+class(dirs)
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
-cbender_mdata_std_yascp_syst <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*|/'))) %>% 
+cbender_mdata_std_yascp_syst <- map(dirs, ~list.files(.x, pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom|_gns|/cb_mdata.*|/cb|/'))))  %>% unlist(., recursive = F) %>% 
+  # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*|/'))) %>% 
   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|/cb_yascp_default|_dir|_gns|/cb_mdata.*'))) %>% 
   .[c(sample_name_LR, sample_name_LR_mod, sample_name_pf, sample_name_pf_LR_mod)] %>%
   .[!is.na(.)] %>%
   map(read_csv) 
+```
+
+
+```{r, message=F, warning=F, eval=T}
+# ##Read BPcells matrices
+# cbender_mdata_std_yascp_syst <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom|_gns|/cb_mdata.*|/'))) %>% 
+#   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*|/'))) %>% 
+#   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|/cb_yascp_default|_dir|_gns|/cb_mdata.*'))) %>% 
+#   .[c(sample_name_LR, sample_name_LR_mod, sample_name_pf, sample_name_pf_LR_mod)] %>%
+#   .[!is.na(.)] %>%
+#   map(read_csv) 
 ```
 
 ```{r, message=F, warning=F, eval=T}
@@ -233,8 +258,12 @@ cbender_std_yascpCr_mrg_syst <- pmap(
          full_join(., ..4 %>% rename_with(~ paste0(.x, "_ypf"), -all_of("barcode")), by = "barcode")
        }) 
 
-names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir")
+names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir|_wHsPf_LR0.000005_E250")
+# names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir")
 ```
+
+
+
 ########################################################################### JUMP to where it says "PICK UP FROM HERE"
 
 ```{r, message=F, warning=F, eval=T}
@@ -576,119 +605,6 @@ all_cbender_mdata_std_yascpCr_mrg %>%
 
 ```
 ########################################################################### PICK UP FROM here
-```{r, message=F, warning=F, eval=T}
-##Read output from cellbender standard pipeline and cellbender yascp pipeline
-# cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_trial_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
-
-cbender_cutoffs <- list.files("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/yascp_default_pfhs_dir/results/preprocessing/cellbender", pattern = "umi_count_estimates.*_cutoff.tsv.gz*", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre.*ing/cellbender/|/cellbender-.*estimates-|_cutoff.tsv.gz'))) %>% 
-  # .[c(sample_name, sample_name_yascp)] %>%
-  .[!is.na(.)] %>%
-  map(read_tsv) 
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
-##Read output from cellbender standard pipeline and cellbender yascp pipeline
-cbender_cutoffs_all <- cbender_cutoffs %>%
-  bind_rows(., .id = "donor_cutoff") %>%
-  mutate(across(method, ~str_remove(., "dropletutils::barcoderanks::")))
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
-
-cbender_cutoffs_all_ncells_ndrops <- cbender_cutoffs_all %>%
-  filter(method %in% c('estimated_ncells', 'estimated_ndroplets', 'knee', 'inflection')) 
-
-```
-
-```{r, message=F, warning=F, eval=T}
-cbender_cutoffs_all_ncells_ndrops %>% 
-  filter(donor_cutoff == paste0("MSC1", "total_droplets"))  %>% 
-  filter(method == "knee") %>% pull(n_cells)
-```
-
-
-```{r, message=F, warning=F, eval=T}
-# cbender_cutoffs_all_ncells_ndrops %>% filter(str_match(donor_cutoff, "MSC12.*")) %>% filter(method == "knee") %>% pull(n_cells)
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read bcrank results matrices
-all_bcrank <- list.files("data/processed/Pf", pattern = "bcrank_1.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/edrops/bcrank_1.*'))) %>% 
-  .[sample_name] %>%
-  .[!is.na(.)] %>%
-  map(readRDS) 
-```
-
-
-```{r, message=F, warning=F, eval=T}
-##Read edrops results matrices
-map(c("knee", "inflection"), ~{
-  knee_or_inlctn <- .x
-  imap(all_bcrank, ~{
-  hlines_df = data.frame(lims = c(cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "cell_estimate")) %>% filter(method == knee_or_inlctn) %>% pull(umi_counts_cutoff),
-                                  cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "total_droplets")) %>% filter(method == knee_or_inlctn)  %>% pull(umi_counts_cutoff)),
-                         labls = c("cell_estimate", "total_droplets"),
-                         pos = rep(500, 2))
-  print(hlines_df)
-  
-  .x %>%
-    data.frame() %>%
-  # filter(total < 500) %>% 
-  filter(!(duplicated(rank))) %>%
-  # rename("total_umi" = detected) %>%
-  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
-  #                             is_cell_ed == "CellEd" ~ "CellEd",
-  #                             TRUE ~ "Non-Cell")) %>%
-  ggplot(., aes(x = rank, y = total)) +
-      geom_point(size = 0.3, alpha = 0.6) +
-      # scale_colour_manual(values = rank_colours) +
-      scale_x_log10() +
-      scale_y_log10() +
-    geom_hline(yintercept = hlines_df$lims) +
-    labs(title = paste0(.y, knee_or_inlctn)) +
-      geom_text(data = hlines_df, mapping = aes(x = pos, y = lims, label = labls), vjust = -0.2)
-
-    })
-})
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read edrops results matrices
-imap(all_bcrank, ~{
-  hlines_df = data.frame(lims = c(cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "cell_estimate")) %>% filter(method == "estimated_ncells") %>% pull(n_cells),
-                                  cbender_cutoffs_all_ncells_ndrops %>% filter(donor_cutoff == paste0(.y, "total_droplets")) %>% filter(method == "estimated_ndroplets") %>% pull(n_cells)),
-                         labls = c("cell_estimate", "total_droplets"),
-                         pos = rep(5, 2))
-  # print(hlines_df)
-  
-  .x %>%
-    data.frame() %>%
-  # filter(total < 500) %>% 
-  filter(!(duplicated(rank))) %>%
-  # rename("total_umi" = detected) %>%
-  # mutate(category = case_when(total_umi <= 50 ~ "Below_Limit",
-  #                             is_cell_ed == "CellEd" ~ "CellEd",
-  #                             TRUE ~ "Non-Cell")) %>%
-  ggplot(., aes(x = rank, y = total)) +
-      geom_point(size = 0.3, alpha = 0.6) +
-      # scale_colour_manual(values = rank_colours) +
-      scale_x_log10() +
-      scale_y_log10() +
-    geom_vline(xintercept = hlines_df$lims) +
-    labs(title = .y) +
-      geom_text(data = hlines_df, mapping = aes(y = pos, x = lims, label = labls), vjust = -0.2, angle = 90)+
-  theme_classic()
-
-    }) 
-
-```
-
 
 ### Compare cellbender iterations and also with cellranger
 
