@@ -45,7 +45,7 @@ suppressPackageStartupMessages({
   # library(ggsankey)
   # library(findPC)
   library(BPCells)
-  # library(furrr)
+  library(furrr)
   # library(future.batchtools)
   library(parallel)
   library(EnhancedVolcano)
@@ -92,11 +92,18 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 
 ```
 
-
 ###################START- RAW READING#############
 
 ```{r, eval=T}
-pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
 ```
 
 ## Genotype clustering for MSC
@@ -113,12 +120,16 @@ slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
 
 # ## poor quality samples
 # sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39", "MSC50_SLO", "MSC33")
-sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
 
 sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
 # 
-# # slct_sample_names[-c(sample_rm)]
-slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+## slct_sample_names[-c(sample_rm)]
+# slct_sample_names <- slct_sample_names[!slct_sample_names %in% c(sample_rm, sample_mxd)]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% c(sample_rm, sample_mxd)]
 
 ## get relevant sample names
 pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
@@ -132,20 +143,9 @@ source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>%
 
 ```
 
-
-```{r, message=F, warning=F, eval=F}
-## read filtered barcodes
-barcodes <- list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", pattern = "barcodes.tsv.gz$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|outs/filtered.*'))) %>% 
-  .[source_irods] %>%
-  set_names(names(source_irods)) %>%
-  read_tsv()
-```
-
-
 ```{r, message=F, warning=F, eval=F}
 ## Get the number of cells that pass cellranger filter
-crangr_filt_num <- system("zgrep -c '' /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz", intern = TRUE) 
+crangr_filt_num <- system("zgrep -c '' /lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_run*/Pf_all_genes/*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz", intern = TRUE) 
 ```
 
 
@@ -163,7 +163,7 @@ pf_mdata_decode_cranger_filt_n %>% write_csv(., "data/raw/pf_mdata_decode_crange
 
 ```{r, fig.width=15, fig.height=5}
 donor_10x_mdata_sk21_summ <- readRDS("data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS") %>%
-  filter(donor %in% slct_sample_names) 
+  filter(donor %in% unique(str_remove(slct_sample_names, "noJC$|C$"))) 
 
 ```
 
@@ -209,15 +209,27 @@ sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
 # sample_name_pf_LR_mod <- paste0(sample_name, "_yascp_default_pf_dir")
 # sample_name_pf <- paste0(sample_name, "_rmHS_LRpt0001")
 
-sample_name_LR_mod <- paste0(sample_name, "_wHsPf_LR0.000005_E250")
-sample_name_LR <- paste0(sample_name, "_wHsPf_LR0.0001_E150")
-sample_name_pf_LR_mod <- paste0(sample_name, "_rmHs_LR0.000005_E250")
-sample_name_pf <- paste0(sample_name, "_rmHs_LR0.0001_E150")
+# sample_name_LR_mod <- paste0(sample_name, "_wHsPf_LR0.000005_E250")
+# sample_name_LR <- paste0(sample_name, "_wHsPf_LR0.0001_E150")
+# sample_name_pf_LR_mod <- paste0(sample_name, "_rmHs_LR0.000005_E250")
+# sample_name_pf <- paste0(sample_name, "_rmHs_LR0.0001_E150")
+
+sample_hsLRloEhi <- paste0(sample_name, "_wHsPf_LR0.000005_E250")
+sample_hsLRloElo <- paste0(sample_name, "_wHsPf_LR0.000005_E150")
+sample_hsLRhiEhi <- paste0(sample_name, "_wHsPf_LR0.0001_E250")
+sample_hsLRhiElo <- paste0(sample_name, "_wHsPf_LR0.0001_E150")
+
+sample_pfLRloEhi <- paste0(sample_name, "_rmHs_LR0.000005_E250")
+sample_pfLRloElo <- paste0(sample_name, "_rmHs_LR0.000005_E150")
+sample_pfLRhiEhi <- paste0(sample_name, "_rmHs_LR0.0001_E250")
+sample_pfLRhiElo <- paste0(sample_name, "_rmHs_LR0.0001_E150")
+
+sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo")
 
 ```
 
 ```{r, message=F, warning=F, eval=T}
-dirs <- Sys.glob("data/processed/Pf/MSC*/cbender_custom_*/cb*")
+dirs <- Sys.glob("data/processed/Pf/MSC*/cbender_custom2_*/cb*")
 class(dirs)
 
 ```
@@ -226,10 +238,10 @@ class(dirs)
 ```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
 cbender_mdata_std_yascp_syst <- map(dirs, ~list.files(.x, pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom|_gns|/cb_mdata.*|/cb|/'))))  %>% unlist(., recursive = F) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom2|_gns|/cb_mdata.*|/cb|/'))))  %>% unlist(., recursive = F) %>% 
   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*|/'))) %>% 
   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|/cb_yascp_default|_dir|_gns|/cb_mdata.*'))) %>% 
-  .[c(sample_name_LR, sample_name_LR_mod, sample_name_pf, sample_name_pf_LR_mod)] %>%
+  .[c(sample_hsLRloEhi, sample_hsLRloElo, sample_hsLRhiEhi, sample_hsLRhiElo, sample_pfLRloEhi, sample_pfLRloElo, sample_pfLRhiEhi, sample_pfLRhiElo)] %>%
   .[!is.na(.)] %>%
   map(read_csv) 
 ```
@@ -247,16 +259,32 @@ cbender_mdata_std_yascp_syst <- map(dirs, ~list.files(.x, pattern = "cb_mdata.cs
 ```
 
 ```{r, message=F, warning=F, eval=T}
+# Create a list of dataframes to join, with their corresponding suffixes
+dfs_to_join <- list(
+  cbender_mdata_std_yascp_syst[sample_hsLRloEhi],
+  cbender_mdata_std_yascp_syst[sample_hsLRloElo],
+  cbender_mdata_std_yascp_syst[sample_hsLRhiEhi],
+  cbender_mdata_std_yascp_syst[sample_hsLRhiElo],
+  cbender_mdata_std_yascp_syst[sample_pfLRloEhi],
+  cbender_mdata_std_yascp_syst[sample_pfLRloElo],
+  cbender_mdata_std_yascp_syst[sample_pfLRhiEhi],
+  cbender_mdata_std_yascp_syst[sample_pfLRhiElo]
+)
 
-cbender_std_yascpCr_mrg_syst <- pmap(
-  list(cbender_mdata_std_yascp_syst[sample_name_LR_mod], 
-       cbender_mdata_std_yascp_syst[sample_name_LR], 
-       cbender_mdata_std_yascp_syst[sample_name_pf_LR_mod], 
-       cbender_mdata_std_yascp_syst[sample_name_pf] ), ~{
-       full_join(..1, ..2, by = "barcode", suffix = c("_lhs", "_yhs")) %>%
-         full_join(., ..3 %>% rename_with(~ paste0(.x, "_lpf"), -all_of("barcode")), by = "barcode") %>%
-         full_join(., ..4 %>% rename_with(~ paste0(.x, "_ypf"), -all_of("barcode")), by = "barcode")
-       }) 
+# Get the number of samples
+n_samples <- length(dfs_to_join[[1]])
+
+# For each sample, join all 8 dataframes with appropriate suffixes
+cbender_std_yascpCr_mrg_syst <- map(1:n_samples, function(i) {
+  # Extract the i-th dataframe from each of the 8 lists and add suffix
+  map2(dfs_to_join, sample_sufx_cb, function(df_list, suffix) {
+    df_list[[i]] %>% rename_with(~ paste0(.x, suffix), -all_of("barcode"))
+  }) %>%
+    reduce(full_join, by = "barcode")
+})
+
+# Assign names from the first list (they should all have the same names)
+names(cbender_std_yascpCr_mrg_syst) <- names(dfs_to_join[[1]])
 
 names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir|_wHsPf_LR0.000005_E250")
 # names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_mrg_syst), "_LRpt000005e250|_yascp_default_pfhs_dir|_yascp_default_pf_dir")
@@ -266,357 +294,26 @@ names(cbender_std_yascpCr_mrg_syst) <- str_remove_all(names(cbender_std_yascpCr_
 
 ########################################################################### JUMP to where it says "PICK UP FROM HERE"
 
-```{r, message=F, warning=F, eval=T}
-gogo()
-```
 
-```{r, message=F, warning=F, eval=F}
-##Read BPcells matrices
-# cbender_mdata_std_yascp <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
-#   .[c(sample_name, sample_name_rmHs, sample_name_yascpCranger, sample_name_LRate_mod)] %>%
-#   .[!is.na(.)] %>%
-#   map(read_csv) 
-```
-
-
-```{r, message=F, warning=F, eval=F}
-##Read BPcells matrices
-sample_name_yascpCranger_nms <- names(cbender_mdata_std_yascp)[str_detect(names(cbender_mdata_std_yascp), "yascpCr")]
-sample_name_yascpCranger_nms <- sample_name_yascpCranger_nms[!str_detect(sample_name_yascpCranger_nms, "MSC50_SLO_yascpCr")]
-
-```
-
-```{r, message=F, warning=F, eval=F}
-cbender_std_yascpCr_mrg <- pmap(
-  list(cbender_mdata_std_yascp[str_remove(sample_name_yascpCranger_nms, "_yascpCr")],
-       cbender_mdata_std_yascp[paste0(str_remove(sample_name_yascpCranger_nms, "_yascpCr"), "_rm_HS")],
-       cbender_mdata_std_yascp[sample_name_yascpCranger_nms],
-       cbender_mdata_std_yascp[paste0(str_remove(sample_name_yascpCranger_nms, "_yascpCr"), "_LRpt000025")]), ~{
-       full_join(..1, ..2, by = "barcode", suffix = c("_wHs", "_rmHs")) %>%
-         full_join(., ..3 %>% rename_with(~ paste0(.x, "_yCr"), -all_of("barcode")), by = "barcode") %>%
-         full_join(., ..4 %>% rename_with(~ paste0(.x, "_lrt"), -all_of("barcode")), by = "barcode")
-       }) 
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-cbender_std_yascpCr_mrg_syst_don <- cbender_std_yascpCr_mrg_syst %>%
-  bind_rows(., .id = "donor") %>%
-  filter(!(cell_probability_lpf == 1 & cell_probability_ypf ==1 & cell_probability_lhs ==1 & cell_probability_yhs ==1))
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-cbender_std_yascpCr_mrg_syst_don %>%
-  ggplot(aes(x=cell_probability_lpf, y = cell_probability_ypf)) +
-  geom_point(size = 0.0001) +
-  geom_density2d() +
-  facet_wrap(. ~ donor)
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by using the pf+Hs gene counts
-all_cbender_mdata_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter((cell_probability_wHs < 0.9 & cell_probability_rmHs > 0.9) | (is.na(cell_probability_wHs)  & cell_probability_rmHs > 0.9)) %>%
-  # filter(cell_size_rmHs >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by using the pf+Hs gene counts
-all_cbender_mdata_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(cell_probability_wHs < 0.9 & cell_probability_rmHs > 0.9) %>%
-  filter(cell_size_rmHs >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(!(cell_probability_wHs == 1 & cell_probability_rmHs ==1)) %>%
-  ggplot(aes(x=cell_probability_wHs, y = cell_probability_rmHs)) +
-  geom_bin2d(bins = 100) +
-  scale_fill_continuous(type = "viridis") +
-  theme_bw() +
-  facet_wrap(. ~ donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  ggplot(aes(x=cell_size_wHs, y = cell_size_rmHs)) +
-  geom_point(size = 0.01) +
-  geom_abline() +
-  facet_wrap(. ~ donor)
-
-```
-
-```{r, message=F, warning=F, eval=T}
-cbender_mdata_std_yascp[[1]] %>% str
-
-```
-
-```{r, message=F, warning=F, eval=T}
-cbender_mdata_std_yascp[[1]] %>% 
-  pivot_longer()
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
-imap(cbender_mdata_std_yascp, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = background_fraction, y = cell_probability)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.5) +
-    labs(title = .y)
-)
-```
-
-
-```{r, message=F, warning=F, eval=T}
-imap(cbender_mdata_std_yascp, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = background_fraction, y = cell_probability)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.5) +
-    labs(title = .y)
-)
-```
-
-
-```{r, message=F, warning=F, eval=T, fig.height=9, fig.width=7}
-cbender_mdata_std_yascp %>%
-  bind_rows(., .id = "donor") %>% 
-      filter(cell_probability > 0.8) %>%
-  group_by(donor) %>% 
-  mutate(bg_50 = sum(background_fraction > 0.5)) %>% 
-  ungroup() %>%
-  ggplot(aes(x = background_fraction)) +
-    geom_histogram() +
-    geom_text(aes(label=bg_50, x = 0.8, y = 200),  size = 3)+
-    geom_vline(xintercept = 0.5) +
-    facet_wrap(donor ~ ., scales = "free_y", ncol = 5)
-
-```
-
-```{r, message=F, warning=F, eval=T, fig.height=8, fig.width=12}
-cbender_mdata_std_yascp %>%
-  bind_rows(., .id = "donor") %>% 
-      filter(cell_probability > 0.8) %>%
-  count(donor, background_fraction>0.5)
-
-```
-
-```{r, message=F, warning=F, eval=T}
-imap(cbender_mdata_std_yascp, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = background_fraction, y = cell_size)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.5) +
-    labs(title = .y)
-)
-```
-
-```{r, message=F, warning=F, eval=T}
-imap(cbender_mdata_std_yascp, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = cell_probability, y = cell_size)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.9) +
-    labs(title = .y)
-)
-
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-all_cbender_mdata_pass.5 <- map(cbender_mdata_std_yascp, ~.x %>% filter(cell_probability>0.5) %>% pull(barcode))
-
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-sample_name_yascp <- paste0(sample_name, "_yascp")
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read output from cellbender standard pipeline and cellbender yascp pipeline
-all_cbender_mdata_std_yascp <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
-  .[c(sample_name, sample_name_yascp)] %>%
-  .[!is.na(.)] %>%
-  map(read_csv) 
-```
-
-```{r, message=F, warning=F, eval=T}
-all_cbender_mdata_std_yascp_mrg <- map2(all_cbender_mdata_std_yascp[sample_name], all_cbender_mdata_std_yascp[sample_name_yascp], ~{
-  full_join(.x, .y, by = "barcode", suffix = c("_std", "_yascp")) 
-}) 
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  # filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
-  ggplot(aes(x=cell_probability_std, y = cell_probability_yascp)) +
-  geom_point(size = 0.0001) +
-  geom_density2d() +
-  facet_wrap(. ~ donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by standard cellbender
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(cell_probability_yascp > 0.9) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by standard cellbender
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(cell_probability_std > 0.9) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by standard cellbender
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  # filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9)) %>%
-  filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9) | (is.na(cell_probability_std)  & cell_probability_yascp > 0.9)) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by yascp cellbender
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  # filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9)) %>%
-  filter((cell_probability_yascp < 0.9 & cell_probability_std > 0.9) | (is.na(cell_probability_yascp)  & cell_probability_std > 0.9)) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by using the pf+Hs gene counts
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(cell_probability_std < 0.9 & cell_probability_yascp > 0.9) %>%
-  filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
-  ggplot(aes(x=cell_probability_std, y = cell_probability_yascp)) +
-  geom_bin2d(bins = 100) +
-  scale_fill_continuous(type = "viridis") +
-  theme_bw() +
-  facet_wrap(. ~ donor)
-
-```
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_std_yascp_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  ggplot(aes(x=cell_size_std, y = cell_size_yascp)) +
-  geom_point(size = 0.01) +
-  geom_abline() +
-  facet_wrap(. ~ donor)
-
-```
-
-
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-sample_name_yascpCranger <- paste0(sample_name, "_yascpCr")
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read output from cellbender standard pipeline and cellbender yascp pipeline
-all_cbender_mdata_std_yascpCr <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
-  .[c(sample_name_yascp, sample_name_yascpCranger)] %>%
-  .[!is.na(.)] %>%
-  map(read_csv) 
-```
-
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-sample_name_yascpCranger_nms <- names(all_cbender_mdata_std_yascpCr)[str_detect(names(all_cbender_mdata_std_yascpCr), "yascpCr")]
-```
-
-
-```{r, message=F, warning=F, eval=T}
-all_cbender_mdata_std_yascpCr_mrg <- map2(all_cbender_mdata_std_yascpCr[str_remove(sample_name_yascpCranger_nms, "Cr")], all_cbender_mdata_std_yascpCr[sample_name_yascpCranger_nms], ~{
-  full_join(.x, .y, by = "barcode", suffix = c("_std", "_yascpCr")) 
-}) 
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-all_cbender_mdata_std_yascpCr_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  # filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
-  ggplot(aes(x=cell_probability_std, y = cell_probability_yascpCr)) +
-  geom_point(size = 0.0001) +
-  geom_density2d() +
-  facet_wrap(. ~ donor)
-
-```
-
-
-```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
-## Count pf cells that are potentially missed by standard cellbender
-all_cbender_mdata_std_yascpCr_mrg %>%
-  bind_rows(., .id = "donor") %>%
-  filter(cell_probability_std > 0.9) %>%
-  # filter(cell_size_yascp >= 100) %>%
-  count(donor)
-
-```
 ########################################################################### PICK UP FROM here
 
 ### Compare cellbender iterations and also with cellranger
 
 ```{r, message=F, warning=F, eval=T}
-## Read Cellranger filtered barcodes
-cranger_bcodes <- list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", pattern = "barcodes.tsv.gz$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|/outs/filtered_feature_bc_matrix.*'))) %>% 
+bcodes_dirs <- Sys.glob("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/*/outs/filtered_feature_bc_matrix/barcodes.tsv.gz")
+class(bcodes_dirs)
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+cranger_bcodes <- map(bcodes_dirs, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/|/outs/filtered.*')))) %>% 
+  unlist(., recursive = F) %>% 
   .[source_irods] %>%
   set_names(names(source_irods)) %>%
-  # .[sample_name] %>%
   map(.,~read_tsv(., col_names = "bcode")) 
-
 ```
 
 
@@ -637,6 +334,24 @@ cr_cbender_mdata_hmnz_syst_snky <- map2(cbender_std_yascpCr_mrg_syst, cranger_bc
       
 ```
 
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+# Set up parallel processing
+plan(multisession, workers = 7)
+
+# Parallelize plot generation
+cb_snky_plts <- future_imap(cr_cbender_mdata_hmnz_syst_snky, ~snk_pt_fn(., strns_2_plt = c("cr", paste0("cb", sample_sufx_cb)), labls = c("cr", paste0("cb", sample_sufx_cb)), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')), .options = furrr_options(seed = TRUE))
+
+# Clean up
+plan(sequential)
+
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+map(cb_snky_plts, ~.x + 
+      theme(axis.text.x = element_text(angle = 20, hjust = 0.8, face = "plain")))
+
+```
+
 
 ```{r}
 ## Read raw cellranger metadata with the sum of Human and Pf reads
@@ -645,22 +360,120 @@ all_msc_bp_raw_noHsGns_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw
 
 
 ```{r, message=F, warning=F, eval=T}
-cr_cbender_mdata_hmnz_syst_snky_gns <- map2(cr_cbender_mdata_hmnz_syst_snky[intersect(names(cr_cbender_mdata_hmnz_syst_snky), names(all_msc_bp_raw_noHsGns_mdata))],
+cr_cbender_mdata_hmnz_syst_snky_pfumi <- map2(cr_cbender_mdata_hmnz_syst_snky[intersect(names(cr_cbender_mdata_hmnz_syst_snky), names(all_msc_bp_raw_noHsGns_mdata))],
                             all_msc_bp_raw_noHsGns_mdata[intersect(names(cr_cbender_mdata_hmnz_syst_snky), names(all_msc_bp_raw_noHsGns_mdata))],
                             ~left_join(.x, 
                                        .y %>% rownames_to_column("barcode"), 
-                                       by = "barcode")# %>%
-                              # filter(pf_umi_count >= 100)
+                                       by = "barcode") #%>%
+                              #filter(pf_umi_count >= 100 & !is.na(pf_umi_count))
                             )
 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
+# Parallelize plot generation
+plan(multisession, workers = 7)
 
-imap(cr_cbender_mdata_hmnz_syst_snky_gns, ~snk_pt_fn(., strns_2_plt = c("cr", "cb_yhs", "cb_lhs", "cb_ypf", "cb_lpf"), labls = c("cr", "cb_yhs", "cb_lhs", "cb_ypf", "cb_lpf"), bp_face = c("bold", "bold", "bold", "bold", "bold"), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')))
+cb_snky_plts_pf100 <- future_imap(cr_cbender_mdata_hmnz_syst_snky_pfumi, ~snk_pt_fn(.x %>% filter(pf_umi_count >= 100 & !is.na(pf_umi_count)), strns_2_plt = c("cr", paste0("cb", sample_sufx_cb)), labls = c("cr", paste0("cb", sample_sufx_cb)), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')), .options = furrr_options(seed = TRUE))
+
+plan(sequential)
 
 ```
 
+```{r, message=FALSE, warning=FALSE}
+map(cb_snky_plts_pf100, ~.x + 
+      theme(axis.text.x = element_text(angle = 20, hjust = 0.8, face = "plain")))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+runs2plot <- c("cr", paste0("cb", c("_hsLRloEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRhiElo")))
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Parallelize plot generation
+plan(multisession, workers = 7)
+
+cb_snky_plts_pf100_set <- future_imap(cr_cbender_mdata_hmnz_syst_snky_pfumi, ~snk_pt_fn(.x %>% filter(pf_umi_count >= 100 & !is.na(pf_umi_count)), strns_2_plt = runs2plot, labls = runs2plot, ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')), .options = furrr_options(seed = TRUE))
+
+plan(sequential)
+
+```
+
+```{r}
+## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
+cr_cbender_mdata_hmnz <- map2(cr_cbender_mdata_hmnz_syst_snky_pfumi, cranger_bcodes[names(cr_cbender_mdata_hmnz_syst_snky_pfumi)], ~.x %>%
+    mutate(#is_cell_cr = case_when(barcode %in% .y$bcode ~ "Cr"),
+           is_cell_cb_hs = case_when(cell_probability_hsLRhiElo > 0.5  ~ "Cbh", cell_probability_hsLRhiElo <= 0.5  ~ "nonCell"),
+           is_cell_cb_pf = case_when(cell_probability_pfLRhiElo > 0.5  ~ "Cbp", cell_probability_pfLRhiElo <= 0.5  ~ "nonCell"),
+           is_cell_cb_yhs = case_when(cell_probability_hsLRloEhi > 0.5  ~ "Cbyh", cell_probability_hsLRloEhi <= 0.5  ~ "nonCell"),
+           is_cell_cb_ypf = case_when(cell_probability_pfLRloEhi > 0.5  ~ "Cbyp", cell_probability_pfLRloEhi <= 0.5  ~ "nonCell")
+           ) #%>%
+      #full_join(., .y, by = c("barcode"="bcode"))
+    )
+         
+      
+```
+
+```{r}
+# go()
+## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
+cr_cbender_mdata_uni <- map(cr_cbender_mdata_hmnz, ~.x %>%
+    # filter() %>%
+    mutate(mthds_union = paste0(is_cell_cr, is_cell_cb_pf, is_cell_cb_yhs, is_cell_cb_ypf),
+           mthds_union = case_when(str_detect(mthds_union, "Cb|Cr") ~ str_remove_all(mthds_union, "nonCell|NA"),
+                                   !str_detect(mthds_union, "Cb|Cr") ~ str_remove_all(mthds_union, "NA"),
+                                   T ~ mthds_union),
+           mthds_union = case_when(str_detect(mthds_union, "nonCell") ~  "nonCell",
+                                   T ~ mthds_union)
+           ))
+         
+# sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo")
+      
+```
+
+
+```{r}
+cr_cbender_mdata_uni[[1]] %>% glimpse()
+```
+
+```{r}
+## Convert mthds_union to factor
+## Get all possible combinations of factors factoring in the order in which the variables were introduced
+# c_mthds <- c("Cr", "Cbhs", "Cbpf", "Cbycr")
+c_mthds <- c("Cr", "Cbp", "Cbyh", "Cbyp")
+c_mthds <- str_replace_all(c_mthds, "Cb", "")
+
+c_combos <- map(1:length(c_mthds), ~ combn(c_mthds, .x, paste0, collapse = "_")) %>% unlist() %>% dput()
+c_combos <- c(rev(c_combos), "nonCell")
+
+
+set.seed(12)
+c_combos_cols <- sample(c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#fabebe', '#008080', '#e6beff', '#9a6324',  '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075'), length(c_combos)) %>% set_names(c_combos)
+
+c_combos_cols <- ifelse(names(c_combos_cols) == "nonCell", "lightgrey", c_combos_cols)  %>% set_names(c_combos)
+
+```
+
+
+```{r}
+# go()
+## Convert mthds_union to factor
+
+cr_cbender_mdata_uni <- map(cr_cbender_mdata_uni, ~.x %>%
+    # mutate(across(mthds_union, ~factor(., levels = c_combos)))%>%
+    mutate(across(mthds_union, ~factor(str_replace_all(., c("^Cb" = "", "Cb" = "_")), levels = c_combos)))
+)
+
+```
+
+```{r}
+map(cr_cbender_mdata_uni[1:2], ~.x %>% count(is_cell_cr,is_cell_cr, is_cell_cb_pf, is_cell_cb_yhs, is_cell_cb_ypf, mthds_union))
+
+```
+
+
+#########################################################################START## RUN for custom selected samples based on the cellbender convergence plot
 
 
 ```{r}
@@ -668,11 +481,11 @@ sample_cbender_select <- c("MSC12_LRpt0001", "MSC13_LRpt0001", "MSC14_LRpt000005
 ```
 
 
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 sample_cbender_select_ptns <- ifelse(str_detect(sample_cbender_select, "LRpt000005e250"), c("lhs|lpf"), c("dhs|dpf")) %>% set_names(str_remove(sample_cbender_select, "_LR.*"))
 ```
 
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 cbender_std_yascpCr_mrg_syst_slct <- map2(cbender_std_yascpCr_mrg_syst,  sample_cbender_select_ptns[names(cbender_std_yascpCr_mrg_syst)], ~.x %>%
        select(barcode, contains(str_remove(.y, "\\|.*")), contains(str_remove(.y, ".*\\|"))) %>%
          rename_with(~ str_replace_all(.x, c("lhs"="hs", "dhs"="hs", "lpf"="pf", "dpf"="pf")), -all_of("barcode"))
@@ -680,7 +493,7 @@ cbender_std_yascpCr_mrg_syst_slct <- map2(cbender_std_yascpCr_mrg_syst,  sample_
 ```
 
 
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 ## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
 cr_cbender_mdata_slct_hmnz <- map2(cbender_std_yascpCr_mrg_syst_slct, cranger_bcodes[names(cbender_std_yascpCr_mrg_syst_slct)], ~.x %>%
     mutate(#is_cell_cr = case_when(barcode %in% .y$bcode ~ "Cr"),
@@ -692,43 +505,7 @@ cr_cbender_mdata_slct_hmnz <- map2(cbender_std_yascpCr_mrg_syst_slct, cranger_bc
       
 ```
 
-```{r}
-go()
-## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
-cr_cbender_mdata_hmnz <- map2(cbender_std_yascpCr_mrg, cranger_bcodes[names(cbender_std_yascpCr_mrg)], ~.x %>%
-    mutate(#is_cell_cr = case_when(barcode %in% .y$bcode ~ "Cr"),
-           is_cell_cb_wHs = case_when(cell_probability_wHs > 0.5  ~ "Cbhs", cell_probability_wHs <= 0.5  ~ "nonCell"),
-           is_cell_cb_rmHs = case_when(cell_probability_rmHs > 0.5  ~ "Cbpf", cell_probability_rmHs <= 0.5  ~ "nonCell"),
-           is_cell_cb_yCr = case_when(cell_probability_yCr > 0.5  ~ "Cbycr", cell_probability_yCr <= 0.5  ~ "nonCell"),
-           is_cell_cb_lrt = case_when(cell_probability_lrt > 0.5  ~ "Cblrt", cell_probability_lrt <= 0.5  ~ "nonCell")
-           )  %>%
-      full_join(., .y, by = c("barcode"="bcode")))
-         
-      
-```
-
-```{r}
-go()
-## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
-cr_cbender_mdata_hmnz <- map2(cbender_std_yascpCr_mrg, cranger_bcodes[names(cbender_std_yascpCr_mrg)], ~.x %>%
-    mutate(#is_cell_cr = case_when(barcode %in% .y$bcode ~ "Cr"),
-           is_cell_cb_wHs = case_when(cell_probability_wHs > 0.5  ~ "Cbhs", cell_probability_wHs <= 0.5  ~ "nonCell"),
-           is_cell_cb_rmHs = case_when(cell_probability_rmHs > 0.5  ~ "Cbpf", cell_probability_rmHs <= 0.5  ~ "nonCell"),
-           is_cell_cb_yCr = case_when(cell_probability_yCr > 0.5  ~ "Cbycr", cell_probability_yCr <= 0.5  ~ "nonCell"),
-           is_cell_cb_lrt = case_when(cell_probability_lrt > 0.5  ~ "Cblrt", cell_probability_lrt <= 0.5  ~ "nonCell")
-           ) %>%
-      full_join(., .y, by = c("barcode"="bcode")))
-         
-      
-```
-
-
-```{r}
-## Read raw cellranger metadata with the sum of Human and Pf reads
-all_msc_bp_raw_noHsGns_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS") %>% .[sample_name]
-```
-
-```{r, message=F, warning=F, eval=T}
+```{r, message=F, warning=F, eval=F}
 cr_cbender_mdata_slct_hmnz_gns <- map2(cr_cbender_mdata_slct_hmnz[intersect(names(cr_cbender_mdata_slct_hmnz), names(all_msc_bp_raw_noHsGns_mdata))],
                             all_msc_bp_raw_noHsGns_mdata[intersect(names(cr_cbender_mdata_slct_hmnz), names(all_msc_bp_raw_noHsGns_mdata))],
                             ~left_join(.x, 
@@ -739,21 +516,10 @@ cr_cbender_mdata_slct_hmnz_gns <- map2(cr_cbender_mdata_slct_hmnz[intersect(name
 ```
 
 
-```{r, message=F, warning=F, eval=T}
-go()
-cr_cbender_mdata_hmnz_gns <- map2(cr_cbender_mdata_hmnz[intersect(names(cr_cbender_mdata_hmnz), names(all_msc_bp_raw_noHsGns_mdata))],
-                            all_msc_bp_raw_noHsGns_mdata[intersect(names(cr_cbender_mdata_hmnz), names(all_msc_bp_raw_noHsGns_mdata))],
-                            ~left_join(.x, 
-                                       .y %>% rownames_to_column("barcode"), 
-                                       by = "barcode")
-                            )
-
-```
-
 ## Sankey plots of cell calls
 
-```{r, message=FALSE, warning=FALSE}
-cr_cbender_mdata_uni_sanky <- map(cr_cbender_mdata_hmnz_gns, ~.x %>% 
+```{r, message=FALSE, warning=FALSE, eval=F}
+cr_cbender_mdata_slct_uni_sanky <- map(cr_cbender_mdata_slct_hmnz_gns, ~.x %>% 
       filter(pf_umi_count >= 100) %>% 
       select(barcode, contains("is_cell")) %>%
       mutate(across(-c(barcode), ~ifelse(str_detect(.x, "Cr|Cb"), "Cell", .x))) %>%
@@ -763,13 +529,13 @@ cr_cbender_mdata_uni_sanky <- map(cr_cbender_mdata_hmnz_gns, ~.x %>%
 ```
 
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, eval=F}
 
-imap(cr_cbender_mdata_uni_sanky, ~snk_pt_fn(., strns_2_plt = c("cr", "cb_wHs", "cb_rmHs", "cb_yCr", "cb_lrt"), labls = c("cr", "cb_wHs", "cb_rmHs", "cb_yCr", "cb_lrt"), bp_face = c("bold", "bold", "bold", "bold", "bold"), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')))
+imap(cr_cbender_mdata_slct_uni_sanky, ~snk_pt_fn(., strns_2_plt = c("cr", "cb_wHs", "cb_rmHs", "cb_yCr", "cb_lrt"), labls = c("cr", "cb_wHs", "cb_rmHs", "cb_yCr", "cb_lrt"), bp_face = c("bold", "bold", "bold", "bold", "bold"), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')))
   
 ```
 
-```{r}
+```{r, eval=F}
 ## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
 # cr_cbender_mdata_uni <- map(cr_cbender_mdata_hmnz, ~.x %>%
 cr_cbender_mdata_slct_uni <- map(cr_cbender_mdata_slct_hmnz_gns, ~.x %>%
@@ -784,54 +550,16 @@ cr_cbender_mdata_slct_uni <- map(cr_cbender_mdata_slct_hmnz_gns, ~.x %>%
       
 ```
 
-```{r}
-go()
-## Create a column summarising the agreement of call methods for each cell - called 'mthds_union'
-cr_cbender_mdata_uni <- map(cr_cbender_mdata_hmnz, ~.x %>%
-    # filter() %>%
-    mutate(mthds_union = paste0(is_cell_cr, is_cell_cb_wHs, is_cell_cb_rmHs, is_cell_cb_yCr),
-           mthds_union = case_when(str_detect(mthds_union, "Cb|Cr") ~ str_remove_all(mthds_union, "nonCell|NA"),
-                                   !str_detect(mthds_union, "Cb|Cr") ~ str_remove_all(mthds_union, "NA"),
-                                   T ~ mthds_union),
-           mthds_union = case_when(str_detect(mthds_union, "nonCell") ~  "nonCell",
-                                   T ~ mthds_union)
-           ))
-         
-      
-```
-
-```{r}
-## Convert mthds_union to factor
-## Get all possible combinations of factors factoring in the order in which the variables were introduced
-c_mthds <- c("Cr", "Cbhs", "Cbpf", "Cbycr")
-c_combos <- map(1:length(c_mthds), ~ combn(c_mthds, .x, paste0, collapse = "")) %>% unlist() %>% dput()
-c_combos <- c(rev(c_combos), "nonCell")
-
-set.seed(12)
-c_combos_cols <- sample(c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#fabebe', '#008080', '#e6beff', '#9a6324',  '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075'), length(c_combos)) %>% set_names(c_combos)
-
-c_combos_cols <- ifelse(names(c_combos_cols) == "nonCell", "lightgrey", c_combos_cols)  %>% set_names(c_combos)
-
-```
-
-
-```{r}
-go()
-## Convert mthds_union to factor
-
-cr_cbender_mdata_uni <- map(cr_cbender_mdata_uni, ~.x %>%
-    mutate(across(mthds_union, ~factor(., levels = c_combos)))
-)
-
-```
-
-```{r}
+```{r, eval=F}
 ## Convert mthds_union to factor
 cr_cbender_mdata_slct_uni <- map(cr_cbender_mdata_slct_uni, ~.x %>%
     mutate(across(mthds_union, ~factor(., levels = c_combos)))
 )
 
 ```
+
+#########################################################################END## RUN for custom selected samples based on the cellbender convergence plot
+
 
 ```{r}
 ## Convert mthds_union to factor
@@ -886,13 +614,12 @@ cr_cbender_mdata_slct_uni <- map(cr_cbender_mdata_slct_uni, ~.x %>%
 
 
 ```{r}
-map(cr_cbender_mdata_uni, ~.x %>% count(is_cell_cr, is_cell_cb_wHs, is_cell_cb_rmHs, mthds_union))
+# saveRDS(cr_cbender_mdata_uni, "data/processed/Pf/m2_all/cr_cbender_mdata_uni.RDS")
 
 ```
 
 ```{r}
-# saveRDS(cr_cbender_mdata_uni, "data/processed/Pf/m2_all/cr_cbender_mdata_uni.RDS")
-
+cr_cbender_mdata_slct_uni <- cr_cbender_mdata_uni
 ```
 
 ```{r, fig.width=10, fig.height=12}
@@ -906,7 +633,7 @@ map(cr_cbender_mdata_slct_uni, ~.x %>%
   geom_col() +
   # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
   geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.35))) +
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.5))) +
   scale_fill_manual(values = c_combos_cols) +
   facet_wrap(. ~ donor, ncol = 5, scales = "free_y") +
   theme_classic() +
@@ -918,7 +645,7 @@ map(cr_cbender_mdata_slct_uni, ~.x %>%
 ```
 
 
-```{r, fig.width=10, fig.height=12}
+```{r, fig.width=12, fig.height=14}
 
 map(cr_cbender_mdata_slct_uni, ~.x %>% 
       filter(pf_umi_count > 100) %>%
@@ -929,12 +656,12 @@ map(cr_cbender_mdata_slct_uni, ~.x %>%
   geom_col() +
   # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
   geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.35))) +
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.8))) +
   scale_fill_manual(values = c_combos_cols) +
   facet_wrap(. ~ donor, ncol = 5, scales = "free_y") +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        text = element_text(size = 13),
+        text = element_text(size = 11),
         legend.position = "bottom")
 
 
@@ -1000,6 +727,8 @@ saveRDS(cr_cbender_pf100_mdata_slct_uni, "data/processed/Pf/m2_all/cr_cbender_pf
 # Add emptydrops metadata
 all_raw_cbcr_mdata <- pmap(list(cr_cbender_pf100_mdata_slct_uni, all_msc_bp_raw_noHsGns_mdata[names(cr_cbender_pf100_mdata_slct_uni)]), ~{
   ..1 %>% 
+    mutate(cell_probability_pf = cell_probability_pfLRhiElo,
+           cell_probability_hs = cell_probability_hsLRhiElo) %>% 
     select(barcode, is_cell_cr, is_cell_cb_hs, is_cell_cb_pf, cell_probability_pf, cell_probability_hs, mthds_union, fnl_call) %>%
     full_join(..2 %>% rownames_to_column("barcode"), by = "barcode") %>% 
                            filter(nCount_RNA > 1) %>%
@@ -1011,44 +740,61 @@ all_raw_cbcr_mdata <- pmap(list(cr_cbender_pf100_mdata_slct_uni, all_msc_bp_raw_
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 ## read manual thresholds
 edrops_thresh <- readRDS("data/processed/Pf/m2_all/man_thresh.RDS")
 ```
 
-```{r, fig.height= 4, fig.width= 4, eval=T}
-all_rank_ncount_cb_hspf <- map2(all_raw_cbcr_mdata, edrops_thresh[names(all_raw_cbcr_mdata)], ~{
+```{r, eval=T}
+## read edrops thresholds
+yascp_cbender_cutoffs_all_ncells_ndrops <- readRDS("data/processed/Pf/m2_all/yascp_cbender_cutoffs_all_ncells_ndrops.RDS")
+```
+
+```{r, eval=T}
+yascp_cbender_cutoffs_all_ncells_ndrops %>% glimpse
+
+```
+
+```{r, fig.height= 4, fig.width= 4, eval=FALSE}
+yascp_ncells_estimates <- yascp_cbender_cutoffs_all_ncells_ndrops %>% filter() %>% select(sample, umi_counts_cutoff_total_droplets_knee, n_cells_total_droplets_estimated_ndroplets, n_cells_cell_estimate_estimated_ncells) %>% separate_wider_regex(sample, c(donor = ".*", "_" , species = "(?:rmHs|wHsPf)"), names_repair = "unique", cols_remove = TRUE) %>%
+ pivot_wider(names_from = species, values_from = c(umi_counts_cutoff_total_droplets_knee, n_cells_total_droplets_estimated_ndroplets, n_cells_cell_estimate_estimated_ncells)) %>%
+  rename_with(~ str_remove_all(.x, "_cutoff_total_droplets|n_cells_total_droplets_estimated_|n_cells_cell_estimate_estimated_"), everything())
+```
+
+```{r, fig.height= 4, fig.width= 4, eval=FALSE}
+all_rank_ncount_cb_hspf <- map(all_raw_cbcr_mdata, ~{
   .x %>% 
     # filter(!is.na(is_cell_cb_hs) & !is.na(is_cell_cb_hs) ) %>%
-    mutate(rank = rank(desc(nCount_RNA), ties.method = "average"),
-           man_thresh = .y) %>% 
+    mutate(rank = rank(desc(nCount_RNA), ties.method = "average")) %>% 
     filter(!(duplicated(rank) & is_cell_cb_hs %in% c("empty_bc", "nonCell") & is_cell_cb_pf %in% c("empty_bc", "nonCell")))
 }) %>%
-  bind_rows(., .id = "donor")
+  bind_rows(., .id = "donor") %>%
+  left_join(yascp_ncells_estimates, by = "donor")
 
 
 ```
 
 
-```{r, fig.height= 4, fig.width= 4, eval=T}
-all_rank_ncount_cb_hspf_mrg <- map2(all_raw_cbcr_mdata, edrops_thresh[names(all_raw_cbcr_mdata)], ~{
+```{r, fig.height= 4, fig.width= 4, eval=FALSE}
+all_rank_ncount_cb_hspf_mrg <- map(all_raw_cbcr_mdata, ~{
   .x %>% 
     # filter(!is.na(is_cell_cb)) %>%
     mutate(rank = rank(desc(nCount_RNA), ties.method = "average"),
            pf_rank = rank(desc(pf_umi_count), ties.method = "average"),
-           hs_rank = rank(desc(hs_umi_count), ties.method = "average"),
-           man_thresh = .y) #%>% 
+           hs_rank = rank(desc(hs_umi_count), ties.method = "average")) #%>% 
     # filter(!(duplicated(rank) & duplicated(pf_rank) & duplicated(hs_rank) ))
 }) %>%
-  bind_rows(., .id = "donor")
+  bind_rows(., .id = "donor") %>%
+  left_join(yascp_ncells_estimates, by = "donor")
 
 
 ```
 
+
 ```{r, fig.height= 10, fig.width= 10, eval=T}
 all_rank_ncount_cb_hspf_mrg %>%
   filter(!(duplicated(pf_rank) & is_cell_cb_hs %in% c("empty_bc", "nonCell") & is_cell_cb_pf %in% c("empty_bc", "nonCell")), .by = "donor") %>%
-  kneeplt_facet_fn(ncount_tbl = ., cell_call_methd = "fnl_call", mthd_col = cell_call_mthd_col, donor_group = "donor", numbr_of_cols = 5, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(50, 100))
+  kneeplt_facet_fn(ncount_tbl = ., cell_call_methd = "fnl_call", mthd_col = cell_call_mthd_col, donor_group = "donor", numbr_of_cols = 5, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(50, 100), thresh = "umi_counts_knee_rmHs")
 
 ```
 
@@ -1141,7 +887,7 @@ map(cr_cbender_mdata_uni, ~.x %>% count(mthds_union)) %>%
         text = element_text(size = 13),
         legend.position = "bottom")
 
-cr_cbender_mdata_uni[["MSC12"]] %>% filter(is.na(mthds_union))
+# cr_cbender_mdata_uni[["MSC12"]] %>% filter(is.na(mthds_union))
 ```
 
 ```{r, fig.width=10, fig.height=12}
@@ -1343,3 +1089,334 @@ map(cr_cbender_pf100_mdata_uni, ~.x %>%
 
 
 ```
+
+
+#########################################################################START## Need to investigate what happens here"
+```{r, message=F, warning=F, eval=T}
+gogo()
+```
+
+```{r, message=F, warning=F, eval=F}
+##Read BPcells matrices
+# cbender_mdata_std_yascp <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
+#   .[c(sample_name, sample_name_rmHs, sample_name_yascpCranger, sample_name_LRate_mod)] %>%
+#   .[!is.na(.)] %>%
+#   map(read_csv) 
+```
+
+
+```{r, message=F, warning=F, eval=F}
+##Read BPcells matrices
+sample_name_yascpCranger_nms <- names(cbender_mdata_std_yascp)[str_detect(names(cbender_mdata_std_yascp), "yascpCr")]
+sample_name_yascpCranger_nms <- sample_name_yascpCranger_nms[!str_detect(sample_name_yascpCranger_nms, "MSC50_SLO_yascpCr")]
+# sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo")
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+cbender_std_yascpCr_mrg_syst_don <- cbender_std_yascpCr_mrg_syst %>%
+  bind_rows(., .id = "donor")# %>%
+  # filter(!(cell_probability_lpf == 1 & cell_probability_ypf ==1 & cell_probability_lhs ==1 & cell_probability_yhs ==1))
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+cbender_std_yascpCr_mrg_syst_don %>%
+  ggplot(aes(x=cell_probability_pfLRhiElo, y = cell_probability_pfLRloEhi)) +
+  geom_point(size = 0.0001) +
+  geom_density2d() +
+  facet_wrap(. ~ donor)
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by using the pf+Hs gene counts
+cbender_std_yascpCr_mrg_syst_don %>%
+  # bind_rows(., .id = "donor") %>%
+  filter((cell_probability_hsLRloEhi < 0.9 & cell_probability_pfLRloEhi > 0.9) | (is.na(cell_probability_hsLRloEhi)  & cell_probability_pfLRloEhi > 0.9)) %>%
+  # filter(cell_size_pfLRloEhi >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by using the pf+Hs gene counts
+cbender_std_yascpCr_mrg_syst_don %>%
+  bind_rows(., .id = "donor") %>%
+  filter(cell_probability_hsLRloEhi < 0.9 & cell_probability_pfLRloEhi > 0.9) %>%
+  filter(cell_size_pfLRloEhi >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+cbender_std_yascpCr_mrg_syst_don %>%
+  bind_rows(., .id = "donor") %>%
+  filter(!(cell_probability_hsLRloEhi == 1 & cell_probability_pfLRloEhi ==1)) %>%
+  ggplot(aes(x=cell_probability_hsLRloEhi, y = cell_probability_pfLRloEhi)) +
+  geom_bin2d(bins = 100) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw() +
+  facet_wrap(. ~ donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+cbender_std_yascpCr_mrg_syst_don %>%
+  # bind_rows(., .id = "donor") %>%
+  ggplot(aes(x=cell_size_hsLRloEhi, y = cell_size_pfLRloEhi)) +
+  geom_point(size = 0.01) +
+  geom_abline() +
+  facet_wrap(. ~ donor)
+
+```
+
+```{r, message=F, warning=F, eval=T}
+cbender_mdata_std_yascp[[1]] %>% str
+
+```
+
+```{r, message=F, warning=F, eval=T}
+cbender_mdata_std_yascp[[1]] %>% 
+  pivot_longer()
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+imap(cbender_mdata_std_yascp, ~.x %>% 
+      filter(cell_probability > 0.5) %>%
+  ggplot(aes(x = background_fraction, y = cell_probability)) +
+    geom_point(size = 0.1) +
+    geom_vline(xintercept = 0.5) +
+    labs(title = .y)
+)
+```
+
+
+```{r, message=F, warning=F, eval=T}
+imap(cbender_mdata_std_yascp, ~.x %>% 
+      filter(cell_probability > 0.5) %>%
+  ggplot(aes(x = background_fraction, y = cell_probability)) +
+    geom_point(size = 0.1) +
+    geom_vline(xintercept = 0.5) +
+    labs(title = .y)
+)
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height=9, fig.width=7}
+cbender_mdata_std_yascp %>%
+  # bind_rows(., .id = "donor") %>% 
+      filter(cell_probability > 0.8) %>%
+  group_by(donor) %>% 
+  mutate(bg_50 = sum(background_fraction > 0.5)) %>% 
+  ungroup() %>%
+  ggplot(aes(x = background_fraction)) +
+    geom_histogram() +
+    geom_text(aes(label=bg_50, x = 0.8, y = 200),  size = 3)+
+    geom_vline(xintercept = 0.5) +
+    facet_wrap(donor ~ ., scales = "free_y", ncol = 5)
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height=8, fig.width=12}
+cbender_mdata_std_yascp %>%
+  # bind_rows(., .id = "donor") %>% 
+      filter(cell_probability > 0.8) %>%
+  count(donor, background_fraction>0.5)
+
+```
+
+```{r, message=F, warning=F, eval=T}
+imap(cbender_mdata_std_yascp, ~.x %>% 
+      filter(cell_probability > 0.5) %>%
+  ggplot(aes(x = background_fraction, y = cell_size)) +
+    geom_point(size = 0.1) +
+    geom_vline(xintercept = 0.5) +
+    labs(title = .y)
+)
+```
+
+```{r, message=F, warning=F, eval=T}
+imap(cbender_mdata_std_yascp, ~.x %>% 
+      filter(cell_probability > 0.5) %>%
+  ggplot(aes(x = cell_probability, y = cell_size)) +
+    geom_point(size = 0.1) +
+    geom_vline(xintercept = 0.9) +
+    labs(title = .y)
+)
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_mdata_pass.5 <- map(cbender_mdata_std_yascp, ~.x %>% filter(cell_probability>0.5) %>% pull(barcode))
+
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+sample_name_yascp <- paste0(sample_name, "_yascp")
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read output from cellbender standard pipeline and cellbender yascp pipeline
+all_cbender_mdata_std_yascp <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
+  .[c(sample_name, sample_name_yascp)] %>%
+  .[!is.na(.)] %>%
+  map(read_csv) 
+```
+
+```{r, message=F, warning=F, eval=T}
+all_cbender_mdata_std_yascp_mrg <- map2(all_cbender_mdata_std_yascp[sample_name], all_cbender_mdata_std_yascp[sample_name_yascp], ~{
+  full_join(.x, .y, by = "barcode", suffix = c("_std", "_yascp")) 
+}) 
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  # filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
+  ggplot(aes(x=cell_probability_std, y = cell_probability_yascp)) +
+  geom_point(size = 0.0001) +
+  geom_density2d() +
+  facet_wrap(. ~ donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by standard cellbender
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  filter(cell_probability_yascp > 0.9) %>%
+  # filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by standard cellbender
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  filter(cell_probability_std > 0.9) %>%
+  # filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by standard cellbender
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  # filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9)) %>%
+  filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9) | (is.na(cell_probability_std)  & cell_probability_yascp > 0.9)) %>%
+  # filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by yascp cellbender
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  # filter((cell_probability_std < 0.9 & cell_probability_yascp > 0.9)) %>%
+  filter((cell_probability_yascp < 0.9 & cell_probability_std > 0.9) | (is.na(cell_probability_yascp)  & cell_probability_std > 0.9)) %>%
+  # filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by using the pf+Hs gene counts
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  filter(cell_probability_std < 0.9 & cell_probability_yascp > 0.9) %>%
+  filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
+  ggplot(aes(x=cell_probability_std, y = cell_probability_yascp)) +
+  geom_bin2d(bins = 100) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw() +
+  facet_wrap(. ~ donor)
+
+```
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+all_cbender_mdata_std_yascp_mrg %>%
+  # bind_rows(., .id = "donor") %>%
+  ggplot(aes(x=cell_size_std, y = cell_size_yascp)) +
+  geom_point(size = 0.01) +
+  geom_abline() +
+  facet_wrap(. ~ donor)
+
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+sample_name_yascpCranger <- paste0(sample_name, "_yascpCr")
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read output from cellbender standard pipeline and cellbender yascp pipeline
+all_cbender_mdata_std_yascpCr <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*'))) %>% 
+  .[c(sample_name_yascp, sample_name_yascpCranger)] %>%
+  .[!is.na(.)] %>%
+  map(read_csv) 
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+sample_name_yascpCranger_nms <- names(all_cbender_mdata_std_yascpCr)[str_detect(names(all_cbender_mdata_std_yascpCr), "yascpCr")]
+```
+
+
+```{r, message=F, warning=F, eval=T}
+all_cbender_mdata_std_yascpCr_mrg <- map2(all_cbender_mdata_std_yascpCr[str_remove(sample_name_yascpCranger_nms, "Cr")], all_cbender_mdata_std_yascpCr[sample_name_yascpCranger_nms], ~{
+  full_join(.x, .y, by = "barcode", suffix = c("_std", "_yascpCr")) 
+}) 
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+all_cbender_mdata_std_yascpCr_mrg %>%
+  bind_rows(., .id = "donor") %>%
+  # filter(!(cell_probability_std == 1 & cell_probability_yascp ==1)) %>%
+  ggplot(aes(x=cell_probability_std, y = cell_probability_yascpCr)) +
+  geom_point(size = 0.0001) +
+  geom_density2d() +
+  facet_wrap(. ~ donor)
+
+```
+
+
+```{r, message=F, warning=F, fig.height=10, fig.width=10, eval=T}
+## Count pf cells that are potentially missed by standard cellbender
+all_cbender_mdata_std_yascpCr_mrg %>%
+  bind_rows(., .id = "donor") %>%
+  filter(cell_probability_std > 0.9) %>%
+  # filter(cell_size_yascp >= 100) %>%
+  count(donor)
+
+```
+
+#########################################################################END## Need to investigate what happens here"
