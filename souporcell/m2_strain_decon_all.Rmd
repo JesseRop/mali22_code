@@ -59,6 +59,9 @@ suppressPackageStartupMessages({
 knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
 ```
 
+```{r }
+# setwd('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/')
+```
 
 ### Common functions
 
@@ -72,11 +75,13 @@ source("mali22_code_lnk/pf_common_vars.R")
 
 
 ```{r}
-# source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_strain_decon_all_GE_postQC_header.R')
-source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_resc_ppQC_header.R')
-# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_resc_preQC_header.R')
-# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header_m55_m60.R')
-# source('mali22_code_lnk/local_rmd_nbooks/m2_strain_decon_all_preQC_header.R')
+source('mali22_code_lnk/souporcell/m2_strain_decon_all_headers/m2_strain_decon_all_resc_preQC_JC_header.R')
+# source('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/souporcell/m2_strain_decon_all_GE_postQC_header.R')
+# source('mali22_code_lnk/souporcell/m2_strain_decon_all_headers/m2_strain_decon_all_resc_preQC_header.R')
+# source('mali22_code_lnk/souporcell/m2_strain_decon_all_headers/m2_strain_decon_all_resc_ppQC_header.R')
+# source('mali22_code_lnk/souporcell/m2_strain_decon_all_resc_preQC_header.R')
+# source('mali22_code_lnk/souporcell/m2_strain_decon_all_preQC_header_m55_m60.R')
+# source('mali22_code_lnk/souporcell/m2_strain_decon_all_preQC_header.R')
 ```
 
 
@@ -103,12 +108,11 @@ map(clusters_log_likelihoods_lst, ~.x %>%
 ```
 
 
-
 ```{r, fig.width= 20, fig.height=4} 
 clusters_log_likelihoods_lst %>% 
   bind_rows(., .id = "sample_algnr") %>% 
-  separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",algnr = "[a-z].*")) %>%
-  # separate_wider_delim(., "sample_algnr", names = c("sample", "algnr"), delim = "_") %>% 
+  # separate_wider_regex(cols = "sample_algnr", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*|MSC[0-9]*[A-Za-z]*|MSC[0-9]*[A-Za-z]*_[A-Z]*", "_",algnr = "[a-z]*$")) %>%
+  separate_wider_regex(cols = "sample_algnr", patterns = c(sample = ".*", "_", algnr  = "minmap$|hsat$")) %>%
   mutate(across(c('sample'), ~factor(., levels = sample_name_nms))) %>%
   mutate(across(c('No_of_clusters'), ~factor(as.numeric(.)))) %>%
   ggplot(., aes(x = No_of_clusters, y = log_likelihood)) +
@@ -208,7 +212,8 @@ soupo_kselect_al <- soupc_all_al %>%
 # Compare HISAT and MINIMAP
 soupo_kselect_al_cor <- soupo_kselect_al %>%
   # separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
-  separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
+  # separate_wider_regex(cols = "sample_k", c(sample = "MSC[0-9]*|MSC[0-9]*_[A-Z]*", "_",aligner = "[a-z].*", "_", k = "\\d+")) %>%
+  separate_wider_regex(cols = "sample_k", patterns = c(sample = "M.*", "_", aligner  = "minmap|hsat", "_", k = "\\d+")) %>%
   unite(col = "sample_k", c('sample','k'), remove = FALSE)  %>%
   select("sample_k","aligner","barcode","Strain") %>% 
   dplyr::group_split(sample_k) %>%
@@ -352,21 +357,51 @@ soupo_kselect_list[str_detect(names(soupo_kselect_list), paste0(.x, "_"))] %>%
 
 
 ```{r}
-# ##Transfer stage labels and other metadata from farm
-# # list.files("data/processed/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
-# #   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) 
+# # ##Transfer stage labels and other metadata from farm
+# # # list.files("data/processed/Pf/", pattern = "msc_filt_w_dblts_scmap_metadata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
+# # #   set_names(nm = (str_remove_all(.,paste0('data/processed/', species, '//|_5736.*|/msc_filt_w_dblts_scmap_metadata.RDS')) %>% str_replace(., '/', '_'))) 
+# # 
+# # all_msc_anotd_preQC_mdata <- readRDS("data/processed/Pf/all_msc_anotd_preQC_mdata.RDS") %>% .[sample_name_nms]
+# # msc_mdata <- map(all_msc_anotd_preQC_mdata, ~.x %>% rownames_to_column('bcode'))
+# # # msc_mdata <- map2(all_msc_anotd_preQC_mdata, msc_qcd_anotd_mdata, ~.x  %>% select(StagePrelim) %>% rownames_to_column('bcode') %>% left_join(., .y %>% rownames_to_column('bcode'), by='bcode'))
 # 
-# all_msc_anotd_preQC_mdata <- readRDS("data/processed/Pf/all_msc_anotd_preQC_mdata.RDS") %>% .[sample_name_nms]
-# msc_mdata <- map(all_msc_anotd_preQC_mdata, ~.x %>% rownames_to_column('bcode'))
-# # msc_mdata <- map2(all_msc_anotd_preQC_mdata, msc_qcd_anotd_mdata, ~.x  %>% select(StagePrelim) %>% rownames_to_column('bcode') %>% left_join(., .y %>% rownames_to_column('bcode'), by='bcode'))
-
-all_ed_pref_w_mdata_cb_mdata <- readRDS(paste0("data/processed/", species, "/" , sv_dir, "/all_ed_pref_w_mdata_cb_mdata.csv"))
-msc_mdata <- map(all_ed_pref_w_mdata_cb_mdata, ~.x %>% 
-                   rownames_to_column('bcode') %>%
-                   mutate(StagePrelim = coalesce(StagePrelim, str_remove_all(fine_stg, "\\(|\\)"))))
+# all_ed_pref_w_mdata_cb_mdata <- readRDS(paste0("data/processed/", species, "/" , sv_dir, "/all_ed_pref_w_mdata_cb_mdata.csv"))
+# msc_mdata <- map(all_ed_pref_w_mdata_cb_mdata, ~.x %>% 
+#                    rownames_to_column('bcode') %>%
+#                    mutate(StagePrelim = coalesce(StagePrelim, str_remove_all(fine_stg, "\\(|\\)"))))
 
 ```
 
+
+```{r}
+##Transfer stage labels and other metadata from farm
+# # all_ed_pref_w_mdata_cb_mdata <- list.files("data/processed/Pf", pattern = "all_ed_pref_w_mdata_cbendr_mdata.RDS", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_prelim_stg_norm_cb_mdata <- list.files("data/processed/Pf", pattern = "all_seu_prelim_stg_norm_cb_mdata.csv", full.names = T, recursive = T, include.dirs = T) %>%
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_seu_prelim_stg_norm_cb_mdata.csv'))) %>%
+#   .[sample_name_nms] %>%
+#   map(read_csv)
+# 
+# msc_mdata <- map(all_seu_prelim_stg_norm_cb_mdata, ~.x %>% 
+#                                       rownames_to_column('bcode') %>%
+#                    mutate(StagePrelim = coalesce(str_remove_all(fine_stg, "\\(|\\)")))
+#                    # mutate(StagePrelim = coalesce(StagePrelim, str_remove_all(fine_stg, "\\(|\\)")))
+#                    )
+# 
+
+```
+
+
+
+```{r}
+##Transfer stage labels and other metadata from farm
+all_seu_prelim_stg_norm_cb_mdata <- readRDS(paste0("data/processed/", species, "/m2_all/all_seu_prelim_stg_norm_cb_mdata.RDS"))
+
+
+msc_mdata <- map(all_seu_prelim_stg_norm_cb_mdata, ~.x %>% 
+                   mutate(StagePrelim = sR_fine_stg)
+                   # mutate(StagePrelim = coalesce(StagePrelim, str_remove_all(fine_stg, "\\(|\\)")))
+                   )
+```
 
 ```{r}
 ##Transfer stage labels and other metadata from farm
@@ -625,10 +660,11 @@ snk_plts[str_detect(names(snk_plts), "lr_ref")]
 ```
 
 ```{r}
+#######!!!!!!! NOTE - Defined in header file
 ## Select most likely optimum k
-optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2, "MSC1" = 5, "MSC3" = 2, "MSC13" = 2, "MSC14" = 8, "MSC12" = 2) %>% .[sample_name_nms]
-
-optimum_k_aln = rep(optimum_k, length(algn_nms)) %>% set_names(sm_aln_nms_al)
+# optimum_k = c("MSC33" =8, "MSC48" =5, "MSC49" =6, "MSC55" =7, "MSC60" =8, "MSC66" =9, "MSC38" =4, "MSC40" =9, "MSC50_MACS" =2, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2, "MSC1" = 5, "MSC3" = 2, "MSC13" = 2, "MSC14" = 8, "MSC12" = 2) %>% .[sample_name_nms]
+# 
+# optimum_k_aln = rep(optimum_k, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 
 ```
 
@@ -748,7 +784,7 @@ aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>%
                       select(bcode, contains("_minmap_"), contains("hsatHMO")) %>%
         pivot_longer(cols = starts_with("Strain_hmo"),
          names_to = c(".value", "K"),
-         names_pattern = ".*[0-9]+_(.*)_([0-9]+$)")
+         names_pattern = ".*[0-9].*_(.*)_([0-9]+$)")
         ) 
 
 imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `minmap`, row_labs=`hsatHMO`, row_labs_c ='hsatHMO', col_labs_c= 'minmap', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
@@ -822,7 +858,7 @@ aln_comp_tbl <- map(strn_harmnzd_tbls_mn_hs2, ~.x %>%
                       select(bcode, contains("_hsat_"), contains("hsatHMO")) %>%
         pivot_longer(cols = starts_with("Strain_hmo"),
          names_to = c(".value", "K"),
-         names_pattern = ".*[0-9]+_(.*)_([0-9]+$)")
+         names_pattern = ".*[0-9].*_(.*)_([0-9]+$)")
         ) 
 
 imap(aln_comp_tbl, possibly(~phmap_lab_transfr(.x, col_labs= `hsat`, row_labs=`hsatHMO`, row_labs_c ='hsatHMO', col_labs_c= 'hsat', ttl = .y)), 'k=1 so no groups to compare which is necessary for the heatmap')
@@ -969,15 +1005,17 @@ Strain_qc_cutoff=0
 # optimum_k = c(8,6, 4,5,5) %>% set_names(sample_name_nms)
 # optimum_k = c(8,6, 4,5,5,10) %>% set_names(sample_name_nms)
 
+#######!!!!!!! NOTE - Defined in header file
+
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9))
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(4:6),"MSC60" = c(6:8),"MSC66" = c(7:9), "MSC38" = c(2:4), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2:4), "MSC57" = c(2:4))
 
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(3:5),"MSC49" = c(5:7),"MSC55" = c(7:9),"MSC60" = c(8:10), "MSC66" = c(7:9), "MSC38" = c(5:7), "MSC40" = c(7:9), "MSC50_MACS" = c(2:4), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:4), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(2:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:9), "MSC12" = c(2:3)) %>% .[sample_name_nms]
-opt_narrow_clusters_nms <-  list("MSC33" = c(8:9),"MSC48" = c(4:5),"MSC49" = c(6:7),"MSC55" = c(6:8),"MSC60" = c(7:8), "MSC66" = c(8:9), "MSC38" = c(5:7), "MSC40" = c(8:9), "MSC50_MACS" = c(2), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:3), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(3:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:8), "MSC12" = c(2:3)) %>% .[sample_name_nms]
+# opt_narrow_clusters_nms <-  list("MSC33" = c(8:9),"MSC48" = c(4:5),"MSC49" = c(6:7),"MSC55" = c(6:8),"MSC60" = c(7:8), "MSC66" = c(8:9), "MSC38" = c(5:7), "MSC40" = c(8:9), "MSC50_MACS" = c(2), "MSC53" = c(2), "MSC57" = c(2), "MSC24" = c(2), "MSC37" = c(5:7), "MSC39" = c(4:6), "MSC45" = c(2), "MSC50_SLO" = c(2:3), "MSC54" = c(2), "MSC67" = c(2), "MSC68" = c(3:4), "MSC70" = c(2), "MSC41"= c(3:5), "MSC51"= c(2), "MSC25"= c(2:3), "MSC1" = c(4:6), "MSC3" = c(2:3), "MSC13" = c(2:3), "MSC14" = c(7:8), "MSC12" = c(2:3)) %>% .[sample_name_nms]
 
 
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5))
-opt_narrow_clusters_nms_aln <- rep(opt_narrow_clusters_nms, length(algn_nms)) %>% set_names(sm_aln_nms_al)
+# opt_narrow_clusters_nms_aln <- rep(opt_narrow_clusters_nms, length(algn_nms)) %>% set_names(sm_aln_nms_al)
 # opt_narrow_clusters_nms <-  list("MSC33" = c(7:9),"MSC48" = c(4:6),"MSC49" = c(3:5),"MSC55" = c(4:6),"MSC60" = c(3:5), "MSC66" = c(8:10))
 
 
@@ -1171,6 +1209,11 @@ Calculate proportion of variance explained by PC1 and PC2
 # (pc_standard_deviations[2] ^ 2) / sum(pc_standard_deviations^2)
 ```
 
+```{r}
+## make directory for strain summary output
+system(paste0("mkdir -p data/processed/",species, "/" , sv_dir))
+
+```
 
 ```{r}
 ## Save PCA
@@ -1413,11 +1456,6 @@ map(strn_c_mdata, . %>%
 ```
 
 
-```{r}
-## make directory for strain summary output
-system(paste0("mkdir -p data/processed/",species, "/" , sv_dir))
-
-```
 
 ```{r}
 ##Save strain + new metadata as RDS
@@ -1603,11 +1641,10 @@ for (s in names(strn_c_mdata_with_ds)) {
   }
 
 }
+
 ```
 
-```{r}
-gogogo()
-```
+
 
 
 ```{r}
