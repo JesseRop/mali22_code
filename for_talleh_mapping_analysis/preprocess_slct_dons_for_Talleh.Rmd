@@ -1,0 +1,328 @@
+
+############ Merge
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+### Cbender filt
+imap(all_msc_cb_no_dbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_no_dbt.RDS")))
+
+```
+
+
+!!!NB - FARM CODE - DONT DELETE
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh
+
+```
+
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_msc_cb_no_dbt_sct <- list.files("data/processed/Pf", pattern = "all_msc_cb_no_dbt_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_msc_cb_no_dbt_sct.RDS'))) %>% 
+  # .[sample_name_all] %>%
+  .[sample_name] %>%
+  map(readRDS)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_stg_sct <- imap(all_msc_cb_no_dbt_sct, possibly(~{
+  cell_stg_plot <- DimPlot(.x, group.by = "sR_fine_stg", cols = sp_col_new, pt.size = 0.2) + 
+    theme_void() + 
+    theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)
+  
+  cell_stg_plot$data <- cell_stg_plot$data %>% rownames_to_column('bcode') %>% left_join(., .x@meta.data[,'seurat_clusters', drop = F] %>% rownames_to_column('bcode'), by='bcode') %>% column_to_rownames('bcode')
+  
+  cell_stg_plot<- LabelClusters(cell_stg_plot, id = "seurat_clusters", size = 4.5, repel = T)
+  return(cell_stg_plot)
+  
+  }, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_stg_sct, ncol = 4)
+```
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh
+
+```
+
+
+```{r, eval=T}
+stg_strn_dist <- map(all_msc_cb_no_dbt_sct[c("MSC49", "MSC55", "MSC60", "MSC66", "MSC68")], ~.x@meta.data %>% 
+      filter(!Strain_DN %in% c("Doublet", "Negative") & sR_fine_stg != "weak_score") %>%
+      mutate(stage_ag = case_when(str_detect(sR_fine_stg,"Male|Female") ~ "Sexual", 
+                                   str_detect(sR_fine_stg,"ring|troph|developing") ~ "Asexual",
+                                   T ~ sR_fine_stg),
+             stage_afm = case_when(str_detect(sR_fine_stg,"Male") ~ "Male", 
+                                   str_detect(sR_fine_stg,"Female") ~ "female", 
+                                   str_detect(sR_fine_stg,"ring|troph|developing") ~ "Asexual",
+                                   T ~ sR_fine_stg)) %>% 
+      count(stage_ag, Strain_DN)) %>%
+  bind_rows(., .id = "donor")
+```
+
+```{r, fig.width=16, fig.height=4}
+## !! NOTE -remove strains with less than 20 - should be done at the beginning
+# sympt_fev_tbl1 <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier[,v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier@meta.data %>% rownames_to_column('bcode') %>% add_count(StrainDon, name="strn_n") %>% filter(strn_n>20) %>% pull(bcode)] %>%
+#   .@meta.data %>%
+#   filter(dset != "Lab") %>%
+#   mutate(across(c(donor, StrainDon), ~str_remove_all(., "_SLO"))) %>% 
+#   # mutate(fev_sympt = case_when(fever == "Fever" & Symptomatic == "Symptomatic" ~ "Sympto_Fever", fever == "NoFever" & Symptomatic == "Asymptomatic" ~ "NonSympto_NoFever")) %>% 
+#   mutate(fev_sympt = case_when(fever == "Fever" & condition == "Symptomatic" ~ "Sympto_Fever", fever == "NoFever" & condition == "Asymptomatic" ~ "NonSympto_NoFever")) %>%
+#   add_count(StrainDon, name = "strain_n") #%>%
+#   # filter(strain_n > 20)
+
+```
+
+same as above without fever
+```{r, fig.width=16, fig.height=3.2}
+tbl <- stg_strn_dist %>% 
+  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  group_by(donor, stage_ag) %>%
+  add_count(name = "strn_n") %>% 
+  ungroup() %>%
+  mutate(prop_wdth =strn_n/n()) 
+
+## Get width proportions of the different facets based on number of strains per group
+p_width <- tbl%>% distinct(donor, stage_ag, prop_wdth) %>% pull(prop_wdth) %>% round(., digits = 2)
+
+tbl %>%
+  rename(c('Counts' =n, 'Strain' = Strain_DN))  %>%
+  # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
+  ggplot(., aes(x = Strain, y = Counts/1000, fill = stage_ag)) +
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
+  # scale_fill_manual(values = donor_cols %>% set_names(str_remove(names(donor_cols), "_SLO"))) +
+  geom_text(aes(label=Counts), angle = 90, hjust=0, vjust= 0.5, position = position_dodge2(width = 0.9, preserve = "single"), size = 5, show.legend = F, fontface ='plain') +
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.62))) +
+  ggh4x::facet_nested_wrap(vars(donor, stage_ag),  nrow = 1, scales = "free_x") +
+  theme_classic()+
+  theme(legend.position = "none", 
+        axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 15),
+        strip.text =element_text(size=16,face="bold", colour = 'black'
+                                 ),
+        panel.border=element_rect(colour="black",fill='transparent')
+        )+
+  # guides(x = "axis_nested") +
+  labs(x = "Strain", y = "Counts (X1000)") +
+  force_panelsizes(cols = p_width, respect = TRUE, total_width = unit(12.6, "inches"), total_height = unit(1.3, "inches"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+map(all_msc_cb_no_dbt_sct[c("MSC49", "MSC68")], ~.x@meta.data %>% mutate(stage_afm = ifelse(str_detect(sR_fine_stg,"ale|veloping"), "Sexual", "Asexual")) %>% count(stage_afm, Strain_DN))
+
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_msc_cb_no_dbt_sct, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_msc_cb_no_dbt_sct[c("MSC49", "MSC55", "MSC60", "MSC66", "MSC68")], ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_ta19_strn_dbt <- imap(all_msc_cb_no_dbt_sct[c("MSC49", "MSC55", "MSC60", "MSC66", "MSC68")], possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(Strain_DN %in% c("Doublet", "Negative"))  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_ta19_strn_dbt, ncol = 5)
+```
+
+```{r, warning=FALSE, message=FALSE}
+#
+all_msc_cb_no_dbt_sct_ta19 <- map(all_msc_cb_no_dbt_sct[c("MSC49", "MSC55", "MSC60", "MSC66", "MSC68")], ~subset(.x, subset = Strain_DN %in% c("Doublet", "Negative"), invert = T))
+all_msc_cb_no_dbt_sct_ta19 <- map(all_msc_cb_no_dbt_sct_ta19, ~subset(.x, subset = sR_fine_stg %in% c("weak_score", "discrepantFM"), invert = T))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Clean metadata names to make it easy for Talleh
+all_msc_cb_no_dbt_sct_ta19 <- map(all_msc_cb_no_dbt_sct_ta19, ~{
+  .x@meta.data %>%
+    rename(c("Stage" = "sR_fine_stg", "Strain" = "Strain_DN")) %>%
+    select(Stage, Strain) %>%
+    AddMetaData(.x, .)
+  })
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+#
+imap(all_msc_cb_no_dbt_sct_ta19, ~DimPlot(.x, dims = c(1,2), group.by = "Strain", pt.size = 0.1)+ scale_color_manual(values = strain_cols_n) + labs(title = .y))
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_msc_cb_no_dbt_sct_ta19, ~DimPlot(.x, dims = c(1,3), group.by = "Stage", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+all_msc_cb_no_dbt_sct_ta19[["MSC49"]]@meta.data %>% count(Strain)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+umap_pt_fn <- function(seu_obj, grp_var, color_var, ttl){
+  DimPlot(seu_obj, label = F, group.by = grp_var) + scale_color_manual(values = color_var) +
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = ttl)}
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_ta19_stg <- imap(all_msc_cb_no_dbt_sct_ta19, possibly(~{umap_pt_fn(seu_obj = .x, grp_var = "Stage", color_var = sp_col_new, ttl = .y)}, "no cells"))
+plot_grid(plotlist = plts_ta19_stg, ncol = 5)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_strn <- DimPlot(all_msc_cb_no_dbt_sct_ta19[["MSC66"]], group.by = "Strain", cols = strain_cols_n) + theme(legend.position = "bottom") + guides(color = guide_legend(override.aes = list(size = 4), title.position = "top", nrow = 1))
+
+plts_strn_lgnd <- get_plot_component(plts_strn, 'guide-box-bottom', return_all = TRUE)
+ggdraw(plts_strn_lgnd)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_ta19_strn <- imap(all_msc_cb_no_dbt_sct_ta19, possibly(~{umap_pt_fn(seu_obj = .x, grp_var = "Strain", color_var = strain_cols_n, ttl = .y)}, "no cells"))
+
+plot_grid(plot_grid(plotlist = plts_ta19_strn, ncol = 5),
+          plts_strn_lgnd,
+          nrow = 2,
+          rel_heights = c(8,2))
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_stg <- DimPlot(all_msc_cb_no_dbt_sct_ta19[["MSC66"]], group.by = "Stage", cols = sp_col_new) + theme(legend.position = "bottom") + guides(color = guide_legend(override.aes = list(size = 4), title.position = "top", nrow = 1))
+
+plts_stg_lgnd <- get_plot_component(plts_stg, 'guide-box-bottom', return_all = TRUE)
+ggdraw(plts_stg_lgnd)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_ta19_stg <- imap(all_msc_cb_no_dbt_sct_ta19, possibly(~{umap_pt_fn(seu_obj = .x, grp_var = "Stage", color_var = sp_col_new, ttl = .y)}, "no cells"))
+
+plot_grid(plot_grid(plotlist = plts_ta19_stg, ncol = 5),
+          plts_stg_lgnd,
+          nrow = 2,
+          rel_heights = c(8,2))
+```
+
+For Talleh
+```{r, warning=FALSE, message=FALSE}
+#
+all_msc_cb_no_dbt_sct_asexual_ta19_asex <- map(all_msc_cb_no_dbt_sct_ta19, ~subset(.x, subset = Stage %in% c("Early ring", "Late ring", "Early trophozoite", "Late trophozoite", "Gametocyte (developing)")))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_ta19_stg_asx <- imap(all_msc_cb_no_dbt_sct_asexual_ta19_asex, possibly(~{umap_pt_fn(seu_obj = .x, grp_var = "Stage", color_var = sp_col_new, ttl = .y)}, "no cells"))
+
+plot_grid(plot_grid(plotlist = plts_ta19_stg_asx, ncol = 5),
+          plts_stg_lgnd,
+          nrow = 2,
+          rel_heights = c(8,2))
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height= 3, fig.width= 10, eval=T}
+plts_ta19_strn_asx <- imap(all_msc_cb_no_dbt_sct_asexual_ta19_asex, possibly(~{umap_pt_fn(seu_obj = .x, grp_var = "Strain", color_var = strain_cols_n, ttl = .y)}, "no cells"))
+
+plot_grid(plot_grid(plotlist = plts_ta19_stg_asx, ncol = 5),
+          plts_strn_lgnd,
+          nrow = 2,
+          rel_heights = c(8,2))
+```
+
+```{r, warning=FALSE, message=FALSE}
+#
+msc49_sct_asx_domStrainSC3_ta19 <- subset( all_msc_cb_no_dbt_sct_asexual_ta19_asex[["MSC49"]], subset = Strain == "SC3")
+msc68_sct_asx_domStrainSC2_ta19 <- subset( all_msc_cb_no_dbt_sct_asexual_ta19_asex[["MSC68"]], subset = Strain == "SC2")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=4}
+DimPlot(msc49_sct_asx_domStrainSC3_ta19,  dims = c(1,2), group.by = c("seurat_clusters","Strain") , pt.size = 0.1, label = T)
+DimPlot(msc68_sct_asx_domStrainSC2_ta19,  dims = c(1,2), group.by = c("seurat_clusters","Strain") , pt.size = 0.1, label = T)
+
+```
+
+
+```{r, eval=T}
+## Save all cells for Talleh
+saveRDS(all_msc_cb_no_dbt_sct_ta19[["MSC49"]], "data/processed/Pf/colleagues/Talleh/msc49_sct_ta19.RDS")
+saveRDS(all_msc_cb_no_dbt_sct_ta19[["MSC68"]], "data/processed/Pf/colleagues/Talleh/msc68_sct_ta19.RDS")
+
+## Save cellranger style folder
+write10xCounts(x = as(all_msc_cb_no_dbt_sct_ta19[["MSC49"]]@assays$RNA$counts, Class = "dgCMatrix"), path = "data/processed/Pf/colleagues/Talleh/msc49_qcd_all_input", overwrite = T, version="3", type = "sparse")
+write10xCounts(x= as(all_msc_cb_no_dbt_sct_ta19[["MSC68"]]@assays$RNA$counts, Class = "dgCMatrix"), path = "data/processed/Pf/colleagues/Talleh/msc68_qcd_all_input", overwrite = T, version="3", type = "sparse")
+
+## Save metadata
+saveRDS(all_msc_cb_no_dbt_sct_ta19[["MSC49"]]@meta.data[, c("Stage", "Strain")], "data/processed/Pf/colleagues/Talleh/msc49_qcd_all_metadata.RDS")
+saveRDS(all_msc_cb_no_dbt_sct_ta19[["MSC68"]]@meta.data[, c("Stage", "Strain")], "data/processed/Pf/colleagues/Talleh/msc68_qcd_all_metadata.RDS")
+```
+
+```{r, eval=T}
+## Save asexual cells for Talleh
+saveRDS(msc49_sct_asx_domStrainSC3_ta19, "data/processed/Pf/colleagues/Talleh/msc49_sct_asx_domStrainSC3_ta19.RDS")
+saveRDS(msc68_sct_asx_domStrainSC2_ta19, "data/processed/Pf/colleagues/Talleh/msc68_sct_asx_domStrainSC2_ta19.RDS")
+
+## Save cellranger style folder
+write10xCounts(x = as(msc49_sct_asx_domStrainSC3_ta19@assays$RNA$counts, Class = "dgCMatrix"), path = "data/processed/Pf/colleagues/Talleh/msc49_qcd_asex_input", overwrite = T, version="3", type = "sparse")
+write10xCounts(x = as(msc68_sct_asx_domStrainSC2_ta19@assays$RNA$counts, Class = "dgCMatrix"),  path = "data/processed/Pf/colleagues/Talleh/msc68_qcd_asex_input", overwrite = T, version="3", type = "sparse")
+
+## Save metadata
+saveRDS(msc49_sct_asx_domStrainSC3_ta19@meta.data[, c("Stage", "Strain")], "data/processed/Pf/colleagues/Talleh/msc49_qcd_asex_metadata.RDS")
+saveRDS(msc68_sct_asx_domStrainSC2_ta19@meta.data[, c("Stage", "Strain")], "data/processed/Pf/colleagues/Talleh/msc68_qcd_asex_metadata.RDS")
+```
+
+
+```{r, eval=T}
+gogo()
+
+## Run standard normalisation on farm like below
+## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_stdnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/all_msc_cb_no_dbt.RDS" --normlzn "norm" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
+```
+
+SCT for the evaluation of raw counts
+```{r, eval=T}
+gogo()
+## Run standard normalisation on farm like below
+## !!NB - reducing the number of hypervariable genes results in scattered and disjointed clusters. higher hvg number better
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_seu_norm.nf --scrpt "/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sctnorm.R" --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/*/seu_obj/bpc_seu_raw_cbendr.RDS" --normlzn "sct" --umap_name "UMAP_" --hvg 500 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --umap_redctn_nm "umap" --redctn "pca" --integrtd_pc30 "no" --pca_redctn_nm "pca" --ncores "3" --mem "10 GB" --resume
+```
