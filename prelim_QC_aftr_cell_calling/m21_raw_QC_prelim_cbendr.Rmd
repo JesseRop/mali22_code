@@ -1,0 +1,1034 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+})
+```
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Variable declarations
+
+```{r}
+##colors
+sp_col_new <- c(`Late ring` = "#78C679", `Early trophozoite` = "#FEEEAA", `Female (LE)` = "#a97f2f", 
+Female = "#551A8B", `Male (LE)` = "#7e5522", Male = "mediumpurple", 
+`Gametocyte (male)` = "#1a6c8b", `Gametocyte (female)` = "#d1b252", 
+Lab = "#D3D3D3", Unassigned = "#DCDCDC", `Failed QC` = "grey", 
+`Not assigned` = "grey", Atlas = "grey", `Early ring` = "#D1EC9F", 
+`Late trophozoite` = "#FEB24C", `Early schizont` = "#C9E8F1", 
+`Late schizont` = "#85B1D3", `Gametocyte (developing)` = "thistle", 
+`early female` = "#749E89", `late female` = "#4E6D58", Asexual = "#FF6961", 
+`NULL` = "lightgrey", `Field unlabelled` = "#D2C1DC", "weak_score" = "#c9c9c9", "unclear" = "#dddddd")
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+
+```
+
+## Genotype clustering for MSC
+
+Read in clusters.tsv files with assignment of cells to strains and PCA plots metrics
+
+Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+```
+
+
+```{r, message=F, warning=F}
+sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+sample_name_ed_cr
+```
+
+Read in seurat objects processed in farm
+```{r, message=F, warning=F}
+# sample_name_cr <- c(paste0(sample_name, "_cbendr"))
+# sample_name_cr
+sample_name_cr <- c(paste0(sample_name, "_CbendrCr"))
+sample_name_cr
+```
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+# all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops)_prelim_stg_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bp_CbendrCr_prelim_stg_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bp.*'))) %>% 
+# all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
+  # .[sample_name_ed_cr] %>%
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+```{r}
+all_seu_prelim_stg_norm[1] %>% map(., ~.x@meta.data %>% 
+                                count(stage_final2, combined_labs, sR_fine_stg) %>% 
+                                filter(str_detect(sR_fine_stg, "LE"))
+                              )
+
+```
+
+## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
+```{r, eval=FALSE}
+## !!!!!!NB -CONSIDER FORE REMOVAL LATER
+#filter out cells with high ncountRNA 
+# all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
+#   map2(., ncount_filt, ~.x  %>%
+#          subset(., nCount_RNA < .y )
+#   )
+
+```
+
+Get mt_filt based on automatic removal of quantiles
+```{r}
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm%>% 
+  map(., ~{
+    
+    mit_fts <- rownames(.x)[str_detect(rownames(.x), "MIT")]
+    api_fts <- rownames(.x)[str_detect(rownames(.x), "API")]
+    
+    .x %>% PercentageFeatureSet(., features = mit_fts, col.name = 'percent.mt', assay = "RNA") %>%
+    PercentageFeatureSet(., features = api_fts, col.name = 'percent.api', assay = "RNA") 
+})
+
+```
+
+```{r}
+mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
+# mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.99, na.rm = T)))
+# api_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.api"], 0.995, na.rm = T)))
+
+```
+
+
+```{r, results='asis'}
+std_theme <- theme(axis.text=element_text(size=18), 
+            axis.title=element_text(size=18,face="bold"), 
+            legend.text = element_text(size=22), 
+            legend.title = element_text(size=22,face="bold"))
+
+
+```
+
+```{r, results='asis'}
+pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
+    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "sR_fine_stg", pt.size = 1)+ 
+      scale_color_manual(values = sp_col_new) +
+      geom_hline(yintercept = ..2)  +
+      labs(title = ..3) +
+      std_theme
+
+  })
+
+```
+
+
+```{r, eval=T}
+
+after_umi100_filt <- map(all_seu_prelim_stg_norm, dim)%>% as.data.frame() %>% .[2,]
+after_umi100_filt
+```
+
+```{r, eval=T}
+
+after_umi100_filt <- map(all_seu_prelim_stg_norm, dim)%>% as.data.frame() %>% .[2,]
+after_umi100_filt
+```
+
+
+```{r}
+map2(all_seu_prelim_stg_norm, mt_filt, ~.@meta.data %>% dplyr::count(percent.mt>.y ))
+```
+
+## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
+```{r, eval=T}
+## !!!!!!NB -CONSIDER FORE REMOVAL LATER
+#filter out cells with high mitochondrial count
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
+  map2(., mt_filt, ~.x  %>%
+         subset(., percent.mt < .y )
+  )
+
+```
+
+
+#### Incorporate and visualize strain - souporcell (SC)
+We did souporcell assuming a range of 3 strains (6,7 and 8)
+```{r, eval=FALSE}
+algn_nm <- "hsat"
+species <- "Pf"
+# sv_dir <- "pbulk_gtypes_preQC_resc"
+sv_dir <- "pbulk_gtypes_ppQC_resc"
+sample_name_nms <- sample_name
+##Read in strain information
+# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
+soupo_kselect_list_pp <-  readRDS(paste0("data/processed/", species, "/" , sv_dir, "/strn_c_new_mdata_m22.RDS"))  %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
+
+# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
+
+
+
+##Creating Binary variable for Doublet/Singlet for doublet finder in the samples with more than 2 strains
+# soupo_kselect_list_pp[2:10] <- soupo_kselect_list_pp[2:10] %>%
+soupo_kselect_list_pp <- soupo_kselect_list_pp %>%
+  map(. %>%
+        mutate(strain_gt = case_when(dbt_neg_all == "DoubletAll" ~ 'Doublet',
+                                     dbt_neg_all == "LikelySinglet" ~ 'Singlet', 
+                                     dbt_neg_all == "DbtNegMix" ~ 'Singlet',
+                                     dbt_neg_all == "NegativeAll" ~ 'Negative'),
+               GT = case_when(dbt_neg_all == "DoubletAll" ~ 'Doublet', 
+                              T ~  'Singlet')))
+                              # dbt_neg_all =='LikelySinglet' ~ 'Singlet',
+                              # T ~ as.character(strain_gt))))
+
+
+# soupo_kselect_list_pp = soupo_kselect_list_pp[c(1:4,37)]
+```
+
+
+```{r}
+# saveRDS(soupo_kselect_list_pp, "data/processed/Pf/soupo_kselect_list_pp.RDS")
+```
+
+
+
+```{r, eval=FALSE}
+
+
+all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
+  map2(., soupo_kselect_list_pp, ~AddMetaData(.x, .y %>% column_to_rownames("bcode") %>%select(Strain_DN,strain_gt, GT)))
+```
+
+
+
+```{r}
+
+for (i in 1:length(all_seu_prelim_stg_norm)) {
+
+  all_seu_prelim_stg_norm[[i]]@meta.data <- all_seu_prelim_stg_norm[[i]]@meta.data %>%
+  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"))) #%>%
+    #select(-c(ends_with("Ehi"), ends_with("Elo"))) 
+}
+
+```
+
+```{r, message=FALSE}
+all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~ {
+    .x@meta.data %>%
+    mutate(background_fraction_yPf_yHs = coalesce(background_fraction_yPf, background_fraction_yHs),
+           cell_probability_yPf_yHs = coalesce(cell_probability_yPf, cell_probability_yHs)) %>%
+    select(background_fraction_yPf_yHs, cell_probability_yPf_yHs) %>% 
+    AddMetaData(.x, .)
+       })
+
+```
+
+```{r, message=FALSE}
+cr_cbender_pf100_mdata_slct_uni <- readRDS("data/processed/Pf/m2_all/cr_cbender_pf100_mdata_slct_uni.RDS")
+
+```
+
+```{r, message=FALSE}
+# ##!!! NOTE - This needs to be added at the beginning
+# Add cellbender metadata that was skipped earlier
+all_seu_prelim_stg_norm <- list(all_seu_prelim_stg_norm, cr_cbender_pf100_mdata_slct_uni[names(all_seu_prelim_stg_norm)]) %>%
+  pmap(~ {
+    ..2 %>%
+      select(mthds_union_slim, barcode) %>%
+      column_to_rownames("barcode") %>%
+      AddMetaData(..1, .)
+       })
+
+```
+
+
+```{r, message=FALSE}
+# map(all_seu_prelim_stg_norm["MSC68C"], ~ {
+#     .x@meta.data %>%
+#     ggplot(aes(x = mthds_union_slim, y = background_fraction_yPf)) +
+#     geom_boxplot()
+#   })
+
+```
+
+
+```{r, fig.height = 12, fig.width = 12}
+
+all_seu_prelim_stg_norm_mdata_mrg <- map(all_seu_prelim_stg_norm, ~.@meta.data) %>% 
+  bind_rows(., .id = 'donor') 
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+all_seu_prelim_stg_norm[[1]]@meta.data %>% glimpse
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_poorStgAno <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$sR_fine_stg %in% c("weak_score", "discrepantFM")]), sizes.highlight = 0.05) + 
+                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_poorStgAno, ncol = 4)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## cellbender prob
+imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, group.by = "is_cell_cb") +  theme_void() + theme(legend.position = "none") + labs(title = .y), "no cells"))
+
+```
+
+## Assess cellbender estimated metrics cell probability and background fraction
+```{r, fig.height = 12, fig.width = 12}
+all_seu_prelim_stg_norm_mdata_mrg %>%
+  ggplot(aes(x = mthds_union_slim, y = background_fraction_yPf)) +
+    geom_boxplot() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+```{r, fig.height = 12, fig.width = 12}
+all_seu_prelim_stg_norm_mdata_mrg %>%
+  ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim)) +
+    geom_point(size = 0.01) +
+  geom_hline(yintercept = 0.5) +
+  geom_vline(xintercept = 0.5) +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
+
+```
+
+
+```{r, fig.height = 12, fig.width = 12}
+all_seu_prelim_stg_norm_mdata_mrg %>%
+  ggplot(aes(x = cell_probability_yHs, y = cell_probability_yPf, colour = mthds_union_slim)) +
+  geom_point(size = 0.01) +
+  geom_hline(yintercept = 0.9) +
+  geom_vline(xintercept = 0.9) +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
+
+```
+
+
+```{r, fig.height = 12, fig.width = 12}
+all_seu_prelim_stg_norm_mdata_mrg %>%
+  ggplot(aes(x = log10(hs_umi_count), y = log10(pf_umi_count), colour = mthds_union_slim)) +
+    geom_point(size = 0.01) +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
+  
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_seu_cb5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$cell_probability_yPf < 0.9 & .x@meta.data$cell_probability_yHs < 0.9]), sizes.highlight = 0.05) + 
+                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_seu_cb5, ncol = 4)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## background fraction cellbender
+plts_cbg <- imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = T, features = "background_fraction_yPf") +  theme_void() + theme(legend.position = "none") + labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_cbg, ncol = 4)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | (.x@meta.data$background_fraction_yHs > 0.5 & .x@meta.data$mthds_union_slim == "yHs")]), sizes.highlight = 0.05) + 
+                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_seu_bg5, ncol = 4)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## umi
+plts_nc <- imap(all_seu_prelim_stg_norm, possibly(~FeaturePlot(.x, label = T, features = "nCount_RNA") +  theme_void() + theme(legend.position = "none") + labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_nc, ncol = 4)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, label = T, group.by = c("sR_fine_stg", "strain_gt", "seurat_clusters"), ncol = 3) + 
+       labs(title = .y) )
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_l100 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$nFeature_RNA <100]), sizes.highlight = 0.05) + 
+                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1)) +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_l100, ncol = 4)
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), group.by = "seurat_clusters", pt.size = 0.1, label = T)+ labs(title = .y))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$background_fraction_yPf >0.5]), sizes.highlight = 0.05) + 
+                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_bg5, ncol = 4)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_stg <- imap(all_seu_prelim_stg_norm, possibly(~{
+  cell_stg_plot <- DimPlot(.x, group.by = "sR_fine_stg", cols = sp_col_new, pt.size = 0.2) + 
+    theme_void() + 
+    theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)
+  
+  cell_stg_plot$data <- cell_stg_plot$data %>% rownames_to_column('bcode') %>% left_join(., .x@meta.data[,'seurat_clusters', drop = F] %>% rownames_to_column('bcode'), by='bcode') %>% column_to_rownames('bcode')
+  
+  cell_stg_plot<- LabelClusters(cell_stg_plot, id = "seurat_clusters", size = 6, repel = T)
+  return(cell_stg_plot)
+  
+  }, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_stg, ncol = 4)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+# # dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+# 
+# all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~{
+#   .x@meta.data %>%
+#   rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"))) #%>%
+#     #select(-c(ends_with("Ehi"), ends_with("Elo"))) 
+#   })
+
+```
+
+```{r}
+
+for (i in 1:length(all_seu_prelim_stg_norm)) {
+
+  all_seu_prelim_stg_norm[[i]]@meta.data <- all_seu_prelim_stg_norm[[i]]@meta.data %>%
+  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"))) #%>%
+    #select(-c(ends_with("Ehi"), ends_with("Elo"))) 
+}
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+
+all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~{
+  .x@meta.data %>%
+  rownames_to_column('bcode') %>%
+  mutate(cell_probability_cat = ifelse((cell_probability_yPf > 0.9 | cell_probability_yHs > 0.9), "PassQC", "PoorQC"),
+         background_fraction_cat = ifelse((background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), "PoorQC", "PassQC"),
+  # mutate(cell_probability_cat = ifelse(cell_probability > 0.9, "PassQC", "PoorQC"),
+  #        background_fraction_cat = ifelse(background_fraction < 0.5, "PassQC", "PoorQC"),
+         sR_fine_stg_cat = ifelse(sR_fine_stg %in% c("weak_score", "discrepantFM"), "PoorQC", "PassQC"),
+         asex_cat = ifelse(str_detect(sR_fine_stg, "ring|trophozoite|developing"), "PoorQC", "PassQC")) %>%
+  select(ends_with("_cat"),bcode) %>% 
+  column_to_rownames('bcode') %>%
+  AddMetaData(.x, .)
+  })
+
+```
+
+Add the doublet proportion per cluster for each of the doublet methods assessed
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+qc_metrics <- paste0(c("cell_probability", "background_fraction", "sR_fine_stg", "asex"), "_cat")
+
+
+all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~{
+  obj = .x
+  map(qc_metrics, ~{
+  obj@meta.data %>%
+    rownames_to_column('bcode') %>%
+    dplyr::add_count(seurat_clusters, !!rlang::sym(.x))  %>%
+    group_by(seurat_clusters) %>%
+    mutate(freq = round(n / n(), 3), 
+           !!paste0(.x, "_poorQc_nums") := case_when(!!rlang::sym(.x) == "PoorQC" ~ n,
+                                                  !!rlang::sym(.x) == "PassQC" ~ n()-n),
+           !!paste0(.x, "_poorQc_prop") := case_when(!!rlang::sym(.x) == "PoorQC" ~ freq,
+                                                  !!rlang::sym(.x) == "PassQC" ~ 1-freq),
+           !!paste0(.x, "_poorQc_ovrl_prop") := case_when(!!rlang::sym(.x) == "PoorQC" ~ round(n / ncol(obj), 3),
+                                                       !!rlang::sym(.x) == "PassQC" ~ round((n()-n) / ncol(obj), 3)),
+           !!paste0(.x, "_poorQc_allnums") := case_when(!!rlang::sym(.x) == "PoorQC" ~ paste(n, n(), ncol(obj), sep = "_"),
+                                                     !!rlang::sym(.x) == "PassQC" ~ paste(n, n(), ncol(obj), sep = "_"))
+           ) %>%
+      ungroup() %>% 
+      select('bcode', paste0(.x, "_poorQc_prop"), paste0(.x, "_poorQc_ovrl_prop"), paste0(.x, "_poorQc_nums"), paste0(.x, "_poorQc_allnums")) 
+    
+    }) %>%
+      purrr::reduce(., .f = full_join, by = "bcode") %>% 
+      column_to_rownames('bcode') %>%
+      AddMetaData(obj, .)
+  })
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+map(all_seu_prelim_stg_norm, ~.x@meta.data %>% count(orig.ident, seurat_clusters, background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop, asex_cat_poorQc_prop) %>% filter(if_any(c(background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.1)))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4, eval=FALSE}
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+map(all_seu_prelim_stg_norm, ~.x@meta.data %>% count(orig.ident, seurat_clusters, background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop, asex_cat_poorQc_prop) %>% filter(if_all(c(background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.2)))
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_poorStgHighBgProp <- imap(all_seu_prelim_stg_norm, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(if_all(c(background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.1))  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_poorStgHighBgProp, ncol = 4)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_HighBgProp <- imap(all_seu_prelim_stg_norm, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(background_fraction_cat_poorQc_prop > 0.1)  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_HighBgProp, ncol = 4)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_bg <- imap(all_seu_prelim_stg_norm, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(nFeature_RNA<gn_lci_cl_seu | nCount_RNA < rna_lci_cl_seu | nCount_RNA > rna_uci_cl_seu | nFeature_RNA > gn_uci_cl_seu)  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_bg, ncol = 4)
+```
+
+```{r}
+map(all_seu_prelim_stg_norm, dim)%>% as.data.frame() %>% .[2,]
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height= 4}
+# dbt_methods <- c(paste0(c("scf_class"), c("_norm", "_rand")), paste0(c("scf_class"), c("_supx_norm", "_supx_rand")), "scrub_doublet", "strain_gt")
+map(all_seu_prelim_stg_norm, ~.x@meta.data %>% count(orig.ident, seurat_clusters, background_fraction_cat_poorQc_prop, cell_probability_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop, asex_cat_poorQc_prop) %>% filter(if_any(c(background_fraction_cat_poorQc_prop, cell_probability_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.2)))
+```
+
+
+
+
+########################### START Remove outliers ##############################
+
+```{r}
+# gn_uc <- c(1900, 2600, 3300, 3800, 3200)
+# gn_lc <- c(250, 250, 250, 300, 250)
+
+all_seu_prelim_stg_norm <- pmap(list(all_seu_prelim_stg_norm, rep('nFeature_RNA', length(sample_name)), rep('nCount_RNA', length(sample_name))), ~{
+  ..1@meta.data %>%
+    rownames_to_column('bcode') %>%
+    group_by(sR_fine_stg) %>%
+    mutate("gn_lci_cl_stg" = quantile(!!rlang::sym(..2), 0.01, na.rm = T),
+            "gn_uci_cl_stg" = quantile(!!rlang::sym(..2), 0.99, na.rm = T),
+            "rna_lci_cl_stg" = quantile(!!rlang::sym(..3),  0.01, na.rm = T),
+            "rna_uci_cl_stg" = quantile(!!rlang::sym(..3), 0.99, na.rm = T)
+    ) %>%
+    ungroup()%>%
+    group_by(seurat_clusters) %>%
+    mutate("gn_lci_cl_seu" = quantile(!!rlang::sym(..2), 0.01, na.rm = T),
+            "gn_uci_cl_seu" = quantile(!!rlang::sym(..2), 0.99, na.rm = T),
+            "rna_lci_cl_seu" = quantile(!!rlang::sym(..3),  0.01, na.rm = T),
+            "rna_uci_cl_seu" = quantile(!!rlang::sym(..3), 0.99, na.rm = T)
+    ) %>%
+    ungroup()%>%
+    select(bcode,contains("ci_cl")) %>%
+    column_to_rownames('bcode')%>%
+    AddMetaData(..1, .)
+})
+```
+
+#### Violin plots
+
+
+```{r, fig.height = 8, fig.width = 12}
+
+fct_theme <- theme(text=element_text(size=14),
+        axis.text=element_text(size=20), 
+            axis.title=element_text(size=20,face="bold"), 
+            legend.text = element_text(size=20), 
+            legend.title = element_text(size=20,face="bold"),
+        strip.text =element_text(size=22,face="plain", colour = 'black'))
+      
+
+```
+
+
+```{r, fig.height = 4.5, fig.width = 12}
+
+md_don_cl <- map(all_seu_prelim_stg_norm, ~.@meta.data #%>% 
+                       # mutate(across(c(sim_lab1, sim_lab2), as.numeric))
+                     ) %>% 
+  bind_rows(., .id = 'donor') %>%
+  mutate(across(donor, ~factor(., levels = as.character(sample_name))))
+
+```
+
+```{r, fig.height = 8, fig.width = 12}
+
+my21_qc_vln_fn <- function(clust_var = "StagePrelimC", clust_cols, ci_sufx = "_stg", row_numbers = 2) {
+  pmap(list(c('nCount_RNA', 'nFeature_RNA'), c('Transcript', 'Gene'), paste0(c("rna_lci_cl","gn_lci_cl"), ci_sufx), paste0(c("rna_uci_cl","gn_uci_cl"), ci_sufx)), ~{
+  
+md_don_cl %>% 
+  ggplot(aes(x = !!rlang::sym(clust_var), y = !!rlang::sym(..1)/1000, color = !!rlang::sym(clust_var))) +
+  scale_color_manual(values = clust_cols) +
+  theme_classic() +
+  geom_violin(drop = F) +
+  ggforce::geom_sina(size = 0.1,  alpha = 0.5)+
+  facet_wrap(donor ~., nrow = row_numbers, scales = "free_x")+
+  labs(y = "Gene count (X 1000)")+
+  geom_segment(aes(x=as.numeric(!!rlang::sym(clust_var))-0.3, xend=as.numeric(!!rlang::sym(clust_var))+0.3,
+                       y = !!rlang::sym(..3)/1000, yend= !!rlang::sym(..3)/1000 ), inherit.aes=F, color="orange", size=0.5)+
+  geom_segment(aes(x=as.numeric(!!rlang::sym(clust_var))-0.3, xend=as.numeric(!!rlang::sym(clust_var))+0.3,
+                       y = !!rlang::sym(..4)/1000, yend= !!rlang::sym(..4)/1000 ), inherit.aes=F, color="red", size=0.5) +
+    labs(x= 'Cluster', y= paste0(..2, ' count (X 1000)')) +
+  fct_theme+
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle =40, hjust = 1, size = 10)) +
+    guides(color = guide_legend(title = 'Cluster',override.aes = list(size = 4), nrow = 1))
+})
+}
+
+
+```
+
+
+```{r, fig.height = 6, fig.width = 15}
+
+
+my21_qc_vln_fn(clust_var = "sR_fine_stg", clust_cols = sp_col_new, ci_sufx = "_stg", row_numbers = 1 ) 
+
+```
+
+
+```{r}
+
+## filter based on gene/transcript count
+# all_msc_filt <- map(all_msc_anotd_preQC, ~subset(.x, nFeature_RNA > gn_lci_cl & nCount_RNA > rna_lci_cl & nCount_RNA < rna_uci_cl & nFeature_RNA < gn_uci_cl))
+all_seu_filtOlMtCb_rm <- map(all_seu_prelim_stg_norm, ~subset(.x, nFeature_RNA < gn_lci_cl_seu | nCount_RNA < rna_lci_cl_seu | nCount_RNA > rna_uci_cl_seu | nFeature_RNA > gn_uci_cl_seu))
+
+map(all_seu_filtOlMtCb_rm, ~.x@meta.data %>% count(sR_fine_stg))
+
+```
+
+```{r, fig.height = 6, fig.width = 15, row_numbers = 1}
+
+my21_qc_vln_fn(clust_var = "seurat_clusters", clust_cols = cluster_cols, ci_sufx = "_seu", row_numbers = 1)  
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_outlrs <- imap(all_seu_prelim_stg_norm, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(nFeature_RNA<gn_lci_cl_seu | nCount_RNA < rna_lci_cl_seu | nCount_RNA > rna_uci_cl_seu | nFeature_RNA > gn_uci_cl_seu)  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_outlrs, ncol = 4)
+```
+
+Number of cells per strain_gt to remove based on REVISED CUT-OFFS to assist souporcell to perform clustering correctly
+```{r}
+
+pmap(list(all_seu_prelim_stg_norm), ~..1@meta.data %>% dplyr::count(nFeature_RNA<gn_lci_cl_seu ,nCount_RNA < rna_lci_cl_seu, nCount_RNA > rna_uci_cl_seu, nFeature_RNA > gn_uci_cl_seu ))
+```
+
+
+```{r, eval=FALSE}
+pmap(list(all_seu_prelim_stg_norm), ~..1@meta.data %>% dplyr::count(strain_gt == "Negative", nFeature_RNA<gn_lci_cl_seu ,nCount_RNA < rna_lci_cl_seu, nCount_RNA > rna_uci_cl_seu, nFeature_RNA > gn_uci_cl_seu ))
+```
+
+
+
+
+```{r, warning=FALSE, message=FALSE}
+
+# imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), label = T, cells.highlight = ..1@meta.data %>% filter(StagePrelimC == "Unassigned") %>% row.names())+ labs(title = .y))
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+#REX1
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-0935900", reduction = "umap")+ labs(title = .y))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-1222600", order = T, slot = "counts")+ labs(title = .y))
+
+```
+
+Remove those with too few genes transcripts
+
+
+###########################START Remove cells######################################
+Remove those with too few genes transcripts
+
+```{r}
+
+after_mt_filt <- map(all_seu_prelim_stg_norm, dim)%>% as.data.frame() %>% .[2,]
+after_mt_filt
+```
+
+```{r}
+
+## filter based on gene/transcript count
+# all_msc_filt <- map(all_msc_anotd_preQC, ~subset(.x, nFeature_RNA > gn_lci_cl & nCount_RNA > rna_lci_cl & nCount_RNA < rna_uci_cl & nFeature_RNA < gn_uci_cl))
+all_seu_filtOlMtCb <- map(all_seu_prelim_stg_norm, ~subset(.x, nFeature_RNA > gn_lci_cl_seu & nCount_RNA > rna_lci_cl_seu & nCount_RNA < rna_uci_cl_seu & nFeature_RNA < gn_uci_cl_seu))
+
+aftr_low_count_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
+aftr_low_count_rm
+
+```
+
+
+```{r}
+## 
+# map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability >= 0.9))
+map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability_yPf >= 0.9))
+```
+
+
+
+```{r}
+## 
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, cell_probability_yPf >= 0.9 | cell_probability_yHs >= 0.9))
+
+aftr_cell_prob9_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
+aftr_cell_prob9_rm
+```
+
+```{r}
+## 
+map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(background_fraction_yPf <= 0.5))
+```
+
+
+```{r}
+## 
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, (background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), invert = T))
+
+# map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,] %>% t()
+aftr_cb_bg_frac_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
+aftr_cb_bg_frac_rm
+```
+
+```{r}
+## filter(if_all(c(background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.2))
+
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, background_fraction_cat_poorQc_prop <= 0.2 | sR_fine_stg_cat_poorQc_prop <= 0.2))
+
+
+# map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,] %>% t()
+aftr_poorStgHighBgProp_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
+aftr_poorStgHighBgProp_rm
+```
+
+###########################END Remove cells######################################
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_filtOlMtCb, ~FeaturePlot(.x, dims = c(1,2), features = "PF3D7-1222600", order = T, slot = "counts")+ labs(title = .y))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+imap(all_seu_filtOlMtCb, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+
+```
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+### gn_edrops50
+# imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_edrops50"), "/seu_obj/bpseu_raw_ed_pref.RDS")))
+imap(all_seu_filtOlMtCb, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_seu_filtOlMtCb.RDS")))
+
+```
+
+```{r}
+
+# ## filter based on gene/transcript count
+# # all_msc_filt <- map(all_msc_anotd_preQC, ~subset(.x, nFeature_RNA > gn_lci_cl & nCount_RNA > rna_lci_cl & nCount_RNA < rna_uci_cl & nFeature_RNA < gn_uci_cl))
+# all_ed_pref_w_mdata_cb <- map(all_ed_pref_w_mdata_cb, ~subset(.x, nFeature_RNA > gn_lci_cl_seu & nCount_RNA > rna_lci_cl_seu & nCount_RNA < rna_uci_cl_seu & nFeature_RNA < gn_uci_cl_seu))
+
+
+```
+
+```{r}
+
+filt_flow <- list(after_umi100_filt, after_mt_filt, aftr_low_count_rm,  aftr_cell_prob9_rm, aftr_cb_bg_frac_rm) %>% set_names("100umi_filt", "mt_filt", "low_count",  "cell_prob9", "cb_bg_frac") %>% bind_rows(., .id = "filt_metric") %>% mutate(across(filt_metric, ~factor(., levels = c("100umi_filt", "mt_filt", "low_count",  "cell_prob9", "cb_bg_frac"))))
+
+```
+
+```{r}
+## Number of cell population removed by respective filter
+filt_diff <- (filt_flow[-nrow(filt_flow), ] - filt_flow[-1, ]) 
+
+filt_diff$filt_metric <- paste0(filt_flow[-1, ]$filt_metric, "_rm")
+filt_diff_t <- filt_diff  %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+filt_diff_t
+
+## Proportion of cell population removed by respective filter
+filt_diff_prop <- round(filt_diff/filt_flow[-nrow(filt_flow), ] * 100, 2)
+filt_diff_prop$filt_metric <- paste0(filt_flow[-1, ]$filt_metric, "_rm_prop")
+filt_diff_prop_t <- filt_diff_prop %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+## Merge number of cells and those that are removed
+filt_flow_diff <- bind_rows(
+  filt_flow %>% 
+  mutate(row_id = row_number(), source = 2),
+  filt_diff %>% 
+  mutate(row_id = row_number(), source = 2)
+) %>%
+  arrange(row_number() + (row_number() > nrow(df)))
+
+filt_flow_diff_t <- filt_flow_diff %>% arrange(row_id, source) %>% 
+  select(-row_id, -source) %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+filt_flow_diff_t
+```
+
+
+```{r}
+
+filt_flow %>% 
+  pivot_longer(cols = contains("MSC"), names_to = "donor", values_to = "cell_counts") %>%  
+  ggplot(aes(x = filt_metric, y = cell_counts, colour = donor, group = donor)) + geom_point() + geom_line()
+
+```
+
+```{r}
+gogo()
+## scrublet inputs
+```
+
+########################### END Remove outliers   ##############################
