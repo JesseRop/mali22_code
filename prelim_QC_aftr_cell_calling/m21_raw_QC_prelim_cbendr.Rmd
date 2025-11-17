@@ -279,54 +279,6 @@ all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
 ```
 
 
-#### Incorporate and visualize strain - souporcell (SC)
-We did souporcell assuming a range of 3 strains (6,7 and 8)
-```{r, eval=FALSE}
-algn_nm <- "hsat"
-species <- "Pf"
-# sv_dir <- "pbulk_gtypes_preQC_resc"
-sv_dir <- "pbulk_gtypes_ppQC_resc"
-sample_name_nms <- sample_name
-##Read in strain information
-# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
-soupo_kselect_list_pp <-  readRDS(paste0("data/processed/", species, "/" , sv_dir, "/strn_c_new_mdata_m22.RDS"))  %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
-
-# soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22_min_qcd.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
-
-
-
-##Creating Binary variable for Doublet/Singlet for doublet finder in the samples with more than 2 strains
-# soupo_kselect_list_pp[2:10] <- soupo_kselect_list_pp[2:10] %>%
-soupo_kselect_list_pp <- soupo_kselect_list_pp %>%
-  map(. %>%
-        mutate(strain_gt = case_when(dbt_neg_all == "DoubletAll" ~ 'Doublet',
-                                     dbt_neg_all == "LikelySinglet" ~ 'Singlet', 
-                                     dbt_neg_all == "DbtNegMix" ~ 'Singlet',
-                                     dbt_neg_all == "NegativeAll" ~ 'Negative'),
-               GT = case_when(dbt_neg_all == "DoubletAll" ~ 'Doublet', 
-                              T ~  'Singlet')))
-                              # dbt_neg_all =='LikelySinglet' ~ 'Singlet',
-                              # T ~ as.character(strain_gt))))
-
-
-# soupo_kselect_list_pp = soupo_kselect_list_pp[c(1:4,37)]
-```
-
-
-```{r}
-# saveRDS(soupo_kselect_list_pp, "data/processed/Pf/soupo_kselect_list_pp.RDS")
-```
-
-
-
-```{r, eval=FALSE}
-
-
-all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
-  map2(., soupo_kselect_list_pp, ~AddMetaData(.x, .y %>% column_to_rownames("bcode") %>%select(Strain_DN,strain_gt, GT)))
-```
-
-
 
 ```{r}
 
