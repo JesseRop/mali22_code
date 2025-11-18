@@ -105,54 +105,48 @@ Integrated asexual to integrate with the rescued parasites
 ## subset where field parasites are for slingshot
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
-v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_asex.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_asex.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
+m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
+
 
 # %in% c("MSC25" ,"MSC41", "MSC51")
 
 ```
 
-
-########################################START## !!! CHEATING - SHORTCUT FOR REPLACING COUNTS WITH LATEST CELLRANGER COUNTS 
-THIS WILL BECOME REDUNDANT ONCE I DO A CLEAN ANALYSIS FROM THE START ########################################## 
-
-######## Replace the counts with new counts including pseudogenes and noncoding RNA among other features that were missing in the original
-
 ```{r}
-all_msc_bp_raw_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+m2_asex_raw_mrg
+
 ```
 
 ```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_list <- SplitObject(v3_m2_asex_harmony_ss_res_fld_pt, split.by = "orig.ident")
+m2_asex_raw_mrg@meta.data %>% count(orig.ident)
 ```
 
 ```{r}
-names(v3_m2_asex_harmony_ss_res_fld_pt_list) <- str_remove(names(v3_m2_asex_harmony_ss_res_fld_pt_list), ".mrna")
+## Remove donors with less than 50 cells
+don50 <- m2_asex_raw_mrg@meta.data %>% filter(n() > 50 , .by = orig.ident) %>% pull(orig.ident) %>% unique()
+
+m2_asex_raw_mrg <- subset(m2_asex_raw_mrg, subset = orig.ident %in% don50)
 ```
 
 ```{r}
-m2_asex_raw_list <- map2(all_msc_bp_raw_noHsGns[names(v3_m2_asex_harmony_ss_res_fld_pt_list)], v3_m2_asex_harmony_ss_res_fld_pt_list, ~.x[,str_remove(colnames(.y), "M.*_")])
+m2_asex_raw_mrg@meta.data %>% count(stage_fld == "Unassigned", orig.ident)
 ```
 
-```{r}
-m2_asex_raw_list <- m2_asex_raw_list[unlist(map(m2_asex_raw_list, ~dim(.x)[2] >=50))]
+```{r, fig.width=14, fig.height=4}
+VlnPlot(m2_asex_raw_mrg, group.by = "orig.ident", split.by = "stage_fld", features = "nCount_RNA", pt.size = 0) + scale_y_log10()
 ```
 
-```{r}
-m2_asex_raw_mrg <- merge(m2_asex_raw_list[[1]], m2_asex_raw_list[2:length(m2_asex_raw_list)], add.cell.ids = str_remove(names(m2_asex_raw_list), "SC"))
-```
-
-
-```{r}
-m2_asex_raw_mrg <- AddMetaData(m2_asex_raw_mrg, v3_m2_asex_harmony_ss_res_fld_pt@meta.data[,!colnames(v3_m2_asex_harmony_ss_res_fld_pt@meta.data) %in% colnames(m2_asex_raw_mrg@meta.data)])
-```
 
 ```{r}
 ## rRNA_gns
 gff <- data.table::fread("/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/PlasmoDB-68_Pfalciparum3D7.gff", skip = 18)
+
 ```
 
 ```{r}
-
+## rRNA_gns
 gff = gff %>% 
   filter(!str_detect(V9, "Parent")) %>% 
   mutate(biotype = str_remove(V9, ".*ebi_biotype="),
@@ -181,7 +175,7 @@ t_sn_sno_rnas <- gff %>% filter(biotype %in% c("snRNA", "snoRNA", "tRNA")) %>% p
 
 
 ```{r}
-## rRNA_gns
+## rRNA_gns from portugal et al
 rRNA_gns <- c("PF3D7-0112300", "PF3D7-0112500", "PF3D7-0112700", "PF3D7-0531600", "PF3D7-0531800", "PF3D7-0532000", "PF3D7-0725600", "PF3D7-0725800", "PF3D7-0726000", "PF3D7-0830000", "PF3D7-0830200", "PF3D7-1148600", "PF3D7-1371000", "PF3D7-1371200", "PF3D7-1371300", "PF3D7-1418500", "PF3D7-1418600", "PF3D7-1418700", "PF3D7-API04900",  "PF3D7-API05700")
 
 ```
@@ -191,9 +185,6 @@ rRNA_gns <- c("PF3D7-0112300", "PF3D7-0112500", "PF3D7-0112700", "PF3D7-0531600"
 ## Remove rRNA_gns genes as is standard in literature - may be due to conserved with humans and other organisms
 m2_asex_raw_mrg <- m2_asex_raw_mrg[!(rownames(m2_asex_raw_mrg) %in% rRNA_gns),]
 ```
-
-########################################END## !!! CHEATING - SHORTCUT FOR REPLACING COUNTS WITH LATEST CELLRANGER COUNTS 
-THIS WILL BECOME REDUNDANT ONCE I DO A CLEAN ANALYSIS FROM THE START ########################################## 
 
 ```{r, warning=FALSE, message=FALSE}
 # split layers
@@ -214,8 +205,8 @@ THIS WILL BECOME REDUNDANT ONCE I DO A CLEAN ANALYSIS FROM THE START ###########
 Integrated asexual to integrate with the rescued parasites
 ```{r}
 ## subset where field parasites are for slingshot
-# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
-# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+# m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_asex_raw_mrg.RDS")
+# m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
 # %in% c("MSC25" ,"MSC41", "MSC51")
 
 ```
@@ -226,22 +217,22 @@ Integrated asexual to integrate with the rescued parasites
 Integrated asexual to integrate with the rescued parasites
 ```{r}
 ## subset where field parasites are for slingshot
-# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
-# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+# m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_asex_raw_mrg.RDS")
+# m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
 # %in% c("MSC25" ,"MSC41", "MSC51")
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-m2_asex_raw_mrg@meta.data %>% count(sR_fine_stg)
+m2_asex_raw_mrg@meta.data %>% count(stage_fld)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 m2_asex_raw_mrg <- m2_asex_raw_mrg@meta.data %>% 
   rownames_to_column('bcode') %>%
   mutate(dset_labmrg = "Field",
-         stage = case_when(sR_fine_stg == "Gametocyte (developing)" ~ "Early ring", 
-                           T ~ sR_fine_stg),
+         stage = case_when(stage_fld %in% c("Gametocyte (developing)", "Schizont", "Unassigned") ~ "Early ring", 
+                           T ~ stage_fld),
          donor = str_remove_all(orig.ident, ".mrna")) %>% 
   add_count(donor, name = "don_count") %>%
   select(bcode, dset_labmrg, donor, don_count, stage) %>%
@@ -262,15 +253,15 @@ v3_m2_asex_cr_filt_all <- m2_asex_raw_mrg[, !m2_asex_raw_mrg@meta.data$dset_labm
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% count(donor, sR_fine_stg) %>% group_by(donor) %>% mutate(prop = round(n/sum(n), 3)) %>% filter(sR_fine_stg == "Gametocyte (developing)")
+v3_m2_asex_cr_filt_all@meta.data %>% count(donor, stage_fld) %>% group_by(donor) %>% mutate(prop = round(n/sum(n), 3)) %>% filter(stage_fld == "Gametocyte (developing)")
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% add_count(sR_fine_stg, name = "stg_n") %>% group_by() %>% dplyr::count(donor)
+v3_m2_asex_cr_filt_all@meta.data %>% add_count(stage_fld, name = "stg_n") %>% group_by() %>% dplyr::count(donor)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% filter(sR_fine_stg == "Gametocyte (developing)") %>% dplyr::count(donor)
+v3_m2_asex_cr_filt_all@meta.data %>% filter(stage_fld == "Gametocyte (developing)") %>% dplyr::count(donor)
 ```
 
 ```{r, eval=T}
@@ -398,7 +389,7 @@ map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.h
 
 plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[[1]]@reductions[["umap.harmony_PC_man"]]@cell.embeddings),
         x = ~umapharmonyPCman_1, y = ~umapharmonyPCman_2, z = ~umapharmonyPCman_3,
-        color= v3_m2_asex_cr_filt_norm_harmony[[1]]@meta.data$sR_fine_stg,
+        color= v3_m2_asex_cr_filt_norm_harmony[[1]]@meta.data$stage_fld,
         # colors = c('blue', 'red'),
         opacity = 0.8,
         size = 0.1, 
@@ -529,7 +520,7 @@ VlnPlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA", group.by = "seurat_
 
 plot_ly(data = data.frame(v3_m2_asex_cr_filt_sct_int@reductions[["umap"]]@cell.embeddings),
         x = ~umap_1, y = ~umap_2, z = ~umap_3,
-        color= v3_m2_asex_cr_filt_sct_int@meta.data$sR_fine_stg,
+        color= v3_m2_asex_cr_filt_sct_int@meta.data$stage_fld,
         # colors = c('blue', 'red'),
         opacity = 0.8,
         size = 0.1, 
