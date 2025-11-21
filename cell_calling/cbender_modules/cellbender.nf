@@ -29,4 +29,4 @@ process CELLBENDER {
 
     ${params.cellbender_script} ${raw_mtx} ${o_file} ${l_rate} ${epoch} \$exp_cells \$exp_edrops 
     """
-}
+} 
