@@ -3,9 +3,9 @@
 nextflow.enable.dsl = 2
 
 // Import modules
-include { UMI_ESTIMATES } from './cbender_/umi_estimates'
-include { CELLBENDER } from './cbender_/cellbender'
-include { METADATA_CSV } from './cbender_/metadata_csv'
+include { UMI_ESTIMATES } from './cbender_modules/umi_estimates'
+include { CELLBENDER } from './cbender_modules/cellbender'
+include { METADATA_CSV } from './cbender_modules/metadata_csv'
 
 // Default parameters
 params.outdir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data'
@@ -71,7 +71,7 @@ id_decode_ch = Channel
     }
     .map { row -> tuple(row.irods_id, row.sample_nm) }
 
-// id_decode_ch.view
+// id_decode_ch.view()
 
 mtx_dirs = Channel
     .fromPath(params.input_tenx, type: 'dir', checkIfExists: true)
