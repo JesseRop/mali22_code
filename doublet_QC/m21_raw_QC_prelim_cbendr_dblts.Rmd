@@ -134,7 +134,7 @@ pf_solo_mixed_mdata_decode <- pf_all_id_decode
 slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
 
 ## poor quality samples
-sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
 sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
 # slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
 
@@ -175,8 +175,9 @@ sample_name_cr
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_seu_filtOlMtCb_sct <- list.files("data/processed/Pf", pattern = "all_seu_filtOlMtCb_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_seu_filtOlMtCb_sct.RDS'))) %>% 
+all_seu_filtOlMtCb_sct <- list.files("data/processed/Pf", pattern = "all_seu_filtOlMtCb3_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_filtOlMtCb_sct <- list.files("data/processed/Pf", pattern = "all_seu_filtOlMtCb_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_seu_filtOlMtCb.*.RDS'))) %>% 
   # .[sample_name_all] %>%
   .[sample_name] %>%
   map(readRDS)
@@ -190,7 +191,10 @@ algn_nm <- "minmap"
 
 species <- "Pf"
 # sv_dir <- "pbulk_gtypes_preQC_resc"
-sv_dir <- "pbulk_gtypes_preQC_resc_hspf"
+# sv_dir <- "pbulk_gtypes_preQC_resc_hspf"
+# sv_dir <- "pbulk_gtypes_preQC_resc_hspf2"
+sv_dir <- "pbulk_gtypes_preQC_resc_hspf3"
+
 sample_name_nms <- sample_name
 ##Read in strain information
 # soupo_kselect_list_pp <-  readRDS("data/processed/Pf/strn_c_new_mdata_m22.RDS") %>% .[paste(sample_name_nms, algn_nm, sep = "_")]
@@ -308,7 +312,7 @@ dbr = map(all_seu_filtOlMtCb_sct, ~(ncol(.)/1000)*0.008)
 ```
 
 
-```{r, eval=F}
+```{r, eval=T}
 library(Matrix)
 write(names(counts_msc), file = "data/processed/Pf/don_nms_raw_cb.txt")
 # write(str_remove(names(counts_msc), "_edrops100"), file = "data/processed/Pf/don_nms_raw.txt")
@@ -322,7 +326,7 @@ imap(genes_msc, ~write(.x, paste0("data/processed/Pf/", .y,"/seu_obj/genes_msc_r
 
 
 
-```{r, eval=F}
+```{r, eval=T}
 ## remove to save space
 rm(counts_msc)
 rm(genes_msc)
@@ -784,6 +788,25 @@ rm(all_filt_cb_no_ScfStgDblts)
 
 ```
 
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+#
+plts_dbt_strn <- imap(all_filt_cb_no_StgDblts, 
+                        possibly(~DimPlot(.x, label = T, 
+                                          cells.highlight =  colnames(.x[,.x@meta.data[,"strain_gt"] == "Doublet"]), 
+                                          sizes.highlight = 0.05) + 
+                                   theme_void() + 
+                                   theme(legend.position = "none", 
+                                         panel.border = element_rect(color = "black", fill = NA, size = 1))  +  
+                                   labs(title = .y), "no cells"))
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_dbt_strn, ncol = 4)
+```
+
 ```{r}
 ## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
 all_msc_cb_filt_dbt <- map(all_filt_cb_no_StgDblts, ~subset(.x, strain_gt != "Doublet"))
@@ -927,11 +950,62 @@ all_msc_cb_no_dbt <- all_msc_cb_filt_dbt_filtBgStg
 rm(all_msc_cb_filt_dbt_filtBgStg)
 ```
 
+```{r}
+
+filt_flow_dbt <- list(scf_dblts_rm, str_dbt_rm) %>% set_names("scdblfinder", "strain") %>% bind_rows(., .id = "filt_metric") %>% mutate(across(filt_metric, ~factor(., levels = c("scdblfinder", "strain"))))
+
+```
+
+```{r}
+## Number of cell population removed by respective filter
+filt_diff <- (filt_flow_dbt[-nrow(filt_flow_dbt), ] - filt_flow_dbt[-1, ]) 
+
+filt_diff$filt_metric <- paste0(filt_flow_dbt[-1, ]$filt_metric, "_rm")
+filt_diff_t <- filt_diff  %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+filt_diff_t
+
+## Proportion of cell population removed by respective filter
+filt_diff_prop <- round(filt_diff/filt_flow_dbt[-nrow(filt_flow_dbt), ] * 100, 2)
+filt_diff_prop$filt_metric <- paste0(filt_flow_dbt[-1, ]$filt_metric, "_rm_prop")
+filt_diff_prop_t <- filt_diff_prop %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+## Merge number of cells and those that are removed
+filt_flow_dbt_diff <- bind_rows(
+  filt_flow_dbt %>% 
+  mutate(row_id = row_number(), source = 2),
+  filt_diff %>% 
+  mutate(row_id = row_number(), source = 2)
+) #%>%
+  # arrange(row_number() + (row_number() > nrow(df)))
+
+filt_flow_dbt_diff_t <- filt_flow_dbt_diff %>% arrange(row_id, source) %>% 
+  select(-row_id, -source) %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+filt_flow_dbt_diff_t
+```
+
+
+```{r}
+# saveRDS(filt_flow_dbt_diff_t, "data/processed/Pf/m2_all/filt_flow_dbt_diff_t.RDS")
+saveRDS(filt_flow_dbt_diff_t, "data/processed/Pf/m2_all/filt_flow_dbt_diff_t3.RDS") 
+
+```
+
+```{r}
+
+filt_flow_dbt %>% 
+  pivot_longer(cols = contains("MSC"), names_to = "donor", values_to = "cell_counts") %>%  
+  ggplot(aes(x = filt_metric, y = cell_counts, colour = donor, group = donor)) + 
+  geom_point() + 
+  geom_line()
+
+```
 
 ```{r, eval=T}
 ## write out seurat bpcells object files for normalization processing in farm
 ### Cbender filt
-imap(all_msc_cb_no_dbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_no_dbt.RDS")))
+# imap(all_msc_cb_no_dbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_no_dbt.RDS")))
+imap(all_msc_cb_no_dbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_no_dbt3.RDS")))
 
 ```
 
