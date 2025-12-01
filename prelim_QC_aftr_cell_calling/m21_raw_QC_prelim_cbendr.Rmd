@@ -136,7 +136,7 @@ pf_solo_mixed_mdata_decode <- pf_all_id_decode
 slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
 
 ## poor quality samples
-sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
 sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
 # slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
 
@@ -163,28 +163,41 @@ Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 # sample_name_cr <- c(paste0(sample_name, "_cbendr"))
 # sample_name_cr
-sample_name_cr <- c(paste0(sample_name, "_CbendrCr"))
+# sample_name_cr <- c(paste0(sample_name, "_CbendrCr"))
+sample_name_cr <- c(paste0(sample_name, "_CbendrCr3"))
+
 sample_name_cr
 ```
 
-```{r, message=F, warning=F}
-##Read BPcells matrices
-# all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops)_prelim_stg_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bp_CbendrCr_prelim_stg_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bp.*'))) %>% 
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
-  # .[sample_name_ed_cr] %>%
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+# all_seu_prelim_stg_norm_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/bp_CbendrCr_prelim_stg_sct.RDS")
+all_seu_prelim_stg_norm_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/bp_CbendrCr3_prelim_stg_sct.RDS")
+
+all_seu_prelim_stg_norm_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
   .[sample_name] %>%
   .[!is.na(.)] %>%
-  map(readRDS)
-
+  map(readRDS) 
 
 ```
+
 
 ```{r, warning=FALSE, message=FALSE}
 #ap2g
 imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", pt.size = 0.1)+ scale_color_manual(values = sp_col_new) + labs(title = .y))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=7, fig.height=3.5}
+#SURF1.2 gexp02
+map(all_seu_prelim_stg_norm, ~FeaturePlot(.x, reduction = "umap",  label = T, features = c("PF3D7-0113600", "PF3D7-1102500"), order = T))
 ```
 
 ```{r}
@@ -285,7 +298,7 @@ all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
 for (i in 1:length(all_seu_prelim_stg_norm)) {
 
   all_seu_prelim_stg_norm[[i]]@meta.data <- all_seu_prelim_stg_norm[[i]]@meta.data %>%
-  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"))) #%>%
+  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf", "_pfLRhiElo" = "_Pf", "_hsLRloElo" = "_mHs", "_pfLRloElo" = "_mPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"), contains("pfLRhiElo"), contains("hsLRloElo"), contains("pfLRloElo"))) #%>%
     #select(-c(ends_with("Ehi"), ends_with("Elo"))) 
 }
 
@@ -294,18 +307,36 @@ for (i in 1:length(all_seu_prelim_stg_norm)) {
 ```{r, message=FALSE}
 all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~ {
     .x@meta.data %>%
-    mutate(background_fraction_yPf_yHs = coalesce(background_fraction_yPf, background_fraction_yHs),
-           cell_probability_yPf_yHs = coalesce(cell_probability_yPf, cell_probability_yHs)) %>%
-    select(background_fraction_yPf_yHs, cell_probability_yPf_yHs) %>% 
+    mutate(background_fraction_yPf_Pf = coalesce(background_fraction_yPf, background_fraction_Pf),
+           cell_probability_yPf_Pf = coalesce(cell_probability_yPf, cell_probability_Pf)) %>%
+    select(background_fraction_yPf_Pf, cell_probability_yPf_Pf) %>% 
+    # mutate(background_fraction_yPf_yHs = coalesce(background_fraction_yPf, background_fraction_yHs),
+    #        cell_probability_yPf_yHs = coalesce(cell_probability_yPf, cell_probability_yHs)) %>%
+    # select(background_fraction_yPf_yHs, cell_probability_yPf_yHs) %>% 
     AddMetaData(.x, .)
        })
 
 ```
 
-```{r, message=FALSE}
-cr_cbender_pf100_mdata_slct_uni <- readRDS("data/processed/Pf/m2_all/cr_cbender_pf100_mdata_slct_uni.RDS")
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+# cr_cbender_pf100_mdata_slct_uni_list <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_pf100_mdata_slct_uni.RDS")
+cr_cbender_pf100_mdata_slct_uni_list <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_pf100_mdata_slct_uni3.RDS")
+
+cr_cbender_pf100_mdata_slct_uni_list
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+cr_cbender_pf100_mdata_slct_uni <- map(cr_cbender_pf100_mdata_slct_uni_list, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
 
 ```
+
 
 ```{r, message=FALSE}
 # ##!!! NOTE - This needs to be added at the beginning
@@ -313,7 +344,7 @@ cr_cbender_pf100_mdata_slct_uni <- readRDS("data/processed/Pf/m2_all/cr_cbender_
 all_seu_prelim_stg_norm <- list(all_seu_prelim_stg_norm, cr_cbender_pf100_mdata_slct_uni[names(all_seu_prelim_stg_norm)]) %>%
   pmap(~ {
     ..2 %>%
-      select(mthds_union_slim, barcode) %>%
+      select(mthds_union_slim2, mthds_union_slim3, mthds_union_slim, barcode) %>%
       column_to_rownames("barcode") %>%
       AddMetaData(..1, .)
        })
@@ -321,10 +352,23 @@ all_seu_prelim_stg_norm <- list(all_seu_prelim_stg_norm, cr_cbender_pf100_mdata_
 ```
 
 
+
+```{r, message=FALSE}
+# ##!!! NOTE - This needs to be added at the beginning
+# Add cellbender metadata that was skipped earlier
+list(cr_cbender_pf100_mdata_slct_uni[2]) %>%
+  pmap(~ {
+    ..1 %>%
+      select(mthds_union_slim2, mthds_union_slim, barcode) %>%
+      column_to_rownames("barcode") 
+       })
+
+```
+
 ```{r, message=FALSE}
 # map(all_seu_prelim_stg_norm["MSC68C"], ~ {
 #     .x@meta.data %>%
-#     ggplot(aes(x = mthds_union_slim, y = background_fraction_yPf)) +
+#     ggplot(aes(x = mthds_union_slim2, y = background_fraction_yPf)) +
 #     geom_boxplot()
 #   })
 
@@ -371,7 +415,7 @@ imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, group.by = "is_ce
 ## Assess cellbender estimated metrics cell probability and background fraction
 ```{r, fig.height = 12, fig.width = 12}
 all_seu_prelim_stg_norm_mdata_mrg %>%
-  ggplot(aes(x = mthds_union_slim, y = background_fraction_yPf)) +
+  ggplot(aes(x = mthds_union_slim2, y = background_fraction_yPf)) +
     geom_boxplot() +
   facet_wrap(donor ~.) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -382,7 +426,9 @@ all_seu_prelim_stg_norm_mdata_mrg %>%
 
 ```{r, fig.height = 12, fig.width = 12}
 all_seu_prelim_stg_norm_mdata_mrg %>%
-  ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim)) +
+  # ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  # ggplot(aes(x = background_fraction_Pf, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  ggplot(aes(x = background_fraction_mPf, y = background_fraction_mHs, colour = mthds_union_slim3)) +
     geom_point(size = 0.01) +
   geom_hline(yintercept = 0.5) +
   geom_vline(xintercept = 0.5) +
@@ -396,7 +442,9 @@ all_seu_prelim_stg_norm_mdata_mrg %>%
 
 ```{r, fig.height = 12, fig.width = 12}
 all_seu_prelim_stg_norm_mdata_mrg %>%
-  ggplot(aes(x = cell_probability_yHs, y = cell_probability_yPf, colour = mthds_union_slim)) +
+  # ggplot(aes(x = cell_probability_yHs, y = cell_probability_yPf, colour = mthds_union_slim2)) +
+  # ggplot(aes(x = cell_probability_yPf, y = cell_probability_Pf, colour = mthds_union_slim2)) +
+  ggplot(aes(x = cell_probability_mPf, y = cell_probability_mHs, colour = mthds_union_slim3)) +
   geom_point(size = 0.01) +
   geom_hline(yintercept = 0.9) +
   geom_vline(xintercept = 0.9) +
@@ -410,7 +458,7 @@ all_seu_prelim_stg_norm_mdata_mrg %>%
 
 ```{r, fig.height = 12, fig.width = 12}
 all_seu_prelim_stg_norm_mdata_mrg %>%
-  ggplot(aes(x = log10(hs_umi_count), y = log10(pf_umi_count), colour = mthds_union_slim)) +
+  ggplot(aes(x = log10(hs_umi_count), y = log10(pf_umi_count), colour = mthds_union_slim2)) +
     geom_point(size = 0.01) +
   geom_abline() +
   facet_wrap(donor ~.) +
@@ -422,8 +470,8 @@ all_seu_prelim_stg_norm_mdata_mrg %>%
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-plts_seu_cb5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$cell_probability_yPf < 0.9 & .x@meta.data$cell_probability_yHs < 0.9]), sizes.highlight = 0.05) + 
-                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+# plts_seu_cb5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$cell_probability_yPf < 0.9 & .x@meta.data$cell_probability_Pf < 0.9]), sizes.highlight = 0.05) + 
+plts_seu_cb5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$cell_probability_mPf < 0.9 & .x@meta.data$cell_probability_mHs < 0.9]), sizes.highlight = 0.05) +                                      theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
                                      labs(title = .y), "no cells"))
 
 ```
@@ -446,8 +494,11 @@ plot_grid(plotlist = plts_cbg, ncol = 4)
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
-plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | (.x@meta.data$background_fraction_yHs > 0.5 & .x@meta.data$mthds_union_slim == "yHs")]), sizes.highlight = 0.05) + 
-                                     theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+# plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | (.x@meta.data$background_fraction_yHs > 0.5 & .x@meta.data$mthds_union_slim == "yHs")]), sizes.highlight = 0.05) + 
+
+# plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | .x@meta.data$background_fraction_Pf > 0.5]), sizes.highlight = 0.05) +  
+
+plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_mPf > 0.5 | (.x@meta.data$background_fraction_mHs > 0.5 & .x@meta.data$mthds_union_slim3 == "^mHs")]), sizes.highlight = 0.05) +       theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
                                      labs(title = .y), "no cells"))
 
 ```
@@ -494,7 +545,7 @@ imap(all_seu_prelim_stg_norm, ~DimPlot(.x, dims = c(1,2), group.by = "seurat_clu
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
-## in cellbender but not in edrops
+## in 
 plts_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[,.x@meta.data$background_fraction_yPf >0.5]), sizes.highlight = 0.05) + 
                                      theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
                                      labs(title = .y), "no cells"))
@@ -542,7 +593,7 @@ plot_grid(plotlist = plts_stg, ncol = 4)
 for (i in 1:length(all_seu_prelim_stg_norm)) {
 
   all_seu_prelim_stg_norm[[i]]@meta.data <- all_seu_prelim_stg_norm[[i]]@meta.data %>%
-  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"))) #%>%
+  rename_with(~str_replace_all(., c("_hsLRloEhi" = "_yHs", "_pfLRloEhi" = "_yPf", "_pfLRhiElo" = "_Pf")), c(contains("hsLRloEhi"), contains("pfLRloEhi"), contains("pfLRloEhi"))) #%>%
     #select(-c(ends_with("Ehi"), ends_with("Elo"))) 
 }
 
@@ -554,8 +605,10 @@ for (i in 1:length(all_seu_prelim_stg_norm)) {
 all_seu_prelim_stg_norm <- map(all_seu_prelim_stg_norm, ~{
   .x@meta.data %>%
   rownames_to_column('bcode') %>%
-  mutate(cell_probability_cat = ifelse((cell_probability_yPf > 0.9 | cell_probability_yHs > 0.9), "PassQC", "PoorQC"),
-         background_fraction_cat = ifelse((background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), "PoorQC", "PassQC"),
+  mutate(cell_probability_cat = ifelse((cell_probability_yPf > 0.9 | cell_probability_Pf > 0.9), "PassQC", "PoorQC"),
+         background_fraction_cat = ifelse((background_fraction_yPf > 0.5 | background_fraction_Pf > 0.5), "PoorQC", "PassQC"),
+  # mutate(cell_probability_cat = ifelse((cell_probability_yPf > 0.9 | cell_probability_yHs > 0.9), "PassQC", "PoorQC"),
+  #        background_fraction_cat = ifelse((background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), "PoorQC", "PassQC"),
   # mutate(cell_probability_cat = ifelse(cell_probability > 0.9, "PassQC", "PoorQC"),
   #        background_fraction_cat = ifelse(background_fraction < 0.5, "PassQC", "PoorQC"),
          sR_fine_stg_cat = ifelse(sR_fine_stg %in% c("weak_score", "discrepantFM"), "PoorQC", "PassQC"),
@@ -647,21 +700,6 @@ plot_grid(plotlist = plts_HighBgProp, ncol = 4)
 ```
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
-## in cellbender but not in edrops
-plts_bg <- imap(all_seu_prelim_stg_norm, possibly(~{
-  DimPlot(.x, label = T, 
-          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(nFeature_RNA<gn_lci_cl_seu | nCount_RNA < rna_lci_cl_seu | nCount_RNA > rna_uci_cl_seu | nFeature_RNA > gn_uci_cl_seu)  %>% pull(bcode), 
-          sizes.highlight = 0.05) + 
-    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
-    labs(title = .y)}, "no cells"))
-
-```
-
-```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
-plot_grid(plotlist = plts_bg, ncol = 4)
-```
-
 ```{r}
 map(all_seu_prelim_stg_norm, dim)%>% as.data.frame() %>% .[2,]
 
@@ -706,6 +744,21 @@ all_seu_prelim_stg_norm <- pmap(list(all_seu_prelim_stg_norm, rep('nFeature_RNA'
 })
 ```
 
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+plts_bg <- imap(all_seu_prelim_stg_norm, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  .x@meta.data %>% rownames_to_column('bcode') %>% filter(nFeature_RNA<gn_lci_cl_seu | nCount_RNA < rna_lci_cl_seu | nCount_RNA > rna_uci_cl_seu | nFeature_RNA > gn_uci_cl_seu)  %>% pull(bcode), 
+          sizes.highlight = 0.05) + 
+    theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)}, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_bg, ncol = 4)
+```
 #### Violin plots
 
 
@@ -761,10 +814,10 @@ md_don_cl %>%
 ```
 
 
-```{r, fig.height = 6, fig.width = 15}
+```{r, fig.height = 9, fig.width = 15}
 
 
-my21_qc_vln_fn(clust_var = "sR_fine_stg", clust_cols = sp_col_new, ci_sufx = "_stg", row_numbers = 1 ) 
+my21_qc_vln_fn(clust_var = "sR_fine_stg", clust_cols = sp_col_new, ci_sufx = "_stg", row_numbers = 3 ) 
 
 ```
 
@@ -863,14 +916,23 @@ aftr_low_count_rm
 ```{r}
 ## 
 # map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability >= 0.9))
-map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability_yPf >= 0.9))
+map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability_yPf >= 0.9 | cell_probability_Pf >= 0.9))
 ```
-
 
 
 ```{r}
 ## 
-all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, cell_probability_yPf >= 0.9 | cell_probability_yHs >= 0.9))
+# map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability >= 0.9))
+imap(all_seu_filtOlMtCb, ~.x@meta.data %>% count((cell_probability_yPf >= 0.9 | cell_probability_Pf >= 0.9), sR_fine_stg)  %>% filter(`(cell_probability_yPf >= 0.9 | cell_probability_Pf >= 0.9)` == F) %>% rename(., !!.y := `(cell_probability_yPf >= 0.9 | cell_probability_Pf >= 0.9)`))
+
+```
+
+```{r}
+## 
+# all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, cell_probability_yPf >= 0.9 | cell_probability_yHs >= 0.9))
+# all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, cell_probability_yPf >= 0.9 | cell_probability_Pf >= 0.9))
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, cell_probability_mPf >= 0.9 | cell_probability_mHs >= 0.9))
+
 
 aftr_cell_prob9_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
 aftr_cell_prob9_rm
@@ -878,13 +940,105 @@ aftr_cell_prob9_rm
 
 ```{r}
 ## 
-map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(background_fraction_yPf <= 0.5))
+# map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(background_fraction_yPf <= 0.5))
+map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(background_fraction_yPf <= 0.5 | background_fraction_Pf <= 0.5))
+
 ```
 
 
 ```{r}
 ## 
-all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, (background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), invert = T))
+# map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability >= 0.9))
+imap(all_seu_filtOlMtCb, ~.x@meta.data %>% 
+       count(((background_fraction_yPf <= 0.5 & str_detect(mthds_union_slim2, "yPf")) | (background_fraction_Pf <= 0.5 & str_detect(mthds_union_slim2, "_Pf|^Pf"))), sR_fine_stg) %>% 
+       filter(`(...)` == F) %>%
+       rename(., !!.y := `(...)`)
+     )
+
+```
+
+```{r}
+## 
+# map(all_seu_filtOlMtCb, ~.x@meta.data %>% count(cell_probability >= 0.9))
+imap(all_seu_filtOlMtCb, ~.x@meta.data %>% 
+       count(((background_fraction_mHs <= 0.5 & str_detect(mthds_union_slim3, "^mHs")) | 
+                (background_fraction_mPf <= 0.5 & str_detect(mthds_union_slim3, "Pf"))), 
+             sR_fine_stg
+             ) %>% 
+       filter(`(...)` == F) %>%
+       rename(., !!.y := `(...)`)
+     )
+
+```
+
+```{r, fig.height = 12, fig.width = 12}
+all_seu_filtOlMtCb_mdata_mrg <- map(all_seu_filtOlMtCb, ~.@meta.data) %>% 
+  bind_rows(., .id = 'donor') 
+
+
+```
+
+
+```{r, fig.height = 12, fig.width = 12}
+all_seu_filtOlMtCb_mdata_mrg %>%
+  # ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  # ggplot(aes(x = background_fraction_Pf, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  ggplot(aes(x = background_fraction_mPf, y = background_fraction_mHs, colour = mthds_union_slim3)) +
+    geom_point(size = 0.01) +
+  geom_hline(yintercept = 0.5) +
+  geom_vline(xintercept = 0.5) +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+# plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | (.x@meta.data$background_fraction_yHs > 0.5 & .x@meta.data$mthds_union_slim == "yHs")]), sizes.highlight = 0.05) + 
+
+# plts_seu_bg5 <- imap(all_seu_filtOlMtCb, possibly(~{
+#   DimPlot(.x, label = T, 
+#           cells.highlight =  colnames(.x[, !((.x@meta.data$background_fraction_yPf <= 0.5 & 
+#                                                str_detect(.x@meta.data$mthds_union_slim2, "yPf")) | 
+#                                               (.x@meta.data$background_fraction_Pf <= 0.5 & 
+#                                                  str_detect(.x@meta.data$mthds_union_slim2, "_Pf|^Pf")))]), 
+#           sizes.highlight = 0.05) +    
+    
+plts_seu_bg5 <- imap(all_seu_filtOlMtCb, possibly(~{
+  DimPlot(.x, label = T, 
+          cells.highlight =  colnames(
+            .x[, !((.x@meta.data$background_fraction_mHs <= 0.5 &  str_detect(.x@meta.data$mthds_union_slim3, "^mHs")) | 
+                     (.x@meta.data$background_fraction_mPf <= 0.5 & str_detect(.x@meta.data$mthds_union_slim3, "Pf")))]
+            ), 
+          sizes.highlight = 0.05) +   
+    theme_void() + 
+    theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+    labs(title = .y)
+  }, "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_seu_bg5[unlist(map(plts_seu_bg5, ~!is.character(.x)))], ncol = 4)
+
+```
+
+```{r}
+# go()
+## 
+# all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, (background_fraction_yPf > 0.5 | (background_fraction_yHs > 0.5 & mthds_union_slim == "yHs")), invert = T))
+
+# all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~.x[, (.x@meta.data$background_fraction_yPf <= 0.5 & 
+#                                                str_detect(.x@meta.data$mthds_union_slim2, "yPf")) | 
+#                                               (.x@meta.data$background_fraction_Pf <= 0.5 & 
+#                                                  str_detect(.x@meta.data$mthds_union_slim2, "_Pf|^Pf"))]
+#                           )
+
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, 
+                          ~.x[, (.x@meta.data$background_fraction_mHs <= 0.5 & str_detect(.x@meta.data$mthds_union_slim3, "^mHs")) | 
+                                (.x@meta.data$background_fraction_mPf <= 0.5 & str_detect(.x@meta.data$mthds_union_slim3, "Pf"))]
+                          )
 
 # map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,] %>% t()
 aftr_cb_bg_frac_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
@@ -894,7 +1048,7 @@ aftr_cb_bg_frac_rm
 ```{r}
 ## filter(if_all(c(background_fraction_cat_poorQc_prop, sR_fine_stg_cat_poorQc_prop), ~. > 0.2))
 
-all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, background_fraction_cat_poorQc_prop <= 0.2 | sR_fine_stg_cat_poorQc_prop <= 0.2))
+# all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, background_fraction_cat_poorQc_prop <= 0.2 | sR_fine_stg_cat_poorQc_prop <= 0.2))
 
 
 # map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,] %>% t()
@@ -918,13 +1072,84 @@ imap(all_seu_filtOlMtCb, ~DimPlot(.x, dims = c(1,2), group.by = "sR_fine_stg", p
 
 ```
 
-```{r, eval=T}
-## write out seurat bpcells object files for normalization processing in farm
-### gn_edrops50
-# imap(all_ed, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_edrops50"), "/seu_obj/bpseu_raw_ed_pref.RDS")))
-imap(all_seu_filtOlMtCb, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_seu_filtOlMtCb.RDS")))
+```{r, fig.height = 12, fig.width = 12}
+map(all_seu_filtOlMtCb, ~.@meta.data) %>% 
+  bind_rows(., .id = 'donor')  %>%
+  # ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  # ggplot(aes(x = background_fraction_Pf, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  ggplot(aes(x = pf_umi_count, y = hs_umi_count, colour = mthds_union_slim3)) +
+    geom_point(size = 0.01) +
+  geom_hline(yintercept = 50) +
+  geom_vline(xintercept = 100) +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
 
 ```
+
+```{r, fig.height = 12, fig.width = 12}
+map(all_seu_filtOlMtCb, ~.@meta.data) %>% 
+  bind_rows(., .id = 'donor')  %>%
+  # ggplot(aes(x = background_fraction_yHs, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  # ggplot(aes(x = background_fraction_Pf, y = background_fraction_yPf, colour = mthds_union_slim2)) +
+  ggplot(aes(x = pf_gn_count, y = hs_gn_count, colour = mthds_union_slim3)) +
+    geom_point(size = 0.01) +
+  geom_hline(yintercept = 40) +
+  geom_vline(xintercept = 100) +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_abline() +
+  facet_wrap(donor ~.) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(color = guide_legend(title = 'Call methods', override.aes = list(size = 4), ncol = 1))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
+## in cellbender but not in edrops
+# plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | (.x@meta.data$background_fraction_yHs > 0.5 & .x@meta.data$mthds_union_slim == "yHs")]), sizes.highlight = 0.05) + 
+
+# plts_seu_bg5 <- imap(all_seu_prelim_stg_norm, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, .x@meta.data$background_fraction_yPf > 0.5 | .x@meta.data$background_fraction_Pf > 0.5]), sizes.highlight = 0.05) +  
+
+plts_seu_hsumi50 <- imap(all_seu_filtOlMtCb, possibly(~DimPlot(.x, label = T, cells.highlight =  colnames(.x[, (.x@meta.data$hs_gn_count > 40 & .x@meta.data$mthds_union_slim3 == "mHs")]), sizes.highlight = 0.05) +       theme_void() + theme(legend.position = "none", panel.border = element_rect(color = "black", fill = NA, size = 1))  +
+                                     labs(title = .y), "no cells"))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height= 14, fig.width= 10, eval=T}
+plot_grid(plotlist = plts_seu_hsumi50, ncol = 4)
+
+```
+
+```{r}
+imap(all_seu_filtOlMtCb, ~.x@meta.data %>% 
+       count((hs_gn_count > 40 & mthds_union_slim3 == "mHs"), 
+             stage_ag
+             ) %>% 
+       # filter(`(...)` == F) %>%
+       rename(., !!.y := n)
+     )
+
+```
+
+```{r, message=F, warning=F}
+all_seu_filtOlMtCb <- map(all_seu_filtOlMtCb, ~subset(.x, subset = ((hs_gn_count <= 40 & mthds_union_slim3 == "mHs") | mthds_union_slim3 != "mHs")))
+
+aftr_hs_umi_rm <- map(all_seu_filtOlMtCb, dim)%>% as.data.frame() %>% .[2,]
+aftr_hs_umi_rm
+
+```
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+# imap(all_seu_filtOlMtCb, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_seu_filtOlMtCb.RDS")))
+imap(all_seu_filtOlMtCb, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y, "_[ed|cb].*"), "/seu_obj/all_seu_filtOlMtCb3.RDS")))
+
+```
+
 
 ```{r}
 
@@ -960,8 +1185,8 @@ filt_flow_diff <- bind_rows(
   mutate(row_id = row_number(), source = 2),
   filt_diff %>% 
   mutate(row_id = row_number(), source = 2)
-) %>%
-  arrange(row_number() + (row_number() > nrow(df)))
+) #%>%
+  # arrange(row_number() + (row_number() > nrow(df)))
 
 filt_flow_diff_t <- filt_flow_diff %>% arrange(row_id, source) %>% 
   select(-row_id, -source) %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
@@ -969,6 +1194,12 @@ filt_flow_diff_t <- filt_flow_diff %>% arrange(row_id, source) %>%
 filt_flow_diff_t
 ```
 
+
+```{r}
+# saveRDS(filt_flow_diff_t, "data/processed/Pf/m2_all/filt_flow_diff_t.RDS")
+saveRDS(filt_flow_diff_t, "data/processed/Pf/m2_all/filt_flow_diff_t3.RDS") 
+
+```
 
 ```{r}
 
