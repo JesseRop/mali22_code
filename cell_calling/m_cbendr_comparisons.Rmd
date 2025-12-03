@@ -96,9 +96,7 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 ###################START- RAW READING#############
 
 ```{r, eval=T}
-# pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
-pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode_minus_noJC.csv")
-
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
 pf_all_id_decode$sample_nm
 ```
 
@@ -227,10 +225,7 @@ sample_pfLRloElo <- paste0(sample_name, "_rmHs_LR0.000005_E150")
 sample_pfLRhiEhi <- paste0(sample_name, "_rmHs_LR0.0001_E250")
 sample_pfLRhiElo <- paste0(sample_name, "_rmHs_LR0.0001_E150")
 
-sample_dpfLRloElo <- paste0(sample_name, "_drmHs_LR0.000005_E150")
-sample_dhsLRloElo <- paste0(sample_name, "_dwHsPf_LR0.000005_E150")
-
-sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo", "_dpfLRloElo", "_dhsLRloElo")
+sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo")
 
 ```
 
@@ -244,10 +239,10 @@ class(dirs)
 ```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
 cbender_mdata_std_yascp_syst <- map(dirs, ~list.files(.x, pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom2|_gns|/cb_mdata.*|/cb|/|efault_'))))  %>% unlist(., recursive = F) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_custom2|_gns|/cb_mdata.*|/cb|/'))))  %>% unlist(., recursive = F) %>% 
   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|_gns|/cb_mdata.*|/'))) %>% 
   # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender|/cb_yascp_default|_dir|_gns|/cb_mdata.*'))) %>% 
-  .[c(sample_hsLRloEhi, sample_hsLRloElo, sample_hsLRhiEhi, sample_hsLRhiElo, sample_pfLRloEhi, sample_pfLRloElo, sample_pfLRhiEhi, sample_pfLRhiElo, sample_dpfLRloElo, sample_dhsLRloElo)] %>%
+  .[c(sample_hsLRloEhi, sample_hsLRloElo, sample_hsLRhiEhi, sample_hsLRhiElo, sample_pfLRloEhi, sample_pfLRloElo, sample_pfLRhiEhi, sample_pfLRhiElo)] %>%
   .[!is.na(.)] %>%
   map(., ~read_csv(.x, show_col_types = FALSE)) 
 ```
@@ -274,9 +269,7 @@ dfs_to_join <- list(
   cbender_mdata_std_yascp_syst[sample_pfLRloEhi],
   cbender_mdata_std_yascp_syst[sample_pfLRloElo],
   cbender_mdata_std_yascp_syst[sample_pfLRhiEhi],
-  cbender_mdata_std_yascp_syst[sample_pfLRhiElo],
-  cbender_mdata_std_yascp_syst[sample_dpfLRloElo],
-  cbender_mdata_std_yascp_syst[sample_dhsLRloElo]
+  cbender_mdata_std_yascp_syst[sample_pfLRhiElo]
 )
 
 # Get the number of samples
@@ -397,7 +390,7 @@ cr_cbender_mdata_hmnz_syst_snky_pfumi <- map2(cr_cbender_mdata_hmnz_syst_snky[in
 
 ```
 
-```{r, message=FALSE, warning=FALSE, eval=T}
+```{r, message=FALSE, warning=FALSE, eval=F}
 # Parallelize plot generation
 plan(multisession, workers = 7)
 
@@ -407,7 +400,7 @@ plan(sequential)
 
 ```
 
-```{r, message=FALSE, warning=FALSE, eval=T}
+```{r, message=FALSE, warning=FALSE, eval=F}
 map(cb_snky_plts_pf100, ~.x + 
       theme(axis.text.x = element_text(angle = 20, hjust = 0.8, face = "plain")))
 
@@ -415,11 +408,9 @@ map(cb_snky_plts_pf100, ~.x +
 
 ```{r, message=FALSE, warning=FALSE}
 runs2plot <- c("cr", paste0("cb", c("_hsLRloEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRhiElo")))
-runs2plot <- c("cr", paste0("cb", c("_hsLRloElo", "_pfLRloElo", "_dpfLRloElo", "_dhsLRloElo")))
-
 ```
 
-```{r, message=FALSE, warning=FALSE, eval=T}
+```{r, message=FALSE, warning=FALSE, eval=F}
 # Parallelize plot generation
 plan(multisession, workers = 7)
 
@@ -429,8 +420,8 @@ plan(sequential)
 
 ```
 
-```{r, message=FALSE, warning=FALSE, eval=T}
-cb_snky_plts_pf100_set
+```{r, message=FALSE, warning=FALSE, eval=F}
+cb_snky_plts_pf100_set[1]
 
 ```
 
