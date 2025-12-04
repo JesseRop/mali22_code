@@ -68,3 +68,40 @@ bcranks_ncells_ndrops_plot_fn <-  function(dset, don_nm, ncols = 6) {
   
 }
 
+## Function to plot how different cell calling methods including different iterations of cellbender overlap
+call_methods_overlap_barplot_fn <- function(tbl = cr_cbender_mdata_slct_uni, mthd = "mthds_union", pf_umi_filt = 0, min_grp_size =0) {
+  map(tbl, ~.x %>% 
+        filter(pf_umi_count >= pf_umi_filt) %>%
+        count(!!rlang::sym(mthd)) %>%
+        filter(n > min_grp_size)
+  ) %>%
+    bind_rows(., .id = "donor") %>%
+    # filter(n > 100) %>%
+    ggplot(aes(y = n/1000, x = !!rlang::sym(mthd), fill = !!rlang::sym(mthd))) +
+    geom_col() +
+    # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+    geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
+    scale_y_continuous(expand = expansion(mult = c(0.01, 0.8))) +
+    scale_fill_manual(values = c_combos_cols) +
+    facet_wrap(. ~ donor, ncol = 5, scales = "free_y") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          text = element_text(size = 11),
+          legend.position = "bottom")
+  
+}
+
+
+## Function to plot the scatter of the human versus plasmodium umi or gene count coloured by different cell calling method
+call_methods_overlap_scatter_fn <- function(tbl = cr_cbender_uni_pf100_mrg, gn_or_umi = "umi",  mthd = "mthds_union") {
+  
+  ggplot(tbl, aes(x = log10(!!rlang::sym(paste0('pf_',gn_or_umi,'_count'))), y = log10(!!rlang::sym(paste0('hs_',gn_or_umi,'_count'))), colour = !!rlang::sym(mthd))) +
+    geom_point(size = 0.01) +
+    # geom_density_2d()  +
+    scale_colour_manual(values = c_combos_cols) +
+    facet_wrap(donor ~ .,  ncol = 5) +
+    geom_hline(yintercept = log10(100)) +
+    geom_vline(xintercept = log10(100)) +
+    guides(color = guide_legend(title = 'Cell call', override.aes = list(size = 4), ncol = 1))
+}
+
