@@ -59,6 +59,7 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/cell_calling/common_plotting_fns.R")
 
 ```
 ## Input
@@ -79,11 +80,15 @@ Get the sample set for processing
 slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
 
 ## poor quality samples
-sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
 sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
 
 ## slct_sample_names[-c(sample_rm)]
-slct_sample_names <- slct_sample_names[!str_detect(slct_sample_names, paste(c(sample_rm, sample_mxd), collapse = "|"))]
+# slct_sample_names <- slct_sample_names[!str_detect(slct_sample_names, paste(c(sample_rm, sample_mxd), collapse = "|"))]
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
 slct_sample_names
 
 
@@ -112,6 +117,11 @@ sample_nm_species <- paste0(rep(sample_name, each=2), c("_rmHs", "_wHsPf"))
 
 ```
 
+
+```{r, message=F, warning=F, eval=T}
+key_samples <- c("MSC13", "MSC14", "MSC3", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
+
+```
 
 ```{r, message=F, warning=F, eval=T}
 ##Read bcrank results matrices
@@ -297,6 +307,10 @@ yascp_cbender_cutoffs_all_ncells_ndrops <- yascp_cbender_cutoffs_all_ncells_ndro
   pivot_wider(names_from = "method", values_from = c("umi_counts_cutoff", "n_cells"))
 ```
 
+```{r, message=F, warning=F, eval=T}
+saveRDS(yascp_cbender_cutoffs_all_ncells_ndrops, "data/processed/Pf/m2_all/yascp_cbender_cutoffs_all_ncells_ndrops.RDS")
+```
+
 
 ```{r, message=F, warning=F, eval=T}
 # yascp_cbender_cutoffs_all_ncells_ndrops %>% filter(str_match(donor_cutoff, "MSC12.*")) %>% filter(method == "knee") %>% pull(n_cells)
@@ -314,6 +328,12 @@ all_bcrank_mrg <- map(all_bcrank, ~data.frame(.x)) %>%
   left_join(., yascp_cbender_cutoffs_all_ncells_ndrops)
 ```
 
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Save the sankey plotting table for plotting in the 'cell_calling_figs.Rmd' script incase needed for publication
+saveRDS(all_bcrank_mrg, "data/processed/Pf/m2_all/cell_calling_plotting/all_bcrank_mrg.RDS")
+
+```
+
 ```{r, message=F, warning=F, eval=T}
 ##Read edrops results matrices
 don_names <- unique(str_remove_all(sample_name, "noJC$|C$"))
@@ -321,7 +341,8 @@ don_names <- unique(str_remove_all(sample_name, "noJC$|C$"))
 
 
 ```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
-##Read edrops results matrices
+## Barcode ranks plotting function incorporating thresholds for the UMI cut off for the knee and inflection for the number of likely cells and total droplets calculated by droplet utils - Added as geom hlines
+
 bcranks_cutoff_plot_fn <-  function(dset, hline_droplets = "umi_counts_cutoff_total_droplets_", hline_cells = "umi_counts_cutoff_cell_estimate_", hline_cells_lab = "umi_cutoff_cells:", hline_droplets_lab = "umi_cutoff_droplets:", line_part = "knee", ncols = 6) {
     label_data = distinct(dset, donor, species, jumpcode, !!rlang::sym(paste0(hline_cells, line_part)), !!rlang::sym(paste0(hline_droplets, line_part)))
     
@@ -344,7 +365,8 @@ bcranks_cutoff_plot_fn <-  function(dset, hline_droplets = "umi_counts_cutoff_to
                     label = paste(hline_droplets_lab, !!rlang::sym(paste0(hline_droplets, line_part)))),
                 vjust = -0.2) +
       facet_wrap2(vars(donor, species, jumpcode), ncol = ncols) +
-      labs(title = paste0(line_part)) 
+      labs(title = paste0(line_part)) +
+      theme_classic()
   
   
 }
@@ -379,8 +401,25 @@ map(c("knee", "inflection"), ~{
 ```
 
 
-```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+```{r, message=F, warning=F, eval=T, fig.height=15, fig.width=10}
 ##Read edrops results matrices
+map(c("knee", "inflection"), ~{
+
+    bcranks_cutoff_plot_fn(dset = all_bcrank_mrg %>% filter(str_detect(sample, paste0(paste(key_samples, collapse = "_|"),"_"))),# %>% 
+                             # filter(donor %in% key_samples), 
+                           hline_droplets = "umi_counts_cutoff_total_droplets_", 
+                           hline_droplets_lab = "droplets:", 
+                           hline_cells = "umi_counts_cutoff_cell_estimate_",
+                           hline_cells_lab = "cells:", 
+                           line_part = .x, ncols = 6)
+  
+})
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height= 4, fig.width=10}
+## Barcode ranks plotting function incorporating thresholds for the number of likely cells and total droplets calculated by droplet utils - Added as geom vlines
+
 bcranks_ncells_ndrops_plot_fn <-  function(dset, don_nm, ncols = 6) {
     label_data = distinct(dset, donor, species, jumpcode, n_cells_cell_estimate_estimated_ncells, n_cells_total_droplets_estimated_ndroplets)
     
