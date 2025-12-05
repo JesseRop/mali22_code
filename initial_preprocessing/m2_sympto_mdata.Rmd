@@ -63,6 +63,7 @@ suppressPackageStartupMessages({
   conflict_prefer("rename", "dplyr")
   conflicts_prefer(dplyr::count)
   conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
   
 })
 ```
@@ -104,6 +105,9 @@ qcd_dons <- c("MSC1", "MSC12", "MSC13", "MSC14", "MSC24", "MSC25", "MSC3",
 "MSC66", "MSC67", "MSC68", "MSC70")
 
 qcd_dons_nc <- qcd_dons[!qcd_dons == "MSC12"] %>% str_remove(., "_MACS|_SLO") %>% unique()
+
+## Remove MSC1 & MSC24 since these are also poorQC and MSC25, MSC41 and MSC51 which are mixed
+qcd_dons_nc <- qcd_dons_nc[!qcd_dons_nc %in% c("MSC1", "MSC24", "MSC25", "MSC41", "MSC51")] %>% unique()
 ```
 
 !!!NOTE - Reading in the metadata to add to the mixed species samples which were missed in the initial step - Will need to redo adding to the source
@@ -122,23 +126,6 @@ donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/M
 donor_mdata <- donor_mdata %>% rename_all(., ~str_to_lower(str_replace_all(.,c("\\["="_", "\\]"="", " "="", "-"="",  "\\/"="_", "º"=""))))
 ```
 
-
-```{r, fig.width=15, fig.height=5}
-## Antoine metadata with age
-# adara_donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/Antoine_MRC_Sample_Manifest_Metadata.csv", col_types =  paste0(c(rep("c", 7), "d", "c","d","d", rep("c", 14)), collapse = ""), show_col_types = T) 
-# adara_donor_mdata <- adara_donor_mdata %>% rename_all(., ~str_to_lower(str_replace_all(.,c("\\["="_", "\\]"="", " "="", "-"="",  "\\/"="_", "º"="")))) %>% filter(if_any(everything(), ~!is.na(.)))
-
-```
-
-
-```{r, fig.width=15, fig.height=5}
-
-donor_mdata %>%
-  filter(!is.na(short_name) & str_detect(short_name, "MSC"))%>%
-  filter(short_name %in% qcd_dons_nc) %>% 
-  select(short_name,  time_of_sampling, time_of_sample_processing)
-
-```
 
 Retain only the MSC and remove "MSC19", "MSC20" which are duplicated and retain the set "`MSC19*`", "`MSC20*`" with relevant details
 ```{r, fig.width=15, fig.height=5}
@@ -196,7 +183,7 @@ donor_mdata_cln_nms_pfp_pmop_times %>% select(short_name, contains("time"), days
 ```
 
 ```{r, fig.width=15, fig.height=5}
-donor_mdata_slct <- donor_mdata_cln_nms_pfp_pmop_times %>%
+donor_mdata_slct1 <- donor_mdata_cln_nms_pfp_pmop_times %>%
   mutate(fever = case_when(temperature_c >= 37.5 ~ "Fever", temperature_c < 37.5 ~ "NoFever"),
          condition = ifelse(symptomatic == "Y", "Symptomatic", "Asymptomatic"),
          across(condition, ~case_when(temperature_c > 37.5 & . == "Asymptomatic" ~ "Symptomatic",
@@ -207,6 +194,109 @@ donor_mdata_slct <- donor_mdata_cln_nms_pfp_pmop_times %>%
 ```
 
 
+```{r, fig.width=15, fig.height=5}
+## Antoine additional metadata with specific symptoms
+donor_mdata_dtld_symptoms <- readxl::read_xlsx("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/MRC_Sample_Manifest_May_2025_additional_info.xlsx")
+
+donor_mdata_dtld_symptoms <- donor_mdata_dtld_symptoms %>% rename_with(.fn = ~str_to_lower(str_replace_all(str_remove(., " \\(.*"), c(" "= "_", "\\[|\\]"="", "/"="_", "º"=""))), .cols = everything())
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+
+donor_mdata_dtld_symptoms <- donor_mdata_dtld_symptoms %>%
+  mutate(fever = case_when(temperature_c >= 37.5 ~ "Fever", temperature_c < 37.5 ~ "NoFever")) 
+
+donor_mdata_dtld_symptoms %>% count(symptomatic, fever, history_of_fever, headache, vomiting, diarrhoea, abdominal_pain, previous_medication)
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_dtld_symptoms %>%
+  filter(symptomatic == "N" & temperature_c > 37.5)
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_dtld_symptoms_slct <- donor_mdata_dtld_symptoms %>% 
+  select(short_name, symptomatic, age_years, gender_m_f, weight_kg, temperature_c, headache, history_of_fever, vomiting, diarrhoea, abdominal_pain, other_comments, previous_medication, village, fever) %>%
+  filter(!is.na(short_name))
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 <- donor_mdata_slct1 %>% left_join(., donor_mdata_dtld_symptoms_slct, by = "short_name", suffix = c("_old", "_dara_new"))
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% count(symptomatic_old, symptomatic_dara_new, fever_old, fever_dara_new)
+```
+
+Check out discrepancies for symptom status classification
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% filter(symptomatic_old == "N" & symptomatic_dara_new == "Y" & fever_old == "Fever" & fever_dara_new == "Fever")
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% filter(symptomatic_old == "N" & symptomatic_dara_new == "Y" & fever_old == "NoFever" & fever_dara_new == "NoFever")
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% filter(symptomatic_old == "Y" & symptomatic_dara_new == "N" & fever_old == "NoFever" & fever_dara_new == "NoFever")
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% filter(symptomatic_old == "Y" & symptomatic_dara_new == "Y" & fever_old == "NoFever" & fever_dara_new == "Fever")
+```
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct2 %>% filter(symptomatic_old == "Y" & symptomatic_dara_new == "Y" & fever_old == "NoFever" & fever_dara_new == "NoFever")
+```
+
+```{r}
+donor_mdata_slct2 %>% ggplot(aes(x = age_years_old, y = age_years_dara_new)) + geom_point()
+donor_mdata_slct2 %>% count(gender_m_f_old,gender_m_f_dara_new)
+donor_mdata_slct2 %>% ggplot(aes(x = temperature_c_old, y = temperature_c_dara_new)) + geom_point()
+```
+
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct <- donor_mdata_slct2 %>%
+  mutate(temperature_c = temperature_c_dara_new,
+         symptomatic= symptomatic_dara_new,
+         fever= fever_dara_new,
+         age_years = age_years_dara_new,
+         weight_kg = weight_kg_dara_new,
+         gender_m_f = gender_m_f_dara_new,
+         sympto_groups = case_when(temperature_c >= 37.5 & symptomatic == "Y" ~ "sympto_fever",
+                                    temperature_c < 37.5 & history_of_fever == "Y" ~ "sympto_hist_fever",
+                                    # temperature_c < 37.5 & history_of_fever == "N" & symptomatic == "Y" ~ "sympto_no_fever",
+                                    temperature_c < 37.5 & history_of_fever == "N" & symptomatic == "Y" & symptomatic_old == "N" ~ "Asympto_NoF_other_symptoms",
+                                    temperature_c < 37.5 & history_of_fever == "N" & symptomatic == "Y" & symptomatic_old == "Y" ~ "sympto_confusing",
+                                    symptomatic == "N" & temperature_c < 37.5 & history_of_fever == "N" ~ "Asympto"),
+         condition = case_when(sympto_groups %in% c("sympto_fever", "sympto_hist_fever", "sympto_confusing") ~ "Symptomatic",
+                               sympto_groups %in% c("Asympto", "Asympto_NoF_other_symptoms") ~ "Asymptomatic"),
+         # condition = ifelse(symptomatic == "Y", "Symptomatic", "Asymptomatic"),
+         # across(condition, ~case_when(temperature_c > 37.5 & . == "Asymptomatic" ~ "Symptomatic",
+         #                             T ~ .)),
+         across(condition, ~factor(., levels = c("Asymptomatic", "Symptomatic")))) %>% 
+  select(short_name, parasitaemia_pf, parasitaemia_pmo, smpl_wait_time, days_frm_ssn_start, gender_m_f, weight_kg, contains("symptomatic"), contains("fever"),  condition, temperature_c, fever, age_years, species_by_microscopy, headache, history_of_fever, vomiting, diarrhoea, abdominal_pain, other_comments, previous_medication, village, sympto_groups)
+
+```
+
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct %>% count(symptomatic, fever, sympto_groups, condition)
+```
+
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_slct %>% filter(fever == "NoFever", sympto_groups == "sympto_confusing")
+```
 
 ```{r, fig.width=15, fig.height=5}
 saveRDS(donor_mdata_slct, "data/processed/Pf/m2_all/donor_mdata_slct.RDS")
@@ -399,9 +489,18 @@ map(donor_mdata_continous, ~.x %>%
 )
 ```
 
+```{r}
+# (table1 <-  map2(table1.categorical.both, table.continuous_variables.both, ~{
+#   .x %>%
+#   # make these variables into character format to be consistent with
+#   # the Mean (SD) column for continuus variables
+#   mutate_each(funs(format), Asymptomatic, Symptomatic) 
+# }))
+
+```
 
 ```{r}
-(table1 <-  map2(table1.categorical.both, table.continuous_variables.both, ~{
+(table1 <-  map2(table1.categorical.both, table.continuous_variables.both, possibly(~{
   .x %>%
   # make these variables into character format to be consistent with
   # the Mean (SD) column for continuus variables
@@ -415,7 +514,7 @@ map(donor_mdata_continous, ~.x %>%
          Variable=variable,
          Response=value,
          `χ2/t` = statistic)
-}))
+}, "less than 2 categories for chisquare")))
 
 ```
 
@@ -427,7 +526,7 @@ table1_key <- c("gender_m_f" = "Sex", "species_by_microscopy" = "Species (micros
 ```
 
 ```{r}
-table1_cln_nms <- map(table1, ~.x %>% mutate(Variable = recode(Variable, !!!table1_key)))
+table1_cln_nms <- map(table1, possibly(~.x %>% mutate(Variable = recode(Variable, !!!table1_key)), "less than 2 categories for chisquare"))
   
 
 ```
@@ -441,13 +540,13 @@ table1_cln_nms
 
 
 ```{r, fig.width=7.5, fig.height=2, results='markup'}
- map(table1_cln_nms, ~.x  %>%
+ map(table1_cln_nms, possibly(~.x  %>%
   # split.tables argument needed to avoid the table wrapping
   pander(split.tables=Inf,
          missing="-",
          justify=c("left", "left", rep("center", 5)),
          caption='Table presenting baseline differences between conditions. Categorical variables tested with Pearson χ2, continuous variables with two-sample t-test.')
- )
+ ), "less than 2 categories for chisquare")
 ```
 
 
@@ -555,170 +654,105 @@ model <- glm(condition ~ age_years + parasitaemia_pf + temperature_c + smpl_wait
 summary(model)
 ```
 
-linear mixed model for pseudotime difference between symptomatic and asymptomatic
-```{r}
-umap_meta_df <- readRDS("data/processed/Pf/m2_all/umap_meta_df.RDS")
-```
-
-```{r}
-umap_meta_df_mdata <- umap_meta_df %>% left_join(., donor_mdata_lst[[1]] %>% mutate(across(short_name, ~str_remove(., "SC"))), by = c("donor"= "short_name"))
-```
-
-```{r}
-umap_meta_df_mdata
-```
-
-```{r, fig.width=15, fig.height=5}
-## Get cell count
-# sympt_mdata_all$parasitaemia_pf_scaled <- scale(sympt_mdata_all$parasitaemia_pf, center = TRUE, scale = TRUE)
-
-umap_meta_df_mdata <- umap_meta_df_mdata %>% 
-  mutate(#PT_grp = factor(PT_grp, levels = c("PT.1", "PT.2", "PT.3")),
-         condition = factor(condition.x, levels = c("Asymptomatic", "Symptomatic")),
-         fever = factor(fever, levels = c("NoFever", "Fever")),
-         parasitaemia_pf_scaled = scale(parasitaemia_pf, center = TRUE, scale = TRUE),
-         age_years_scaled = scale(age_years, center = TRUE, scale = TRUE),
-         smpl_wait_time_scaled = scale(smpl_wait_time, center = TRUE, scale = TRUE))
-```
-
-```{r}
-# Fit a mixed model to pseudotime values
-model2 <- lmerTest::lmer(pseudotime ~ condition.x + (1|donor) + age_years + parasitaemia_pf_scaled + temperature_c + smpl_wait_time + fever, data = umap_meta_df_mdata)
-# summary(model2)
-
-# Fit a reduced model without the fixed effect
-model_reduced <- lmerTest::lmer(pseudotime ~ 1 + (1 | donor) + age_years + parasitaemia_pf_scaled + temperature_c + smpl_wait_time + fever, data = umap_meta_df_mdata)
-
-# Perform a likelihood ratio test
-anova(model_reduced, model2)
-```
-
 ```{r}
 
 ```
 Read in single cell object and add metadata
 
-Integrated asexual
-```{r}
-## subset where field parasites are for slingshot
-# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
-v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
+##############################START - Sample processing metadata ############################
 
+!!!NOTE - Reading in the metadata to add to the mixed species samples which were missed in the initial step - Will need to redo adding to the source
+```{r}
+mrc_sk21_summary <- read_csv("data/raw/MRC_Sample_Analysis_Summary_Summary.csv", skip = 1) 
+
+# mrc_sk21_summary_mxd <- mrc_sk21_summary %>% filter(Sample_Name %in% c("MSC25" ,"MSC41", "MSC51")) %>% mutate(across(Symptomatic, ~str_replace_all(., c("Y" = "Yes", "N" = "No")))) %>% select(Sample_Name,Symptomatic, Hb_Type) %>% rename("donor" = Sample_Name)
+```
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
 ```
 
 ```{r}
-## add metadata for the mixed infections donors
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
-  rownames_to_column("bcode") %>% 
-  left_join(., mrc_sk21_summary_mxd, by = "donor") %>%
-  mutate(Symptomatic = coalesce(Symptomatic.x, Symptomatic.y), Hb_Type = coalesce(Hb_Type.x, Hb_Type.y)) %>% 
-  select(bcode, Symptomatic, Hb_Type) %>% 
-  column_to_rownames("bcode") %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
-```
-
-
-Remove 1 early ring
-```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,!(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$StageFL == "Early ring")]
-```
-
-
-Remove msc12
-```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,!(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$donor == "MSC12")]
+mrc_sk21_summary_slct <- mrc_sk21_summary %>% 
+  left_join(pf_solo_mixed_mdata_decode, ., by = c("irods_id" = "Sanger_SampleID")) %>%
+  # mutate(donor = str_remove(sample_nm, "_.*")) %>%
+  rename("perc_map_p" = `%map to pfpmpo`, "perc_map_hs" = `%map to hs`) %>%
+  mutate(p_map_cat = case_when(perc_map_p > 0 & perc_map_p < 33 ~ "low",
+                              perc_map_p >= 33 & perc_map_p < 66 ~ "medium",
+                              perc_map_p >= 66 & perc_map_p <= 100 ~ "high"),
+         hs_map_cat = case_when(perc_map_hs > 0 & perc_map_hs < 33 ~ "low",
+                              perc_map_hs >= 33 & perc_map_hs < 66 ~ "medium",
+                              perc_map_hs >= 66 & perc_map_hs <= 100 ~ "high"),
+         across(c(p_map_cat, hs_map_cat), ~factor(., levels = c("low", "medium", "high")))) %>% 
+  mutate(peak = factor(str_replace(str_remove(Peak, " peak"), "Very ", "V."), levels = c("No", "Small", "Medium", "Big", "V.big"))) %>%
+  select(sample_nm, pf, pm, po, nStrains_Pf, nStrains_Pm, nStrains_Po, Hb_Type, mixed_infection, Jumpcode, Gel_Emulsion, Symptomatic, perc_map_p, perc_map_hs, p_map_cat, hs_map_cat, Hb_perc, `RBCs loaded`, peak, Comment)
 ```
 
 
 ```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% 
-  mutate(across(Symptomatic, ~case_when(donor == "MSC14" ~ "No", T ~ .)),
-         across(Hb_Type, ~case_when(donor == "MSC14" ~ "HbC", T ~ .))) %>% 
-  mutate(across(Symptomatic, ~factor(str_replace_all(.,  c("Yes" = "Symptomatic", "No" = "Asymptomatic")), levels=c("Symptomatic", "Asymptomatic")))) %>%
-  select(Symptomatic, Hb_Type) %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, .)
+mrc_sk21_summary_slct
 ```
+
 
 ```{r}
-# v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_df <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% 
-#   mutate(across(Symptomatic, ~case_when(donor == "MSC14" ~ "No", T ~ .)),
-#          across(Hb_Type, ~case_when(donor == "MSC14" ~ "HbC", T ~ .))) %>% 
-#   mutate(across(Symptomatic, ~factor(str_replace_all(.,  c("Yes" = "Symptomatic", "No" = "Asymptomatic")), levels=c("Symptomatic", "Asymptomatic")))) %>%
-#   select(Symptomatic, Hb_Type) 
+mrc_sk21_summary_slct %>%
+  dplyr::count(p_map_cat, hs_map_cat)
+
 ```
 
-Check which stage label to use
-```{r}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% count(stage, StageFL, StageFL, StageFL_ND)
-```
 
-add metadata
 ```{r, fig.width=15, fig.height=5}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data  %>%
-  rownames_to_column("bcode") %>% 
-  mutate(donor_nm = str_remove_all(donor, "_SLO|_MACS")) %>%
-  select(bcode, donor_nm) %>%
-  left_join(., donor_mdata_slct, by=c("donor_nm"="short_name"), relationship = "many-to-one") %>%
-  select(bcode, any_of(colnames(donor_mdata_slct))) %>% 
-  column_to_rownames("bcode") %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, .)
+# donor_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/MRC_Sample_Manifest_FOR_GEM_10X.csv.csv", col_types =  paste0(c(rep("c", 7), "d", "c","d","d", rep("c", 14)), collapse = ""), show_col_types = T)  
+donor_10x_mdata <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/MRC_Sample_Manifest - FOR_GEM_10X.csv", 
+                            col_types =  paste0(c(rep("c", 9), rep("d", 8), "c" , rep("d", 6), rep("c", 4), rep("d", 6)), collapse = ""),
+                            show_col_types = T
+                            ) 
+
+donor_10x_mdata <- donor_10x_mdata %>% rename_all(., ~str_to_lower(str_replace_all(.,c("\\["="_", "\\]"="", " "="", "-"="",  "\\/"="_", "º"=""))))
+```
+
+
+```{r, fig.width=15, fig.height=5}
+
+donor_10x_mdata %>%
+  filter(!is.na(short_name) & str_detect(short_name, "MSC"))
+
+```
+
+```{r, fig.width=15, fig.height=5}
+
+donor_10x_mdata_full <- donor_10x_mdata %>%
+  filter(!is.na(short_name) & str_detect(short_name, "MSC"))%>%
+  rename("donor" = short_name,
+         "parasites_loaded" = totalparasitesloaded,
+         "macsloaded" = macsloaded...29,
+         "sloloaded" = sloloaded...30) %>% 
+  mutate(frac_load = case_when(macsloaded > 0 & sloloaded > 0 ~ "MACS_SLO",
+                               macsloaded > 0 & (sloloaded == 0 | is.na(sloloaded)) ~ "MACS",
+                               (macsloaded == 0 | is.na(macsloaded)) & sloloaded > 0 ~ "SLO"),
+         overload = case_when(parasites_loaded > 20000 ~ "Yes_20k",
+                              parasites_loaded > 16000 ~ "Yes_16_20k",
+                              parasites_loaded > 10000 & parasites_loaded <= 16000 ~ "No_10_16K",
+                              parasites_loaded < 16000 ~ "No_under10K"),
+         overload = factor(overload, levels = c("No_under10K", "No_10_16K", "Yes_16_20k", "Yes_20k")),
+         frac_over = case_when(macsloaded > 16000 & sloloaded > 16000 ~ "MACS_SLO",
+                               macsloaded > 16000 & (sloloaded == 0 | is.na(sloloaded)) ~ "MACS",
+                               (macsloaded == 0 | is.na(macsloaded)) & sloloaded > 16000 ~ "SLO")) %>%
+  select(donor, macs_smear_parasitemia_fraction, macs_parasites_per_ul, slo_smear_parasitemia_fraction, slo_parasites_per_ul, slo_volume_10x, rbcs_in_mix, parasites_loaded...23, targeted_cells, gel_emulsion, macsloaded, sloloaded, parasites_loaded, frac_load, overload, frac_over)
 
 ```
 
 
-Remove outlier MSC41 and lab for now
-```{r, fig.width=7.5, fig.height=2}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$donor != "MSC41" | v3_m2_asex_harmony_ss_res_fld_pt_mxdSp$dset == "Lab"]
+
+```{r, fig.width=15, fig.height=5}
+donor_10x_mdata_sk21_summ <- donor_10x_mdata_full %>% left_join(., mrc_sk21_summary_slct, by = c("donor" = "sample_nm"))
 
 ```
 
-```{r, fig.width=16, fig.height=4}
-## !! NOTE -remove strains with less than 20 - should be done at the beginning
-sympt_fev_tbl1 <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier[,v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier@meta.data %>% rownames_to_column('bcode') %>% add_count(StrainDon, name="strn_n") %>% filter(strn_n>20) %>% pull(bcode)] %>%
-  .@meta.data %>%
-  filter(dset != "Lab") %>%
-  mutate(across(c(donor, StrainDon), ~str_remove_all(., "_SLO"))) %>% 
-  # mutate(fev_sympt = case_when(fever == "Fever" & Symptomatic == "Symptomatic" ~ "Sympto_Fever", fever == "NoFever" & Symptomatic == "Asymptomatic" ~ "NonSympto_NoFever")) %>% 
-  mutate(fev_sympt = case_when(fever == "Fever" & condition == "Symptomatic" ~ "Sympto_Fever", fever == "NoFever" & condition == "Asymptomatic" ~ "NonSympto_NoFever")) %>%
-  add_count(StrainDon, name = "strain_n") #%>%
-  # filter(strain_n > 20)
+```{r, fig.width=15, fig.height=5}
+saveRDS(donor_10x_mdata_sk21_summ, "data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS")
 
 ```
 
-same as above without fever
-```{r, fig.width=14, fig.height=3.2}
-tbl <- sympt_fev_tbl1 %>%
-  count(condition, donor, StrainDon) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
-  group_by(condition, donor) %>%
-  add_count(name = "strn_n") %>% 
-  ungroup() %>%
-  mutate(prop_wdth =strn_n/n()) 
 
-## Get width proportions of the different facets based on number of strains per group
-p_width <- tbl%>% distinct(condition, donor, prop_wdth) %>% pull(prop_wdth) %>% round(., digits = 2)
-
-tbl %>%
-  rename(c('Counts' =n, 'Strain' = StrainDon))  %>%
-  # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = Strain, y = Counts/1000, fill = donor)) +
-  geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
-  scale_fill_manual(values = donor_cols %>% set_names(str_remove(names(donor_cols), "_SLO"))) +
-  geom_text(aes(label=Counts), angle = 90, hjust=0, vjust= 0.5, position = position_dodge2(width = 0.9, preserve = "single"), size = 5, show.legend = F, fontface ='bold') +
-  scale_y_continuous(expand = expansion(mult = c(0.01, 0.62))) +
-  ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
-  theme_classic()+
-  theme(legend.position = "none", 
-        axis.title = element_text(size = 16),
-        axis.text.y = element_text(size = 14),
-        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 15),
-        strip.text =element_text(size=16,face="bold", colour = 'black'
-                                 ),
-        panel.border=element_rect(colour="black",fill='transparent')
-        )+
-  # guides(x = "axis_nested") +
-  labs(x = "Strain", y = "Counts (X1000)") +
-  force_panelsizes(cols = p_width, respect = TRUE, total_width = unit(12.6, "inches"), total_height = unit(1.3, "inches"))
-```
-
-
+##############################END - Sample processing metadata ############################
