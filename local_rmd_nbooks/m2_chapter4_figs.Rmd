@@ -94,22 +94,31 @@ optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 
 ```{r}
 # m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS")
-m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
+# m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Generated in 'm2_scvi_to_seurat.Rmd' 
+m2_all_raw_mrg_list_umap_mdata <- readRDS("data/processed/Pf/m2_all/all_stgs_figs/m2_all_raw_mrg_list_umap_mdata.RDS") %>% .[["no_M55"]]
 
 ```
 
 ```{r}
-m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~subset(.x, subset = Strain_DN %in% c("Doublet", "Negative"), invert = T))
+# m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~subset(.x, subset = Strain_DN %in% c("Doublet", "Negative"), invert = T))
 ```
 
 ```{r}
 # map(m2_all_raw_mrg_list, ~.x@meta.data %>% head) 
 
-m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~.x@meta.data %>% 
-  # rownames_to_column("bcode_don") %>%
-  mutate("strain" = Strain_DN) %>% 
-  select(strain) %>%
-  AddMetaData(.x, .))
+m2_all_raw_mrg_list_umap_mdata <- m2_all_raw_mrg_list_umap_mdata %>% 
+  mutate("strain" = Strain_DN) 
+  
+# m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~.x@meta.data %>% 
+#   # rownames_to_column("bcode_don") %>%
+#   mutate("strain" = Strain_DN) %>% 
+#   select(strain) %>%
+#   AddMetaData(.x, .))
   
 
 ```
@@ -120,7 +129,7 @@ m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~.x@meta.data %>%
 
 
 ```{r}
-msc_w_cln_strns <- SplitObject(m2_all_raw_mrg_list[["no_M55"]], split.by = "donor")
+# msc_w_cln_strns <- SplitObject(m2_all_raw_mrg_list[["no_M55"]], split.by = "donor")
 
 ```
 
@@ -132,13 +141,25 @@ msc_w_cln_strns <- SplitObject(m2_all_raw_mrg_list[["no_M55"]], split.by = "dono
 
 
 ```{r}
-msc_w_cln_strns_mdata <- msc_w_cln_strns %>% 
-  map(., ~.x@meta.data %>% rownames_to_column('bcode')) %>%
-  bind_rows(., .id = "donor") %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
-  mutate(bcode_don = paste0(donor, "_", bcode),
-         # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes")) 
-         stage_ag = ifelse(str_detect(stage, "ale"), "Gametocytes", "Asexual"))  
+msc_w_cln_strns_mdata <- m2_all_raw_mrg_list_umap_mdata %>% 
+  mutate(donor = str_remove_all(orig.ident, "SC|.mrna"),
+         bcode_don = paste0(donor, "_", bcode),
+         # across(donor, ~factor(str_remove(., "C$"), levels = don_order)),
+         stage_fld = str_replace_all(stage_fld, c("Mid trophozoite" = "Early trophozoite", ".*schizont" = "Schizont", "Gametocyte \\(developing\\)" = "Early ring")),
+         across(stage_fld, ~factor(., levels = stg_refnd_lvls)),
+         stage = stage_fld#,
+         # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocyte")) 
+         # stage_ag = ifelse(str_detect(stage, "ale"), "Gametocyte", "Asexual")
+         )  
+
+
+# msc_w_cln_strns_mdata <- msc_w_cln_strns %>% 
+#   map(., ~.x@meta.data %>% rownames_to_column('bcode')) %>%
+#   bind_rows(., .id = "donor") %>% 
+#   mutate(across(donor, ~str_remove(., "SC"))) %>%
+#   mutate(bcode_don = paste0(donor, "_", bcode),
+#          # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocyte")) 
+#          stage_ag = ifelse(str_detect(stage, "ale"), "Gametocyte", "Asexual"))  
 
 ```
 
@@ -196,7 +217,9 @@ msc_w_cln_strns_w_don_mdata %>%
 stage_dist_plot <- msc_w_cln_strns_w_don_mdata %>%
   filter(donor != "M12") %>%
   count(condition, donor, stage_ag, stage) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  # mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
+  mutate(Stage_ag = factor(str_extract(stage_ag, "^."), levels = c("G", "A")),
+         # Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^.")),
          Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic")) %>% 
   group_by(donor, Stage_ag) %>% 
@@ -259,16 +282,75 @@ m2_seu_norm_harmony <- m2_seu_norm_harmony@meta.data %>%
 
 ```
 
-```{r}
 
-DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("stage"), pt.size = 0.01, dims = c(1,2), raster = F) + scale_color_manual(values = sp_fld_colors3)
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=10, fig.height=6.5}
 
+msc_w_cln_strns_w_don_mdata %>%
+  ggplot(aes(x = umap_1, y = umap_2, colour = stage)) + 
+  scale_color_manual(values = sp_fld_colors3)+
+  geom_point(size = 0.2) +
+  theme_classic() +
+  theme(strip.text = element_text(size = 13, face = "bold"),
+        text = element_text(size = 13),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  guides(colour = guide_legend(title = "Cell QC label", nrow = 2, override.aes = list(size = 4)))
+  
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=10, fig.height=6.5}
 
-DimPlot(m2_seu_norm_harmony, reduction = "scvi_umap", group.by = c("donor"), pt.size = 0.01, dims = c(1,2), raster = F)
+msc_w_cln_strns_w_don_mdata %>%
+  ggplot(aes(x = umap_1, y = umap_2, colour = donor)) + 
+  # scale_color_manual(values = sp_fld_colors3)+
+  geom_point(size = 0.2) +
+  theme_classic() +
+  theme(strip.text = element_text(size = 13, face = "bold"),
+        text = element_text(size = 13),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  guides(colour = guide_legend(title = "Cell QC label", nrow = 2, override.aes = list(size = 4)))
+  
+```
 
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=10, fig.height=6.5}
+
+msc_w_cln_strns_w_don_mdata %>%
+  ggplot(aes(x = umap_1, y = umap_2, colour = stage)) + 
+  scale_color_manual(values = sp_fld_colors3)+
+  # scale_color_manual(values = cell_qc_cols,
+  #                    labels = cell_qc_names) + 
+  geom_point(size = 0.01) +
+  facet_wrap("donor", ncol = 6, scales = "fixed") +
+  theme_classic() +
+  theme(strip.text = element_text(size = 13, face = "bold"),
+        text = element_text(size = 13),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  guides(colour = guide_legend(title = "Cell QC label", nrow = 2, override.aes = list(size = 4)))
+  
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=10, fig.height=6.5}
+
+msc_w_cln_strns_w_don_mdata %>%
+  ggplot(aes(x = umap_1, y = umap_2, colour = stage)) + 
+  scale_color_manual(values = sp_fld_colors3)+
+  # scale_color_manual(values = cell_qc_cols,
+  #                    labels = cell_qc_names) + 
+  geom_point(size = 0.01) +
+  facet_wrap(vars(groups, donor), ncol = 6, scales = "fixed") +
+  theme_classic() +
+  theme(strip.text = element_text(size = 13, face = "bold"),
+        text = element_text(size = 13),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +
+  guides(colour = guide_legend(title = "Cell QC label", nrow = 2, override.aes = list(size = 4)))
+  
 ```
 
 ```{r, fig.width=10, fig.height=10}
@@ -507,7 +589,7 @@ msc_w_cln_strns_w_don_mdata %>%
   filter(n_distinct(strain) > 1) %>%
   ungroup() %>%
   count(donor, stage_ag, strain) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual"))) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual"))) %>% 
   group_by(donor, Stage_ag) %>% 
   # filter(n>20) %>%
   mutate("total" = sum(n), 
@@ -534,7 +616,7 @@ strain_dist_plot_tbl <- msc_w_cln_strns_w_don_mdata %>%
   filter(n_distinct(strain) > 1) %>%
   ungroup() %>%
   count(condition, donor, stage_ag, strain) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^.")),
          Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic")) %>% 
   group_by(donor, Stage_ag) 
@@ -566,7 +648,7 @@ msc_w_cln_strns_w_don_mdata %>%
   filter(n_distinct(strain) > 1) %>%
   ungroup() %>%
   count(condition, donor, stage_ag, strain) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^."))) %>% 
   group_by(donor, Stage_ag) %>% 
   filter(n>20) %>%
@@ -594,7 +676,7 @@ strain_prop_in_stage_tbl <- msc_w_cln_strns_w_don_mdata %>%
   filter(n_distinct(strain) > 1) %>%
   ungroup() %>%
   count(condition, donor, stage_ag, strain) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^."))) %>% 
   group_by(donor, Stage_ag) %>% 
   # filter(n>20) %>%
@@ -713,7 +795,7 @@ msc_w_cln_strns_w_don_mdata %>%
   filter(n_distinct(StrainDon) > 1) %>%
   ungroup() %>%
   count(condition, donor, stage_ag, StrainDon) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^."))) %>% 
   group_by(donor, Stage_ag) %>% 
   filter(n>20) %>%
@@ -1218,7 +1300,7 @@ paired_data <- map(tbl_strn_list, ~{
 
 # Perform the paired test
 # Replace 'Stage1' and 'Stage2' with the actual levels of 'stage'
-test_result <- map(paired_data, ~{wilcox.test(.x$Asexual, .x$Gametocytes, paired = TRUE)})
+test_result <- map(paired_data, ~{wilcox.test(.x$Asexual, .x$Gametocyte, paired = TRUE)})
 map(test_result, ~.x$p.value)
 
 
@@ -1248,7 +1330,7 @@ map2(tbl_strn_list, test_result, ~{.x %>%
                      labels = scales::number_format(accuracy = 1)) + 
   theme_classic() + 
   geom_signif(
-    comparisons = list(c("Asexual", "Gametocytes")),
+    comparisons = list(c("Asexual", "Gametocyte")),
     # annotations = paste0(round(.y$statistic, 2), "  p=", round(.y$p.value, 3)),
     annotations = paste0("p=", round(.y$p.value, 3)),
     textsize = 8,
@@ -1270,7 +1352,7 @@ test_result2 <- map(tbl_strn_list, ~{.x  %>%
   summarise(
     p_value = wilcox.test(
       Asexual, 
-      Gametocytes, 
+      Gametocyte, 
       paired = TRUE
     )$p.value
   )
@@ -1302,7 +1384,7 @@ for(p in 1:length(plt)) {
     # print(tbl_strn_list[[p]])
     pt1 <- pt1 + geom_signif(
       data = tbl_strn_list[[p]] %>% filter(condition == test_result2[[p]]$condition[i]),  # Filter for each facet
-      comparisons = list(c("Asexual", "Gametocytes")),
+      comparisons = list(c("Asexual", "Gametocyte")),
       annotations = round(test_result2[[p]]$p_value[i], 3),
       y_position = max(tbl_strn_list[[p]]$n_strains) + i,  # Adjust y-position for each facet if needed
       tip_length = 0.02,
