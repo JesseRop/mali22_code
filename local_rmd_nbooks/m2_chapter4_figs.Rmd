@@ -93,7 +93,9 @@ optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
 ```
 
 ```{r}
-m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS") 
+# m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS")
+m2_all_raw_mrg_list <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
+
 ```
 
 ```{r}
@@ -190,12 +192,13 @@ msc_w_cln_strns_w_don_mdata %>%
 ```
 
 
-```{r, fig.width= 7, fig.height=8}
-msc_w_cln_strns_w_don_mdata %>%
+```{r, fig.width= 7, fig.height=3.5}
+stage_dist_plot <- msc_w_cln_strns_w_don_mdata %>%
   filter(donor != "M12") %>%
   count(condition, donor, stage_ag, stage) %>% 
   mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
-         across(condition, ~str_extract(., "^."))) %>% 
+         across(condition, ~str_extract(., "^.")),
+         Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic")) %>% 
   group_by(donor, Stage_ag) %>% 
   # filter(n>20) %>%
   mutate("total" = sum(n), 
@@ -203,7 +206,23 @@ msc_w_cln_strns_w_don_mdata %>%
          "Donor" = paste0(donor, " (", total,")"),
          "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
   ggplot(., aes(x= `Coarse Stage`, y = Proportion, fill = stage)) + 
-  geom_col(position = position_stack(reverse = TRUE)) +
+  geom_col(position = position_stack(reverse = TRUE)) 
+  # facet_wrap(vars(condition, donor), nrow = 1, scales = "free_x") 
+
+stage_dist_plot +
+  facet_nested_wrap(vars(Condition, donor), nrow = 1 , scales = "free_x") +
+  scale_fill_manual(values = sp_fld_colors3) +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom")  +
+    guides(fill = guide_legend(title = "Stage", title.position = "top", nrow = 1))
+  
+
+```
+
+```{r, fig.width= 7, fig.height=8}
+stage_dist_plot +
   facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
   scale_fill_manual(values = sp_fld_colors3) +
   theme_classic() +
@@ -507,6 +526,38 @@ msc_w_cln_strns_w_don_mdata %>%
 
 ```
 
+
+```{r, fig.width= 7, fig.height=3.5}
+strain_dist_plot_tbl <- msc_w_cln_strns_w_don_mdata %>%
+  filter(donor != "M12") %>%
+  group_by(donor) %>%
+  filter(n_distinct(strain) > 1) %>%
+  ungroup() %>%
+  count(condition, donor, stage_ag, strain) %>% 
+  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+         across(condition, ~str_extract(., "^.")),
+         Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic")) %>% 
+  group_by(donor, Stage_ag) 
+
+strain_dist_plot_tbl %>% 
+  filter(n>20) %>%
+  mutate("total" = sum(n), 
+         "Proportion" = n/total, 
+         "Donor" = paste0(donor, " (", total,")"),
+         "Coarse Stage" = paste0(Stage_ag, " (", total,")")) %>% 
+  ggplot(., aes(x=`Coarse Stage`, y = Proportion, fill = strain)) + 
+  geom_col(position = position_stack(reverse = TRUE)) +
+  facet_nested_wrap(vars(Condition, donor), nrow = 1 , scales = "free_x") +
+  # facet_nested(vars(condition, donor) , scales = "free_y", space = "free") +
+  scale_fill_manual(values = strain_cols_n)  +
+  theme_classic() +
+  theme(strip.text.y.right = element_text(angle = 360),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom")  +
+    guides(fill = guide_legend(title = "Stage", title.position = "top", nrow = 1))
+  
+
+```
 
 ```{r, fig.width= 6, fig.height=6}
 msc_w_cln_strns_w_don_mdata %>%
@@ -1546,7 +1597,9 @@ msc_w_cln_strns_w_don_mdata %>%
 
 ```{r}
 ## subset where field parasites are for slingshot
-v3_m2_asex_harmony_res <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res.RDS")
+# v3_m2_asex_harmony_res <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res.RDS")
+v3_m2_asex_harmony_res <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res3.RDS")
+
 ```
 
 
@@ -2049,17 +2102,17 @@ DotPlot(m2_seu_no_M12_norm, features = as.character(unlist(stg_mkrs)), split.by 
 Findmarkers for each cluster
 ```{r}
 # Idents(msc_w_cln_strns) <- "stage_c"
-msc_w_cln_strns<- map(msc_w_cln_strns,  ~SetIdent(.x, value="stage_c"))
+# msc_w_cln_strns<- map(msc_w_cln_strns,  ~SetIdent(.x, value="stage_c"))
 ```
 
 
 ```{r}
-all_mrks_afm <- imap(msc_w_cln_strns[!names(msc_w_cln_strns) %in% c("MSC12")], ~{
-  
-  print(.y)
-  seurobj <- .x
-  seurobj[["RNA"]]$data <- as(object = seurobj[["RNA"]]$data, Class = "dgCMatrix")
-  FindAllMarkers(object = seurobj)
-  
-  })
+# all_mrks_afm <- imap(msc_w_cln_strns[!names(msc_w_cln_strns) %in% c("MSC12")], ~{
+#   
+#   print(.y)
+#   seurobj <- .x
+#   seurobj[["RNA"]]$data <- as(object = seurobj[["RNA"]]$data, Class = "dgCMatrix")
+#   FindAllMarkers(object = seurobj)
+#   
+#   })
 ```
