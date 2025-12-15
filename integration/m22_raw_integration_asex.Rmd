@@ -107,7 +107,10 @@ Integrated asexual to integrate with the rescued parasites
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_cb_no_dbt_mrg_noM12_asex.RDS")
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
-m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
+# m2_asex_raw_jcC_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
+# m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_asex_mrg.RDS")
+m2_asex_raw_jcC_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg3.RDS")
+m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_asex_mrg3.RDS")
 
 
 # %in% c("MSC25" ,"MSC41", "MSC51")
@@ -115,27 +118,27 @@ m2_asex_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mr
 ```
 
 ```{r}
-m2_asex_raw_mrg
+m2_asex_raw_mrg <- list(m2_asex_raw_jcC_mrg, m2_asex_raw_jcO_mrg) %>% set_names(c("jcC", "jcO"))
 
 ```
 
 ```{r}
-m2_asex_raw_mrg@meta.data %>% count(orig.ident)
+map(m2_asex_raw_mrg, ~.x@meta.data %>% count(orig.ident))
 ```
 
 ```{r}
 ## Remove donors with less than 50 cells
-don50 <- m2_asex_raw_mrg@meta.data %>% filter(n() > 50 , .by = orig.ident) %>% pull(orig.ident) %>% unique()
+don50 <- map(m2_asex_raw_mrg, ~.x@meta.data %>% filter(n() > 50 , .by = orig.ident) %>% pull(orig.ident) %>% unique())
 
-m2_asex_raw_mrg <- subset(m2_asex_raw_mrg, subset = orig.ident %in% don50)
+m2_asex_raw_mrg <- map2(m2_asex_raw_mrg, don50, ~subset(.x, subset = orig.ident %in% .y))
 ```
 
 ```{r}
-m2_asex_raw_mrg@meta.data %>% count(stage_fld == "Unassigned", orig.ident)
+map(m2_asex_raw_mrg, ~.x@meta.data %>% count(stage_fld == "Unassigned", orig.ident))
 ```
 
 ```{r, fig.width=14, fig.height=4}
-VlnPlot(m2_asex_raw_mrg, group.by = "orig.ident", split.by = "stage_fld", features = "nCount_RNA", pt.size = 0) + scale_y_log10()
+map(m2_asex_raw_mrg, ~VlnPlot(.x, group.by = "orig.ident", split.by = "stage_fld", features = "nCount_RNA", pt.size = 0) + scale_y_log10())
 ```
 
 
@@ -183,7 +186,7 @@ rRNA_gns <- c("PF3D7-0112300", "PF3D7-0112500", "PF3D7-0112700", "PF3D7-0531600"
 
 ```{r}
 ## Remove rRNA_gns genes as is standard in literature - may be due to conserved with humans and other organisms
-m2_asex_raw_mrg <- m2_asex_raw_mrg[!(rownames(m2_asex_raw_mrg) %in% rRNA_gns),]
+m2_asex_raw_mrg <- map(m2_asex_raw_mrg, ~.x[!(rownames(.x) %in% rRNA_gns),])
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -224,11 +227,11 @@ Integrated asexual to integrate with the rescued parasites
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-m2_asex_raw_mrg@meta.data %>% count(stage_fld)
+map(m2_asex_raw_mrg, ~.x@meta.data %>% count(stage_fld))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-m2_asex_raw_mrg <- m2_asex_raw_mrg@meta.data %>% 
+m2_asex_raw_mrg <- map(m2_asex_raw_mrg, ~.x@meta.data %>% 
   rownames_to_column('bcode') %>%
   mutate(dset_labmrg = "Field",
          stage = case_when(stage_fld %in% c("Gametocyte (developing)", "Schizont", "Unassigned") ~ "Early ring", 
@@ -237,31 +240,31 @@ m2_asex_raw_mrg <- m2_asex_raw_mrg@meta.data %>%
   add_count(donor, name = "don_count") %>%
   select(bcode, dset_labmrg, donor, don_count, stage) %>%
   column_to_rownames('bcode') %>%
-  AddMetaData(m2_asex_raw_mrg, .)
+  AddMetaData(.x, .))
   
 ```
 
 
 
 ```{r, warning=FALSE, message=FALSE}
-m2_asex_raw_mrg@meta.data %>% dplyr::count(donor, dset_labmrg)
+map(m2_asex_raw_mrg, ~.x@meta.data %>% dplyr::count(donor, dset_labmrg))
 ```
 
 ```{r}
 ## remove lab and M12
-v3_m2_asex_cr_filt_all <- m2_asex_raw_mrg[, !m2_asex_raw_mrg@meta.data$dset_labmrg %in% c("Lab", "MSC12")]
+v3_m2_asex_cr_filt_all <- map(m2_asex_raw_mrg, ~.x[, !.x@meta.data$dset_labmrg %in% c("Lab", "MSC12")])
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% count(donor, stage_fld) %>% group_by(donor) %>% mutate(prop = round(n/sum(n), 3)) %>% filter(stage_fld == "Gametocyte (developing)")
+map(v3_m2_asex_cr_filt_all, ~.x@meta.data %>% count(donor, stage_fld) %>% group_by(donor) %>% mutate(prop = round(n/sum(n), 3)) %>% filter(stage_fld == "Gametocyte (developing)"))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% add_count(stage_fld, name = "stg_n") %>% group_by() %>% dplyr::count(donor)
+map(v3_m2_asex_cr_filt_all, ~.x@meta.data %>% add_count(stage_fld, name = "stg_n") %>% group_by() %>% dplyr::count(donor))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% filter(stage_fld == "Gametocyte (developing)") %>% dplyr::count(donor)
+map(v3_m2_asex_cr_filt_all, ~.x@meta.data %>% filter(stage_fld == "Gametocyte (developing)") %>% dplyr::count(donor))
 ```
 
 ```{r, eval=T}
@@ -271,42 +274,46 @@ v3_m2_asex_cr_filt_all@meta.data %>% filter(stage_fld == "Gametocyte (developing
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% dplyr::count(donor, dset_labmrg)
+map(v3_m2_asex_cr_filt_all, ~.x@meta.data %>% dplyr::count(donor, dset_labmrg))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_all@meta.data %>% add_count(donor) %>% dplyr::filter( n < 100)
+map(v3_m2_asex_cr_filt_all, ~.x@meta.data %>% add_count(donor) %>% dplyr::filter( n < 100))
 ```
 
 ```{r}
 ## remove weird 2 cells with >9000 ncountRNA
-VlnPlot(v3_m2_asex_cr_filt_all, features = "nCount_RNA") + geom_hline(yintercept = 9000)
+map(v3_m2_asex_cr_filt_all, ~VlnPlot(.x, features = "nCount_RNA", group.by = "stage_fld") + geom_hline(yintercept = 9000))
 ```
 
 ```{r}
 ## remove weird 2 cells with >9000 ncountRNA
-table(v3_m2_asex_cr_filt_all@meta.data$nCount_RNA >9000)
-v3_m2_asex_cr_filt_all <- v3_m2_asex_cr_filt_all[, !v3_m2_asex_cr_filt_all@meta.data$nCount_RNA >9000]
+map(v3_m2_asex_cr_filt_all, ~table(.x@meta.data$nCount_RNA >9000))
+v3_m2_asex_cr_filt_all <- map(v3_m2_asex_cr_filt_all, ~.x[, !.x@meta.data$nCount_RNA >9000])
 ```
 
 ```{r}
-## remove any donor with less than 100 cells
-v3_m2_asex_cr_filt_all <- v3_m2_asex_cr_filt_all[, !v3_m2_asex_cr_filt_all@meta.data$don_count < 150]
+## remove any donor with less than 150 cells
+v3_m2_asex_cr_filt_all <- map(v3_m2_asex_cr_filt_all, ~.x[, !.x@meta.data$don_count < 150])
 ```
 
 
 ```{r}
-saveRDS(v3_m2_asex_cr_filt_all, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_all.RDS")
+# imap(v3_m2_asex_cr_filt_all, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_all_", .y, ".RDS")))
+imap(v3_m2_asex_cr_filt_all, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_all_", .y, "_3.RDS")))
+
 ```
 
 ```{r}
 ## remove any donor with less than 100 cells and donor MSC55
-v3_m2_asex_cr_filt_noM55 <- v3_m2_asex_cr_filt_all[, !v3_m2_asex_cr_filt_all@meta.data$donor == "MSC55"]
+v3_m2_asex_cr_filt_noM55 <- map(v3_m2_asex_cr_filt_all, ~.x[, !.x@meta.data$donor %in% c("MSC55", "MSC55C")])
 ```
 
 ```{r}
 ## remove any donor with less than 100 cells and donor MSC55
-saveRDS(v3_m2_asex_cr_filt_noM55, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55.RDS")
+# imap(v3_m2_asex_cr_filt_noM55, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_", .y, ".RDS")))
+imap(v3_m2_asex_cr_filt_noM55, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_", .y, "_3.RDS")))
+
 ```
 
 
@@ -314,12 +321,26 @@ saveRDS(v3_m2_asex_cr_filt_noM55, "data/processed/Pf/m2_all/v3_m2_asex_cr_filt_n
 gogo()
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_integration_bsub.sh
 
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}.RDS" \
+# --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --integrtd_pc30 "no" \
+# --ncores "6" --mem "100 GB" --run_time="55.min" \
+
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_3.RDS" \
+# --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --integrtd_pc30 "no" \
+# --ncores "6" --mem "100 GB" --run_time="55.min" \
 ```
 
 
 ```{r, eval=T}
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_intgrtn_pc_harmony_bsub.sh
 
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_norm.RDS" \
+# --mthd_nm "harmony_PC_man" --cluster_resoln 0.5 --intgrtn_pc 8 --integrtd_pc_man "yes" \
+# --ncores "8" --mem "100 GB" --run_time="1.hour" \
+
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_3_norm.RDS" \
+# --mthd_nm "harmony_PC_man" --cluster_resoln 0.5 --intgrtn_pc 8 --integrtd_pc_man "yes" \
+# --ncores "8" --mem "100 GB" --run_time="1.hour" \
 ```
 
 ```{r, message=F, warning=F}
@@ -333,12 +354,75 @@ gogo()
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_(all|noM55)_norm_harmony_PC_man.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/v3_m2_asex_cr_filt_|_norm.*'))) %>% 
+# v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_(all|noM55)_jc._norm_harmony_PC_man.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_(all|noM55)_jc._3_norm_harmony_PC_man.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/v3_m2_asex_cr_filt_|_norm.*|_3'))) %>% 
   # .[sample_name] %>%
   map(readRDS)
 
 ```
+
+```{r, message=F, warning=F, eval=F}
+v3_m2_asex_cr_filt_norm_harmony2 <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_norm2_harmony_PC_man.RDS") 
+v3_m2_asex_cr_filt_norm_harmony2 <- list(v3_m2_asex_cr_filt_norm_harmony2)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+map(v3_m2_asex_cr_filt_norm_harmony2, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+map(v3_m2_asex_cr_filt_norm_harmony['noM55_jcC'], ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+all_equal(v3_m2_asex_cr_filt_norm_harmony2[[1]]@reductions$umap.harmony_PC_man@cell.embeddings %>% data.frame(), v3_m2_asex_cr_filt_norm_harmony[['noM55_jcC']]@reductions$umap.harmony_PC_man@cell.embeddings %>% data.frame())
+```
+
+##########START# Run the same object twice through integration UMAP clustering to ensure seed is working - only needed for testing this ###############
+```{r, message=F, warning=F, eval=F}
+v3_m2_asex_cr_filt_norm_harmony_bckup <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_bckup_norm_harmony_PC_man.RDS") 
+v3_m2_asex_cr_filt_norm_harmony_bckup <- list(v3_m2_asex_cr_filt_norm_harmony_bckup)
+```
+
+```{r, message=F, warning=F, eval=F}
+v3_m2_asex_cr_filt_norm_harmony_bckup2 <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_bckup2_norm_harmony_PC_man.RDS") 
+v3_m2_asex_cr_filt_norm_harmony_bckup2 <- list(v3_m2_asex_cr_filt_norm_harmony_bckup2)
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+map(v3_m2_asex_cr_filt_norm_harmony_bckup, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+map(v3_m2_asex_cr_filt_norm_harmony_bckup2, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+all_equal(v3_m2_asex_cr_filt_norm_harmony_bckup[[1]]@reductions$umap.unintegrated@cell.embeddings %>% data.frame(), v3_m2_asex_cr_filt_norm_harmony_bckup2[[1]]@reductions$umap.unintegrated@cell.embeddings %>% data.frame())
+```
+##########END# Run the same object twice through integration UMAP clustering to ensure seed is working - only needed for testing this ###############
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+v3_m2_asex_cr_filt_norm_harmony_umap_mdata <- map(v3_m2_asex_cr_filt_norm_harmony, ~{
+  .x@meta.data %>% 
+    rownames_to_column("bcode") %>%
+      left_join(., .x@reductions$umap.harmony_PC_man@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode")
+})
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Save the clean umaps for plotting
+saveRDS(v3_m2_asex_cr_filt_norm_harmony_umap_mdata, "data/processed/Pf/m2_all/asex_integration_comtmnt_DE_figs/v3_m2_asex_cr_filt_norm_harmony_umap_mdata.RDS")
+# go()
+```
+
 
 ```{r, warning=FALSE, message=FALSE}
 # # v3_m2_asex_cr_filt_norm_harmony <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony.RDS")
@@ -352,8 +436,8 @@ v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_norm_harmony_elbo <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_elbo.RDS")
-v3_m2_asex_cr_filt_norm_harmony_elbo
+# v3_m2_asex_cr_filt_norm_harmony_elbo <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_elbo.RDS")
+# v3_m2_asex_cr_filt_norm_harmony_elbo
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -374,6 +458,26 @@ map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, group.by = "stage",
 
 ```
 
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(.x, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", ncol = 3))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(.x, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", ncol = 3, order = T))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x@meta.data$Strain_DN == "Doublet"])))
+
+```
+```{r, warning=FALSE, message=FALSE}
+# map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x@meta.data$stage_fld == "Unassigned"])))
+
+```
+
 ```{r, warning=FALSE, message=FALSE, fig.width= 15, fig.height=4}
 map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, split.by = "stage", reduction = "umap.harmony_PC_man", pt.size = 0.0001) )
 
@@ -384,12 +488,12 @@ map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.h
 
 ```
 
-```{r, warning=FALSE, message=FALSE, eval=T}
+```{r, warning=FALSE, message=FALSE, eval=F}
 # Display the combined datasets as an interactive 3D plot
 
-plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[[1]]@reductions[["umap.harmony_PC_man"]]@cell.embeddings),
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[["noM55_jcC"]]@reductions[["umap.harmony_PC_man"]]@cell.embeddings),
         x = ~umapharmonyPCman_1, y = ~umapharmonyPCman_2, z = ~umapharmonyPCman_3,
-        color= v3_m2_asex_cr_filt_norm_harmony[[1]]@meta.data$stage_fld,
+        color= v3_m2_asex_cr_filt_norm_harmony[["noM55_jcC"]]@meta.data$harmony_PC_man_clusters,
         # colors = c('blue', 'red'),
         opacity = 0.8,
         size = 0.1, 
@@ -399,20 +503,38 @@ plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[[1]]@reductions[["umap
 ```
 
 
+```{r, warning=FALSE, message=FALSE, eval=F}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[["all_jcC"]]@reductions[["umap.harmony_PC_man"]]@cell.embeddings),
+        x = ~umapharmonyPCman_1, y = ~umapharmonyPCman_2, z = ~umapharmonyPCman_3,
+        color= v3_m2_asex_cr_filt_norm_harmony[["all_jcC"]]@meta.data$harmony_PC_man_clusters,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
+```
+
 ############# START find all markers to test for merozoites #############
 
 ```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_PC_man_clusters"))
+imap(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_PC_man_clusters") + labs(title = .y))
+
+```
+```{r, warning=FALSE, message=FALSE}
+# imap(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x@meta.data$stage_fld == "Unassigned"])) + labs(title = .y))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_pc_man_clusters", dims = c(1,3)))
+imap(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_PC_man_clusters", dims = c(1,3))+ labs(title = .y))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "integrated.harmony_PC_man", group.by = "harmony_pc_man_clusters", dims = c(2,3)))
+map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "integrated.harmony_PC_man", group.by = "harmony_PC_man_clusters", dims = c(2,3)))
 
 ```
 
@@ -426,16 +548,23 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~unique(Idents(.x)))
 
 
 ```{r, warning=FALSE, message=FALSE}
-gogo()
-```
-
-```{r, warning=FALSE, message=FALSE}
 rm(v3_m2_asex_cr_filt_norm_harmony)
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
-imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd.RDS")))
+# imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd.RDS")))
+imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd3.RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FeaturePlot(.x, features = c("PF3D7-1222600", "PF3D7-0113600"), reduction = "umap.harmony_PC_man", order = T))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+gogo()
 ```
 
 ##!!!! NOTE - Below should be deleted if we decide not to use SCT
@@ -508,8 +637,8 @@ DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, reduction = "pca")
 DimPlot(v3_m2_asex_cr_filt_sct_int, label = T)
 DimPlot(v3_m2_asex_cr_filt_sct_int, label = T, group.by = "stage") + scale_color_manual(values = sp_fld_colors)
 DimPlot(v3_m2_asex_cr_filt_sct_int, group.by = "donor")
-map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nFeature_RNA")
-map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA")
+map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nFeature_RNA"))
+map(v3_m2_asex_cr_filt_norm_harmony, ~FeaturePlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA"))
 VlnPlot(v3_m2_asex_cr_filt_sct_int, features = "nCount_RNA", group.by = "seurat_clusters")
 
 ```
