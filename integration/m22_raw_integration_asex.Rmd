@@ -362,51 +362,6 @@ v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3
 
 ```
 
-```{r, message=F, warning=F, eval=F}
-v3_m2_asex_cr_filt_norm_harmony2 <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_norm2_harmony_PC_man.RDS") 
-v3_m2_asex_cr_filt_norm_harmony2 <- list(v3_m2_asex_cr_filt_norm_harmony2)
-```
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-map(v3_m2_asex_cr_filt_norm_harmony2, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
-```
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-map(v3_m2_asex_cr_filt_norm_harmony['noM55_jcC'], ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
-```
-
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-all_equal(v3_m2_asex_cr_filt_norm_harmony2[[1]]@reductions$umap.harmony_PC_man@cell.embeddings %>% data.frame(), v3_m2_asex_cr_filt_norm_harmony[['noM55_jcC']]@reductions$umap.harmony_PC_man@cell.embeddings %>% data.frame())
-```
-
-##########START# Run the same object twice through integration UMAP clustering to ensure seed is working - only needed for testing this ###############
-```{r, message=F, warning=F, eval=F}
-v3_m2_asex_cr_filt_norm_harmony_bckup <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_bckup_norm_harmony_PC_man.RDS") 
-v3_m2_asex_cr_filt_norm_harmony_bckup <- list(v3_m2_asex_cr_filt_norm_harmony_bckup)
-```
-
-```{r, message=F, warning=F, eval=F}
-v3_m2_asex_cr_filt_norm_harmony_bckup2 <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_3_bckup2_norm_harmony_PC_man.RDS") 
-v3_m2_asex_cr_filt_norm_harmony_bckup2 <- list(v3_m2_asex_cr_filt_norm_harmony_bckup2)
-```
-
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-map(v3_m2_asex_cr_filt_norm_harmony_bckup, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
-
-```
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-map(v3_m2_asex_cr_filt_norm_harmony_bckup2, ~DimPlot(.x, label = T, group.by = "stage", reduction = "umap.harmony_PC_man") + scale_color_manual(values = sp_col_new))
-```
-
-```{r, warning=FALSE, message=FALSE, eval=F}
-all_equal(v3_m2_asex_cr_filt_norm_harmony_bckup[[1]]@reductions$umap.unintegrated@cell.embeddings %>% data.frame(), v3_m2_asex_cr_filt_norm_harmony_bckup2[[1]]@reductions$umap.unintegrated@cell.embeddings %>% data.frame())
-```
-##########END# Run the same object twice through integration UMAP clustering to ensure seed is working - only needed for testing this ###############
-
-
 ```{r, warning=FALSE, message=FALSE}
 #ap2g
 v3_m2_asex_cr_filt_norm_harmony_umap_mdata <- map(v3_m2_asex_cr_filt_norm_harmony, ~{
