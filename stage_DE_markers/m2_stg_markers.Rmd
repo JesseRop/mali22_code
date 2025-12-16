@@ -1,0 +1,478 @@
+---
+title: "m2_stg_markers"
+date: "2025-03-31"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  # library(patchwork)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  # library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(knitr)
+  # library(readxl)
+  # library(SCpubr)
+  # library(ggh4x)
+  # library(htmlwidgets)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+#  integration of all MSC
+
+
+```{r setup}
+sample_set = "Mali2"
+
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Generated in 'm2_scvi_to_seurat.Rmd' 
+m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg_no_M55_3.RDS")
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+m2_all_raw_mrg@meta.data %>% count(stage_afm) 
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+Idents(m2_all_raw_mrg) <- "stage_afm"
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+m2_all_raw_mrg[["RNA"]]$data <- as(m2_all_raw_mrg[["RNA"]]$data, Class = "dgCMatrix")
+
+```
+
+
+```{r}
+all_mrks <- FindAllMarkers(
+  object = m2_all_raw_mrg,
+  test.use = "MAST",
+  latent.vars = c("donor")
+)
+```
+
+```{r}
+all_mrks_anot <- all_mrks %>% 
+  left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) 
+
+```
+
+
+```{r}
+saveRDS(all_mrks_anot, "data/processed/Pf/m2_all/all_mrks_anot.RDS")
+
+```
+
+```{r}
+all_mrks_anot
+
+```
+
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Asexual") 
+```
+
+
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.05 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Asexual") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene)
+```
+
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.05 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Female") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene)
+```
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.05 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Male") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene)
+```
+
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.5 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Female LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene)
+```
+
+```{r}
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.5 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Male LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene)
+```
+
+```{r}
+## https://pubmed.ncbi.nlm.nih.gov/37708854/
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% dplyr::filter(cluster == "Female LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% dplyr::filter(gene %in% c("PF3D7-1322900", "PF3D7-0418800", "PF3D7-1340400", "PF3D7-0315700"))
+```
+
+
+```{r}
+## https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% dplyr::filter(cluster == "Female LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% dplyr::filter(gene %in% c("PF3D7-1220000"))
+```
+
+
+```{r}
+## https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% dplyr::filter(cluster == "Female") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% dplyr::filter(gene %in% c("PF3D7-1220000", "PF3D7-1250600")) %>% slice_min(order_by = p_val_adj, n = 2, with_ties = F) 
+```
+
+```{r}
+asx_mkrs <- all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.05 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == "Asexual") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% distinct(gene, .keep_all = T) %>% head(n=10) %>% select(Gene, gene) %>% deframe()
+```
+
+```{r}
+stg_mkrs_df <- map(c("Asexual", "Female", "Male"), ~all_mrks %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% dplyr::filter(pct.2 < 0.05 & avg_log2FC > 0) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% slice_head(n = 5) %>% dplyr::filter(cluster == .x) %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% distinct(gene, .keep_all = T) %>% head(n=10)) %>% set_names(c("Asexual", "Female", "Male"))
+```
+
+```{r}
+stg_mkrs <- map(stg_mkrs_df, ~ .x %>% select(Gene, gene) %>% deframe()) %>% set_names(c("Asexual", "Female", "Male"))
+```
+
+```{r}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+map(msc_w_cln_strns, ~DotPlot(.x, features = as.character(asx_mkrs), group.by = "stage_c") + theme(axis.text.x = element_text(angle = 25)) + scale_x_discrete(labels = names(asx_mkrs)))
+
+
+```
+
+
+```{r}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+map(msc_w_cln_strns, 
+                   ~DotPlot(.x, features = as.character(asx_mkrs), group.by = 'stage_c') +
+                     scale_x_discrete(labels= names(asx_mkrs)) +
+                     scale_fill_gradientn(colours = brewer.pal(n = 9, name = "Blues"), na.value = 'grey50', name = "Avg. Expression", guide = guide_colorbar(title.position = "top", title.hjust = 0.5, order = 2, frame.colour ="grey50", ticks.colour = "white"))+
+                     # new_scale_fill() +
+                     # geom_tile(data = data.frame(Stage = factor(levels(seu_obj@meta.data$stageHL), levels = levels(seu_obj@meta.data$stageHL))), inherit.aes = F, aes(x=0, y=Stage, fill =Stage)) +
+                     # labs(title = nm) +
+                     theme(axis.text.y = element_text(size = 16),
+                           axis.text.x = element_text(size = 16),
+                           # axis.ticks.x = element_blank(),
+                           legend.text = element_text(size = 14), 
+                           legend.title = element_text(size = 14, face = 'bold'),
+                           legend.position = "bottom", 
+                           legend.box = "horizontal",
+                           legend.spacing.x = unit(0.02, "cm"),
+                           legend.key.width = unit(0.4, "cm"),
+                           legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),
+                           plot.title = element_text(hjust = 0.5)
+                     ) +
+                     # scale_fill_manual(values = sp_fld_colors, name = "Stage", guide = guide_legend(nrow = 2,  title.position = "top", order = 1)) + 
+                     ##!!NOTE - turning off stage label after screen shotting - switch back on if needed
+                     # guides(fill=F, size = guide_legend(title = "% Expressed", title.position = "top")) +
+                     coord_flip()
+    )
+```
+
+```{r}
+top3_all_gns_pval0 <- map(all_mrks, possibly(~.x %>% filter(p_val_adj ==0) %>% group_by(cluster) %>% slice_max(order_by = avg_log2FC, n = 3) %>% left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Gene")], by = c("gene" = "gene_id"))), "missing")
+
+top3_all_gns_pval0
+```
+
+
+```{r}
+saveRDS(all_mrks, "data/processed/Pf/m2_all/all_mrks.RDS")
+```
+
+```{r}
+##Read MCA V3 blood stage reference dataset
+# EF_V3_ref <- readRDS("../sc_velo/data/raw/RoadtoUMAP/pseudotime/raw_combined_cut_0.4.RDS")
+EF_V3_ref <- readRDS("../Mali/data/raw/mca_v3_ref/raw_combined_cut_0.4_nodoublets_stagenew.RDS")
+```
+
+```{r}
+##make refined metadata column that includes the gametocyte substages for finer resolution mapping
+EF_V3_ref <- EF_V3_ref@meta.data %>%
+  mutate(stage_fine = case_when(optionB_Stage == "no assignment" ~ as.character(Stage),
+                                TRUE ~ as.character(optionB_Stage))
+  ) %>% 
+  mutate(across(stage_fine, ~str_to_sentence(str_replace_all(., c("Gametocytes"="Gametocyte", "comitted" = "committed"))))) %>%
+  mutate(across(stage_fine, ~droplevels(factor(., levels = stg_refnd_lvls)))) %>%
+  mutate(across(stagenewx, ~droplevels(factor(str_to_sentence(.), levels = stg_refnd_lvls)))) %>% 
+  dplyr::select(stage_fine, stagenewx) %>%
+  AddMetaData(EF_V3_ref, .)
+```
+
+
+```{r}
+# Keep only counts for V5 seurat object to allow layers integration
+# options(Seurat.object.assay.version = "v5")
+EF_V3_ref_V5_cnts <- CreateSeuratObject(counts = EF_V3_ref[["RNA"]]$counts, meta.data = EF_V3_ref@meta.data)
+
+```
+
+Write out annotated MSC14 dataset in .h5ad 
+```{r, message=FALSE, warning=FALSE, eval=F}
+##Save msc14 h5ad
+msc_w_cln_strns_raw <- map(msc_w_cln_strns, ~DietSeurat(
+  .x,
+  counts = TRUE,
+  data = F,
+  scale.data = FALSE,
+  features = NULL,
+  assays = "RNA",
+  dimreducs = c("pca", "umap"),
+  graphs = NULL
+)
+)
+
+##Change factor metadata to character as these are not handled properly when converting to h5ad
+msc_w_cln_strns_raw<- map(msc_w_cln_strns_raw, ~{
+  .x@meta.data %>% mutate(across(where(is.factor), as.character)) %>% AddMetaData(.x, .)
+})
+
+# imap(msc_w_cln_strns_raw, ~system(paste0("mkdir /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/", .y)))
+
+
+# ## !!!NB - NEEDS SORTING IN FUTURE UPGRADING TO SEURAT 5 RESULTED IN ERROR AS DESCRIBED https://github.com/mojaveazure/seurat-disk/issues/147#top
+# imap(msc_w_cln_strns_raw, ~SeuratDisk::SaveH5Seurat(.x, filename =  paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.y,"/",.y,"_qcd_anotd_diet.h5Seurat"), overwrite = T))
+# 
+# 
+# imap(msc_w_cln_strns_raw, ~Convert(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.y,"/",.y,"_qcd_anotd_diet.h5Seurat"), dest = "h5ad", overwrite = T))
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+##Get the raw counts
+options(Seurat.object.assay.version = "v5")
+
+msc_w_cln_strns_raw <- map(msc_w_cln_strns, ~{
+  obj <- CreateSeuratObject(counts = as(object = .x[["RNA"]]$counts, Class = "dgCMatrix"), meta.data = .x@meta.data)
+  obj@meta.data <- obj@meta.data %>% mutate(across(where(is.factor), as.character))
+  obj@reductions$pca <- CreateDimReducObject(embeddings = .x@reductions$pca@cell.embeddings, loadings = .x@reductions$pca@feature.loadings, projected = .x@reductions$pca@feature.loadings.projected, key = "PC_", assay = "RNA")
+  obj@reductions$umap <- CreateDimReducObject(embeddings = .x@reductions$umap@cell.embeddings, loadings = .x@reductions$umap@feature.loadings, projected = .x@reductions$umap@feature.loadings.projected, key = "UMAP_", assay = "RNA")
+  return(obj)
+  
+})
+
+```
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+saveRDS(msc_w_cln_strns_raw, "data/processed/Pf/m2_all/msc_w_cln_strns_raw.RDS")
+```
+
+Write out raw objects into .h5ad 
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+##Save msc14 h5ad
+
+imap(msc_w_cln_strns_raw, ~{
+  
+  ##Convert to v3 object since v5 not supported by seuratdisk 
+  obj <- .x
+  obj[["RNA3"]] <- as(object = obj[["RNA"]], Class = "Assay")
+  DefaultAssay(obj) <- "RNA3"
+  obj[["RNA"]] <- NULL
+  obj <- RenameAssays(object = obj, RNA3 = 'RNA')
+  
+  # SeuratDisk::SaveH5Seurat(obj, filename =  paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.y,"/",.y,"_qcd_anotd_raw.h5Seurat"), overwrite = T)
+  SeuratDisk::SaveH5Seurat(obj, filename =  paste0("data/processed/Pf/",.y,"/qcd_anotd_raw.h5Seurat"), overwrite = T)
+  
+  # Convert(paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.y,"/",.y,"_qcd_anotd_raw.h5Seurat"), dest = "h5ad", overwrite = T)
+  Convert(paste0("data/processed/Pf/",.y,"/qcd_anotd_raw.h5Seurat"), dest = "h5ad", overwrite = T)
+  
+})
+
+```
+
+NB-LOCAL CODE
+Transfer MCA and MSC14 .h5ad to farm
+```{r, eval=F}
+
+##Copy h5ad
+map(names(msc_w_cln_strns_raw), ~{
+  # system(paste0("rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.x,"/",.x,"_qcd_anotd_diet.h5ad jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/",sample_set,"/data/processed/Pf/",.x,"/"))
+  system(paste0("rsync -av /Users/jr35/Google\\ Drive/My\\ Drive/PHD_documents/malaria_phd/",sample_set,"/data/processed/Pf/",.x,"/qcd_anotd_raw.h5ad jr35@farm5:/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/",sample_set,"/data/processed/Pf/",.x,"/"))
+  
+})
+
+```
+
+```{r, eval=T}
+
+##Copy h5ad
+# rm(msc_w_cln_strns_raw)
+
+```
+
+
+```{r}
+## Making list of objects and renaming before integrating
+m2_seu <- merge(x = msc_w_cln_strns_raw[[1]], y = msc_w_cln_strns_raw[2:length(msc_w_cln_strns_raw)], add.cell.ids = str_remove(names(msc_w_cln_strns_raw), "SC"))
+m2_seu$donor <- str_remove_all(m2_seu$orig.ident, "SC|\\.mrna")
+m2_seu$stage_c <- factor(m2_seu$stage_c, levels = c("Asexual", "Female", "Female LE", "Male", "Male LE"))
+```
+
+
+```{r, fig.width=20, fig.height=5}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+# m2_seu_jnd <- JoinLayers(m2_seu)
+m2_seu_noM12 <- m2_seu[,m2_seu@meta.data$donor != "M12"]
+
+```
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=5}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+# m2_seu_jnd <- JoinLayers(m2_seu)
+
+map(stg_mkrs, ~DotPlot(m2_seu_noM12, features = as.character(.x), split.by = "stage_c", group.by = "donor",  
+        cols = c("#90bce5", "#ea5bba",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(.x))
+)
+
+
+```
+
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=12}
+Idents(m2_seu_noM12) <- "stage_c"
+
+DotPlot(m2_seu_noM12, features = as.character(unlist(stg_mkrs)), split.by = "stage_c", group.by = "donor",  
+        cols = c("#ea5bba", "#90bce5",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(unlist(stg_mkrs)))
+
+
+
+```
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+saveRDS(stg_mkrs, "data/processed/Pf/m2_all/stg_mkrs.RDS")
+
+```
+
+
+```{r}
+
+all_mrks <- readRDS("data/processed/Pf/m2_all/all_mrks.RDS")
+```
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+msc_w_cln_strns_raw <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns_raw.RDS")
+```
+
+```{r, fig.width=12, fig.height=4}
+# add stage metadata
+stg_mkrs <- readRDS("data/processed/Pf/m2_all/stg_mkrs.RDS")
+
+```
+
+
+```{r}
+## Making list of objects and renaming before integrating
+m2_seu <- merge(x = msc_w_cln_strns_raw[[1]], y = msc_w_cln_strns_raw[2:length(msc_w_cln_strns_raw)], add.cell.ids = str_remove(names(msc_w_cln_strns_raw), "SC"))
+m2_seu$donor <- str_remove_all(m2_seu$orig.ident, "SC|\\.mrna")
+m2_seu$stage_c <- factor(m2_seu$stage_c, levels = c("Asexual", "Female", "Female LE", "Male", "Male LE"))
+```
+
+
+```{r, fig.width=20, fig.height=5}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+# m2_seu_jnd <- JoinLayers(m2_seu)
+m2_seu_noM12 <- m2_seu[,m2_seu@meta.data$donor != "M12"]
+
+```
+
+
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=5}
+#ap2g, gdv1, pfs16, etramp10.3, gexp5, pfg14-744, pfg14-748
+# m2_seu_jnd <- JoinLayers(m2_seu)
+
+map(stg_mkrs, ~DotPlot(m2_seu_noM12, features = as.character(.x), split.by = "stage_c", group.by = "donor",  
+        cols = c("#90bce5", "#ea5bba",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(.x))
+)
+
+
+```
+
+
+!!!NOTE - RAW COUNTS BEING USED - NEED TO CHANGE TO NORMALISED(DATA) WHICH IS STANDARD
+```{r, fig.width=20, fig.height=12}
+Idents(m2_seu_noM12) <- "stage_c"
+
+DotPlot(m2_seu_noM12, features = as.character(unlist(stg_mkrs)), split.by = "stage_c", group.by = "donor",  
+        cols = c("#ea5bba", "#90bce5",  "#4ba7fc", "#f2e48c", "#af1527", "#af1091"
+)) + 
+  coord_flip()+
+  RotatedAxis() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_discrete(labels = names(unlist(stg_mkrs)))
+
+
+
+```
