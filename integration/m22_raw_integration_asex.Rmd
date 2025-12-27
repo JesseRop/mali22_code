@@ -472,12 +472,11 @@ plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony[["all_jcC"]]@reduction
 
 ```
 
-############# START find all markers to test for merozoites #############
-
 ```{r, warning=FALSE, message=FALSE}
 imap(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_PC_man_clusters") + labs(title = .y))
 
 ```
+
 ```{r, warning=FALSE, message=FALSE}
 # imap(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x@meta.data$stage_fld == "Unassigned"])) + labs(title = .y))
 
@@ -512,6 +511,45 @@ rm(v3_m2_asex_cr_filt_norm_harmony)
 imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd3.RDS")))
 
 ```
+
+######################START## Save a diet slim object which is lighter for faster processing if one just needs counts#####################
+
+```{r, message=F, warning=F}
+v3_m2_asex_cr_filt_norm_harmony_jnd_slim <- v3_m2_asex_cr_filt_norm_harmony_jnd
+```
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(v3_m2_asex_cr_filt_norm_harmony_jnd_slim)) {
+  v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]][["RNA"]]$counts <- as(v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
+  v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]][["RNA"]]$data <- as(v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]][["RNA"]]$data, Class = "dgCMatrix")
+
+}
+```
+
+```{r, message=F, warning=F}
+v3_m2_asex_cr_filt_norm_harmony_jnd_slim <- map(v3_m2_asex_cr_filt_norm_harmony_jnd_slim, ~CreateSeuratObject(
+  counts = LayerData(.x, layer = "counts"), 
+  data = LayerData(.x, layer = "data"),  
+  meta.data = .x@meta.data))
+```
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(v3_m2_asex_cr_filt_norm_harmony_jnd_slim)) {
+  
+  v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]]@reductions$umap.harmony_PC_man = v3_m2_asex_cr_filt_norm_harmony_jnd[[nm]]@reductions$umap.harmony_PC_man
+  
+  v3_m2_asex_cr_filt_norm_harmony_jnd_slim[[nm]]@reductions$integrated.harmony_PC_man = v3_m2_asex_cr_filt_norm_harmony_jnd[[nm]]@reductions$integrated.harmony_PC_man
+
+}
+```
+
+
+```{r}
+# save object
+imap(v3_m2_asex_cr_filt_norm_harmony_jnd_slim, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_all_", .y, "_norm_harmony_jnd_slim3.RDS")))
+```
+
+######################END## Save a diet slim object which is lighter for faster processing if one just needs counts#####################
 
 ```{r, warning=FALSE, message=FALSE}
 map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FeaturePlot(.x, features = c("PF3D7-1222600", "PF3D7-0113600"), reduction = "umap.harmony_PC_man", order = T))
