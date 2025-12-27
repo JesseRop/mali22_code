@@ -106,8 +106,8 @@ qcd_dons <- c("MSC1", "MSC12", "MSC13", "MSC14", "MSC24", "MSC25", "MSC3",
 
 qcd_dons_nc <- qcd_dons[!qcd_dons == "MSC12"] %>% str_remove(., "_MACS|_SLO") %>% unique()
 
-## Remove MSC1 & MSC24 since these are also poorQC and MSC25, MSC41 and MSC51 which are mixed
-qcd_dons_nc <- qcd_dons_nc[!qcd_dons_nc %in% c("MSC1", "MSC24", "MSC25", "MSC41", "MSC51")] %>% unique()
+## Remove MSC1 & MSC24 since these are also poorQC and MSC25, MSC41 and MSC51 which are mixed and M55 which is overloaded
+qcd_dons_nc <- qcd_dons_nc[!qcd_dons_nc %in% c("MSC1", "MSC24", "MSC25", "MSC41", "MSC51", "MSC55")] %>% unique()
 ```
 
 !!!NOTE - Reading in the metadata to add to the mixed species samples which were missed in the initial step - Will need to redo adding to the source
@@ -673,8 +673,7 @@ pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv"
 ```
 
 ```{r}
-mrc_sk21_summary_slct <- mrc_sk21_summary %>% 
-  left_join(pf_solo_mixed_mdata_decode, ., by = c("irods_id" = "Sanger_SampleID")) %>%
+mrc_sk21_summary_w_categories <- mrc_sk21_summary %>% 
   # mutate(donor = str_remove(sample_nm, "_.*")) %>%
   rename("perc_map_p" = `%map to pfpmpo`, "perc_map_hs" = `%map to hs`) %>%
   mutate(p_map_cat = case_when(perc_map_p > 0 & perc_map_p < 33 ~ "low",
@@ -684,7 +683,13 @@ mrc_sk21_summary_slct <- mrc_sk21_summary %>%
                               perc_map_hs >= 33 & perc_map_hs < 66 ~ "medium",
                               perc_map_hs >= 66 & perc_map_hs <= 100 ~ "high"),
          across(c(p_map_cat, hs_map_cat), ~factor(., levels = c("low", "medium", "high")))) %>% 
-  mutate(peak = factor(str_replace(str_remove(Peak, " peak"), "Very ", "V."), levels = c("No", "Small", "Medium", "Big", "V.big"))) %>%
+  mutate(peak = factor(str_replace(str_remove(Peak, " peak"), "Very ", "V."), levels = c("No", "Small", "Medium", "Big", "V.big"))) 
+```
+
+
+```{r}
+mrc_sk21_summary_slct <- mrc_sk21_summary_w_categories %>% 
+  left_join(pf_solo_mixed_mdata_decode, ., by = c("irods_id" = "Sanger_SampleID")) %>%
   select(sample_nm, pf, pm, po, nStrains_Pf, nStrains_Pm, nStrains_Po, Hb_Type, mixed_infection, Jumpcode, Gel_Emulsion, Symptomatic, perc_map_p, perc_map_hs, p_map_cat, hs_map_cat, Hb_perc, `RBCs loaded`, peak, Comment)
 ```
 
@@ -749,10 +754,139 @@ donor_10x_mdata_sk21_summ <- donor_10x_mdata_full %>% left_join(., mrc_sk21_summ
 
 ```
 
+
 ```{r, fig.width=15, fig.height=5}
-saveRDS(donor_10x_mdata_sk21_summ, "data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS")
+donor_10x_mdata_sk21_summ <- donor_10x_mdata_sk21_summ %>%
+    mutate(across(Jumpcode, ~ifelse(donor == "MSC14", "No", Jumpcode)),
+           year = ifelse(donor %in% paste0("MSC",1:20), "2021", "2022"))
 
 ```
 
 
+```{r, fig.width=15, fig.height=5}
+saveRDS(donor_10x_mdata_sk21_summ, "data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS")
+saveRDS(donor_10x_mdata_sk21_summ, "data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.csv")
+
+```
+
 ##############################END - Sample processing metadata ############################
+
+##############################START - Sample from total participants VS sequenced ############################
+
+```{r, fig.width=15, fig.height=5}
+donor_mdata_lst[[1]] %>% glimpse
+
+```
+
+
+```{r, fig.width=15, fig.height=5}
+glimpse(mrc_sk21_summary_w_categories)
+```
+
+```{r count-runs-per-sample}
+# Count number of unique irods ids to get the total number of sequenced output
+length(unique(mrc_sk21_summary_w_categories$Sanger_SampleID))
+```
+
+```{r count-runs-per-sample}
+mrc_sk21_summary_sequenced_distinct_dons <- mrc_sk21_summary_w_categories %>% 
+  # filter(str_detect(mixed_infection, "pf") & (str_detect(shortids, "SetB|SetC") | Sample_Name %in% c("MSC1", "MSC3", "MSC13", "MSC14", "MSC12C72") )) %>%
+  mutate(sample_nm = str_remove_all(Sample_Name, "_JC|C72|_MACS|_SLO")) %>%
+  group_by(sample_nm) %>%
+  add_count(name = "runs") %>% 
+  ungroup() %>%
+  mutate(sequenced = "yes") %>%
+  distinct(sample_nm, sequenced, .keep_all = T)
+```
+
+
+```{r count-runs-per-sample}
+mrc_sk21_summary_sequenced_distinct_dons
+```
+
+
+```{r count-runs-per-sample}
+donor_mdata_all_w_sequence_info <- donor_mdata_lst[[1]] %>% 
+  left_join(mrc_sk21_summary_sequenced_distinct_dons, by = c("short_name"= "sample_nm"))
+
+```
+
+
+```{r count-runs-per-sample}
+donor_mdata_all_w_sequence_info %>% 
+  count(sequenced, mixed_infection, mixed_infection2)
+
+```
+
+```{r count-runs-per-sample}
+## Non - pf
+donor_mdata_all_w_sequence_info %>% 
+  filter(sequenced == "yes" & !(mixed_infection == "pf" & mixed_infection2 == "solo"))
+
+```
+
+```{r count-runs-per-sample}
+## Non - pf
+donor_mdata_all_w_sequence_info %>% 
+  filter(sequenced == "yes" & !(mixed_infection == "pf" & mixed_infection2 == "solo")) %>%
+  pull(short_name) %>%
+  unique()
+
+```
+
+
+## Samples to be included in the paper
+```{r, message=F, warning=F, eval=T}
+key_samples <- c("MSC3", "MSC13", "MSC14", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
+
+don_order <- str_remove(key_samples, "C$")
+
+```
+
+```{r, message=F, warning=F, eval=T}
+don_order_plus_m50 <- c(don_order, "MSC50")
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## Jr35 excluded due to poor QC outlook
+jr35_exclude <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39", "MSC55")
+```
+
+```{r, message=F, warning=F, eval=T}
+## Jr35 excluded due to poor QC outlook
+culture <- c("MSC12")
+```
+
+Reason for including or not including sample in the final analysis for the paper
+
+```{r count-runs-per-sample}
+
+donor_mdata_all_w_sequence_info_criteria <- donor_mdata_all_w_sequence_info %>% 
+  mutate(publication_inclusion = case_when(sequenced == "yes" & mixed_infection == "pf" & short_name %in% don_order_plus_m50 ~ "Included",
+                                           sequenced == "yes" & mixed_infection == "pf" & short_name %in% culture ~ "Ex-vivo culture",
+                                           sequenced == "yes" & mixed_infection == "pf" & short_name %in% jr35_exclude ~ "Pf low post-seq qual (poor cells jr35)",
+                                           sequenced == "yes" & mixed_infection == "pf" & !(short_name %in% don_order_plus_m50) ~ "Pf low post-seq qual (sk21)",
+                                           sequenced == "yes" & str_detect(mixed_infection, "pm|po") ~ "Non Pf",
+                                           is.na(sequenced) ~ "Not sequenced"
+                                           ))
+
+```
+
+```{r count-runs-per-sample}
+donor_mdata_all_w_sequence_info_criteria %>%
+  count(publication_inclusion)
+
+```
+
+```{r count-runs-per-sample}
+donor_mdata_all_w_sequence_info_criteria %>%
+  filter(publication_inclusion == "Not sequenced")
+
+```
+
+```{r count-runs-per-sample}
+donor_mdata_all_w_sequence_info_criteria %>%
+  count(publication_inclusion, Reason, Gel_Emulsion)
+
+```
