@@ -411,11 +411,11 @@ map(donor_mdata_lst, ~.x  %>% filter(if_any(c(categorical_variables, continuous_
 (table1.categorical.tests <-
    map(donor_mdata_categorical, possibly(~.x  %>%
   group_by(variable) %>%
-  do(., chisq.test(.$value, .$condition) %>% tidy) %>%
+  do(., fisher.test(.$value, .$condition) %>% tidy) %>%
   # this purely to facilitate matching rows up below
   mutate(firstrowforvar=T) %>%
     mutate(across(where(is.numeric), ~round(.x, digits = 3))),
-  "less than 2 categories for chisquare")
+  "less than 2 categories for fisher exact")
 ))
 
 ```
@@ -430,7 +430,7 @@ map(donor_mdata_lst, ~.x  %>% filter(if_any(c(categorical_variables, continuous_
   # this is gross, but we don't want to repeat the variable names in our table
   ungroup() %>%
   mutate(variable = ifelse(firstrowforvar==T, as.character(variable), NA)) %>%
-  select(variable, value, Asymptomatic, Symptomatic, statistic, parameter, p.value), "less than 2 categories for chisquare")))
+  select(variable, value, Asymptomatic, Symptomatic, statistic, parameter, p.value), "less than 2 categories for fisher exact")))
 
 ```
 
@@ -450,8 +450,8 @@ donor_mdata_continous <- map(donor_mdata_lst, ~.x  %>%
 ```{r}
 (table.continuous_variables.tests <-
     map(donor_mdata_continous, ~.x %>%
-    # note that we pass the result of t-test to tidy, which returns a dataframe
-    do(., t.test(.$value~.$condition) %>% tidy) %>%
+  # note that we pass the result of Wilcoxon rank-sum to tidy, which returns a dataframe
+  do(., wilcox.test(.$value ~ .$condition) %>% tidy) %>%
     select(variable, statistic, parameter, p.value) %>%
     mutate(across(where(is.numeric), ~round(.x, digits = 3)))
 ))
@@ -514,7 +514,7 @@ map(donor_mdata_continous, ~.x %>%
          Variable=variable,
          Response=value,
          `χ2/t` = statistic)
-}, "less than 2 categories for chisquare")))
+}, "less than 2 categories for fisher exact")))
 
 ```
 
@@ -526,7 +526,7 @@ table1_key <- c("gender_m_f" = "Sex", "species_by_microscopy" = "Species (micros
 ```
 
 ```{r}
-table1_cln_nms <- map(table1, possibly(~.x %>% mutate(Variable = recode(Variable, !!!table1_key)), "less than 2 categories for chisquare"))
+table1_cln_nms <- map(table1, possibly(~.x %>% mutate(Variable = recode(Variable, !!!table1_key)), "less than 2 categories for fisher exact"))
   
 
 ```
@@ -545,8 +545,8 @@ table1_cln_nms
   pander(split.tables=Inf,
          missing="-",
          justify=c("left", "left", rep("center", 5)),
-         caption='Table presenting baseline differences between conditions. Categorical variables tested with Pearson χ2, continuous variables with two-sample t-test.')
- ), "less than 2 categories for chisquare")
+     caption='Table presenting baseline differences between conditions. Categorical variables tested with Fisher\'s exact test, continuous variables with Wilcoxon rank-sum (Mann-Whitney U).')
+   ), "less than 2 categories for fisher exact")
 ```
 
 
@@ -556,7 +556,7 @@ table1[[3]] %>%
   pander(split.tables=Inf,
          missing="-",
          justify=c("left", "left", rep("center", 5)),
-         caption='Table presenting baseline differences between conditions. Categorical variables tested with Pearson χ2, continuous variables with two-sample t-test.')
+         caption='Table presenting baseline differences between conditions. Categorical variables tested with Fisher\'s exact test, continuous variables with Wilcoxon rank-sum (Mann-Whitney U).')
 
 ```
 
