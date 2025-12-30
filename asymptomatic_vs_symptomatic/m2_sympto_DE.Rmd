@@ -160,7 +160,9 @@ Integrated asexual
 ## subset where field parasites are for slingshot
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS")
-v3_m2_asex_cr_filt_norm_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+# v3_m2_asex_cr_filt_norm_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+v3_m2_asex_cr_filt_norm_harmony_pt <- readRDS("data/processed/Pf/asex_noM55_jcC_harmony_no_comtd_pt3.RDS")
+
 v3_m2_asex_cr_filt_norm_harmony_pt <- v3_m2_asex_cr_filt_norm_harmony_pt[, !v3_m2_asex_cr_filt_norm_harmony_pt$Strain_DN %in% c("Doublet", "Negative")]
 
 ```
