@@ -1,0 +1,792 @@
+---
+title: "EmptyDrop with lower UMI limits"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  html_notebook:
+    toc: true
+    toc_float:
+      collapsed: true
+    code_folding: hide
+    df_print: paged
+    theme: cerulean
+---
+
+Refer to: https://support.bioconductor.org/p/9151199/#9151459 regarding choosing the right lower limit for emptyDrops
+
+
+
+# Setup
+```{r, warning=FALSE}
+library("knitr")
+library("ggplot2")
+library("DropletUtils")
+library("gridExtra")
+library(dplyr)
+library(stringr)
+library(readr)
+library(tibble)
+```
+
+```{r message=FALSE, warning=FALSE}
+# set up the working directory & source project-wide functions & constants (e.g. colors for lifecycle stages)
+root_dir <- "/lustre/scratch126/tol/teams/lawniczak/users/jr35/sk_25_QC/data"
+knitr::opts_knit$set(root.dir = root_dir)
+#source(paste0(root_dir, "PmPo_atlas_functions.R"))
+```
+
+
+## Input
+
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- read_csv("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode$sample_nm
+```
+
+## Genotype clustering for MSC
+
+Read in clusters.tsv files with assignment of cells to strains and PCA plots metrics
+
+Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
+
+```{r}
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## get relevant sample names
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+
+##Sample IDs
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
+
+```
+
+
+
+```{r, warning=FALSE}
+part <- "Part1"
+dir <- "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/"
+outdir <- paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/sk_25_QC/PmML03_PowML03_QC_objects/", part, "/")
+
+system(paste0('mkdir -p ', outdir))
+
+manifest <- read.csv(paste0(dir, "rdata/manifest_sampleIDs_info_min.csv"))
+
+# choose samples that have Pm/Po 
+# msc_ids <- c(
+#   "MSC5", "MSC6", "MSC9", 
+#   "MSC10", "MSC15", "MSC15_JC", 
+#   "MSC16", "MSC21_22_23", "MSC25", 
+#   "MSC25_JC", "MSC27", "MSC31_MACS", 
+#   "MSC31_SLO", "MSC34", "MSC35", 
+#   "MSC36", "MSC36_JC", "MSC41", 
+#   "MSC42", "MSC44", "MSC47", 
+#   "MSC51", "MSC52"
+# )
+# msc_ids <-c("MSC48", "MSC68", "MSC14", "MSC49", "MSC70", "MSC60", "MSC66", "MSC67", "MSC24", "MSC33", "MSC40", "MSC54", "MSC55") %>% str_sort(., numeric = T)
+msc_ids <-c("MSC12C72", "MSC14") %>% str_sort(., numeric = T)
+# msc_ids <- slct_sample_names %>% str_sort(., numeric = T)
+
+# msc_ids <-c("MSC48", "MSC68", "MSC14", "MSC49", "MSC70", "MSC55") %>% str_sort(., numeric = T)
+
+sanger_ids <- manifest[match(msc_ids, manifest$Sample_Name), "Sanger_SampleID"]
+# sanger_ids <- manifest[match(paste0(msc_ids, "_JC"), manifest$Sample_Name), "Sanger_SampleID"]
+
+
+
+cellranger_run_species <- "Pf"
+
+cellranger_dirs <- paste0(dir, "cellranger_runs/", cellranger_run_species, "/", sanger_ids, "/outs/raw_feature_bc_matrix/")
+
+# Extract loaded and Sunil cell counts for the current msc_ids
+counts_all <- read.table("/lustre/scratch126/tol/teams/lawniczak/users/sk25/projects/pm_atlas/data/tmp/msc_loaded_sunil_cell_counts.csv", sep=",", head=TRUE)
+counts <- counts_all[which(counts_all$Sample_Name %in% msc_ids),]
+counts <- counts[match(msc_ids, counts$Sample_Name), ]  # ensure same order as msc_ids
+```
+
+
+## Define parameters
+```{r, warning=FALSE}
+# thresholds for "Lower" for EmptyDrops
+# limits <- c(50, 100, 150, 200, 300, 400, 500)
+limits <- c(20, 50, 100, 150, 200)
+FDR <- 0.01
+# Define UMI thresholds used for summary statistics
+umi_thresholds <- c(1, 50, 100)
+# umi_thresholds <- c(50, 100, 150, 200, 300)
+
+# Initialise cell count table with named rows
+row_labels <- c(
+  "Loaded_cells",
+  "After_old_QC",
+  paste0("UMI>=", umi_thresholds),
+  c(paste0("Limit (no retain): ", limits),
+  paste0("Limit (with retain): ", limits))
+)
+
+# Initialise empty table with named rows and columns
+cell_count_table <- matrix(NA, nrow = length(row_labels), ncol = length(msc_ids),
+                           dimnames = list(row_labels, msc_ids)) |>
+  as.data.frame()
+
+# Fill in the known values from counts table
+cell_count_table["Loaded_cells", ] <- counts$Total_loaded
+cell_count_table["After_old_QC", ] <- counts$Total_cells_sunil
+
+colnames(cell_count_table) <- msc_ids
+```
+
+
+# Without 'retain' {.tabset}
+Note that not using the 'retain' feature might be dangerous for, say, a Pf sample that only has rings (one stage). 
+```{r, message = FALSE, warning=FALSE, results='asis'}
+
+# sce <- read10xCounts("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY13782211/outs/raw_feature_bc_matrix/")
+# 
+# e.out <- emptyDrops(counts(sce), lower = 50, test.ambient = TRUE)
+
+```
+
+```{r, message = FALSE, warning=FALSE, results='asis'}
+sce2 <- read10xCounts("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY11771546/outs/raw_feature_bc_matrix.h5")
+# 
+# e.out22 <- emptyDrops(counts(sce2), lower = 200, test.ambient = TRUE)
+
+```
+
+```{r, message = FALSE, warning=FALSE, results='asis'}
+sce <- read10xCounts("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/5736STDY11771546/outs/raw_feature_bc_matrix/")
+# 
+e.out2 <- emptyDrops(counts(sce), lower = 200, test.ambient = TRUE)
+e.out2i <- emptyDrops(counts(sce), lower = 200, test.ambient = TRUE, retain = Inf)
+
+```
+
+
+```{r, warning=FALSE}
+# Storage for processed data (is.cell results per sample and limit)
+processed_data_noretain <- list()
+processed_data_withretain <- list()
+```
+
+```{r, warning=FALSE}
+set.seed(100)
+```
+
+# Without 'retain' {.tabset}
+Note that not using the 'retain' feature might be dangerous for, say, a Pf sample that only has rings (one stage). 
+```{r, message = FALSE, warning=FALSE, results='asis'}
+# Loop through each sample
+for (i in seq_along(cellranger_dirs)) {
+  sample_start <- Sys.time()
+  d <- cellranger_dirs[i]
+  msc_id <- msc_ids[i]
+  cat("##", msc_id, "\n\n")
+  
+  message("======== Processing ", msc_id, " (sample ", i, " of ", length(cellranger_dirs), ") ========")
+
+  # Step 1: Load raw data
+  start <- Sys.time()
+  message("Reading 10X data from: ", d)
+  sce <- read10xCounts(d)
+  elapsed <- Sys.time() - start
+  message("  → Read complete in ", round(as.numeric(elapsed), 2), " sec")
+
+  # Step 2: Calculate raw counts
+  start <- Sys.time()
+  message("Calculating UMI and feature counts...")
+  raw_ncounts <- colSums(counts(sce))
+  raw_feature_counts <- colSums(counts(sce) > 0)
+  elapsed <- Sys.time() - start
+  message("  → Count calculation done in ", round(as.numeric(elapsed), 2), " sec")
+
+  cell_count_table["UMI>=1", msc_id] <- sum(raw_ncounts > 0)
+  for (u in umi_thresholds) {
+  cell_count_table[paste0("UMI>=", u), msc_id] <- sum(raw_ncounts >= u)
+  }
+  
+  # Step 3: Run barcodeRanks on all barcodes
+  start <- Sys.time()
+  message("Running barcodeRanks() on full dataset (lower = 1)...")
+  bcrank_whole <- barcodeRanks(counts(sce), lower = 1)
+  elapsed <- Sys.time() - start
+  message("  → barcodeRanks() full done in ", round(as.numeric(elapsed), 2), " sec")
+
+  # Step 4: Loop through limits
+  sample_results_noretain <- list()
+  
+  for (limit_idx in seq_along(limits)) {
+    limit <- limits[limit_idx]
+    cat("### Limit:", limit, "\n\n")
+    message("  --- Processing limit = ", limit)
+    
+    # Step 4.1: barcodeRanks for subset
+    start <- Sys.time()
+    message("  │  • Running barcodeRanks() with lower = ", limit)
+    bcrank <- barcodeRanks(counts(sce), lower = limit)
+    elapsed <- Sys.time() - start
+    message("  │  → barcodeRanks() (above limit) done in ", round(as.numeric(elapsed), 2), " sec")
+
+
+    # Step 4.2: Run emptyDrops
+    start <- Sys.time()
+    message("  │  • Running emptyDrops() with lower = ", limit)
+    e.out <- emptyDrops(counts(sce), lower = limit, test.ambient = TRUE, retain = Inf)
+    elapsed <- Sys.time() - start
+    message("  │  → emptyDrops() done in ", round(as.numeric(elapsed), 2), " sec")
+
+    is.cell <- e.out$FDR <= FDR
+    real_cell_count <- sum(is.cell, na.rm = TRUE)
+    cell_count_table[paste0("Limit (no retain): ", limit), msc_id] <- real_cell_count
+    
+    # Step 4.3: Build sample_df
+    start <- Sys.time()
+    message("  │  • Creating classification table")
+    sample_df <- data.frame(
+      Total_UMI = raw_ncounts,
+      Total_Features = raw_feature_counts,
+      FDR = e.out$FDR,
+      Is_Cell = ifelse(is.cell, "Cell", "Non-Cell"),
+      Limit = limit
+    )
+    sample_results_noretain[[as.character(limit)]] <- data.frame(
+      Barcode = sce$Barcode[sample_df$Is_Cell == "Cell"],
+      FDR = sample_df$FDR[sample_df$Is_Cell == "Cell"]
+    )
+    elapsed <- Sys.time() - start
+    message("  │  → Table ready in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.4: Plot 1 - Barcode rank plot
+    start <- Sys.time()
+    message("  │  • Generating barcode rank plot")
+    rank_df <- data.frame(
+      rank = bcrank$rank,
+      total = bcrank$total,
+      is_cell = sample_df$Is_Cell,
+      total_umi = sample_df$Total_UMI
+    )
+    rank_df$category <- dplyr::case_when(
+      rank_df$total_umi <= limit ~ "Below_Limit",
+      rank_df$is_cell == "Cell" ~ "Cell",
+      TRUE ~ "Non-Cell"
+    )
+    rank_df <- rank_df[!duplicated(rank_df$rank) & !is.na(rank_df$total), ]
+
+    rank_colours <- c("Cell" = "red", "Non-Cell" = "black", "Below_Limit" = "grey60")
+
+    ggplot(rank_df, aes(x = rank, y = total, colour = category)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+      labs(
+        title = paste("MSC ID:", msc_id, "| Limit:", limit, "- Barcode Rank"),
+        x = "Barcode Rank", y = "Total UMI Count",
+        colour = "Classification"
+      ) +
+      geom_hline(yintercept = metadata(bcrank_whole)$inflection, linetype = "dashed", colour = "lightgreen") +
+      geom_hline(yintercept = metadata(bcrank_whole)$knee, linetype = "dashed", colour = "skyblue") +
+      annotate("text", x = 0, y = metadata(bcrank_whole)$inflection,
+               label = paste0("Inflection (whole data) ", round(metadata(bcrank_whole)$inflection)),
+               hjust = 0, vjust = -0.5, size = 3, colour = "lightgreen") +
+      annotate("text", x = 0, y = metadata(bcrank_whole)$knee,
+               label = paste0("Knee (whole data) ", round(metadata(bcrank_whole)$knee)),
+               hjust = 0, vjust = -0.5, size = 3, colour = "skyblue") +
+      geom_hline(yintercept = metadata(bcrank)$inflection, linetype = "solid", colour = "darkgreen") +
+      geom_hline(yintercept = metadata(bcrank)$knee, linetype = "solid", colour = "dodgerblue") +
+      annotate("text", x = 4000, y = metadata(bcrank)$inflection,
+               label = paste0("Inflection (above Limit) ", round(metadata(bcrank)$inflection)),
+               hjust = 0, vjust = 1.2, size = 3, colour = "darkgreen") +
+      annotate("text", x = 4000, y = metadata(bcrank)$knee,
+               label = paste0("Knee (above Limit) = ", round(metadata(bcrank)$knee)),
+               hjust = 0, vjust = 1.2, size = 3, colour = "dodgerblue") +
+      theme_minimal() -> p0
+    print(p0)
+    elapsed <- Sys.time() - start
+    message("  │  → Rank plot done in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.5: Histogram of ambient p-values
+    start <- Sys.time()
+    message("  │  • Plotting ambient P-value histogram")
+    if (!is.null(e.out$PValue)) {
+      ambient_pvals <- e.out$PValue[e.out$Total <= limit & e.out$Total > 0]
+      if (length(ambient_pvals) > 0) {
+        hist(
+          ambient_pvals,
+          xlab = "P-value",
+          main = paste("MSC ID:", msc_id, "| Limit:", limit),
+          col = "grey80"
+        )
+        legend("bottomleft", legend = paste("limit =", limit),
+               col = "dodgerblue", lty = 2, cex = 1.2)
+      }
+    }
+    elapsed <- Sys.time() - start
+    message("  │  → Histogram done in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.6: Feature vs UMI plots
+    start <- Sys.time()
+    message("  │  • Plotting feature vs UMI scatter (full + zoomed)")
+
+    ggplot(subset(sample_df, Total_UMI >= 30), 
+       aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+    geom_point(alpha = 0.5, size = 0.3) +
+    scale_color_manual(values = c("Cell" = "red", "Non-Cell" = "black")) +
+    labs(
+      title = paste("MSC ID:", msc_id, "| Limit:", limit),
+      x = "Total UMI Count", y = "Total Feature Count (Non-Zero Genes)",
+      color = "Cell Status"
+      ) +
+    theme_minimal() -> p2
+    print(p2)
+
+    ggplot(subset(sample_df, Total_UMI >= 30), 
+       aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+    geom_point(alpha = 0.5, size = 0.3) +
+    scale_color_manual(values = c("Cell" = "red", "Non-Cell" = "black")) +
+    labs(
+      title = paste("MSC ID:", msc_id, "| Limit:", limit, "(Zoomed-in)"),
+      x = "Total UMI Count", y = "Total Feature Count (Non-Zero Genes)",
+      color = "Cell Status"
+      ) +
+    xlim(0, 3000) + ylim(0, 500) +
+    theme_minimal() -> p3
+    print(p3)
+
+    elapsed <- Sys.time() - start
+    message("  │  → Feature plots done in ", round(as.numeric(elapsed), 2), " sec")
+  }
+
+  start <- Sys.time()
+  # Reset plotting device
+  plot.new()
+  dev.off()
+  elapsed <- Sys.time() - start
+  message("  • Plotting device reset in ", round(as.numeric(elapsed), 2), " sec")
+
+  cat("\n\n")
+
+  start <- Sys.time()
+  # Store processed data
+  processed_data_noretain[[msc_id]] <- sample_results_noretain
+  elapsed <- Sys.time() - start
+  message("  • adding data in ", round(as.numeric(elapsed), 2), " sec")
+  
+  # Sample-level timing summary
+  sample_elapsed <- difftime(Sys.time(), sample_start, units = "secs")
+  message("Finished ", msc_id, " (sample ", i, " of ", length(cellranger_dirs), ") in ",
+        round(as.numeric(sample_elapsed, units = "secs"), 2), " sec\n")
+
+}
+
+```
+
+
+```{r, warning=FALSE}
+set.seed(100)
+```
+
+# With 'retain' {.tabset}
+Note that not using the 'retain' feature might be dangerous for, say, a Pf sample that only has rings (one stage). 
+```{r, message = FALSE, warning=FALSE, results='asis'}
+# Loop through each sample
+for (i in seq_along(cellranger_dirs)) {
+  sample_start <- Sys.time()
+  d <- cellranger_dirs[i]
+  msc_id <- msc_ids[i]
+  cat("##", msc_id, "\n\n")
+  
+  message("======== Processing ", msc_id, " (sample ", i, " of ", length(cellranger_dirs), ") ========")
+
+  # Step 1: Load raw data
+  start <- Sys.time()
+  message("Reading 10X data from: ", d)
+  sce <- read10xCounts(d)
+  elapsed <- Sys.time() - start
+  message("  → Read complete in ", round(as.numeric(elapsed), 2), " sec")
+
+  # Step 2: Calculate raw counts
+  start <- Sys.time()
+  message("Calculating UMI and feature counts...")
+  raw_ncounts <- colSums(counts(sce))
+  raw_feature_counts <- colSums(counts(sce) > 0)
+  elapsed <- Sys.time() - start
+  message("  → Count calculation done in ", round(as.numeric(elapsed), 2), " sec")
+
+  cell_count_table["UMI>=1", msc_id] <- sum(raw_ncounts > 0)
+  for (u in umi_thresholds) {
+  cell_count_table[paste0("UMI>=", u), msc_id] <- sum(raw_ncounts >= u)
+  }
+  
+  # Step 3: Run barcodeRanks on all barcodes
+  start <- Sys.time()
+  message("Running barcodeRanks() on full dataset (lower = 1)...")
+  bcrank_whole <- barcodeRanks(counts(sce), lower = 1)
+  elapsed <- Sys.time() - start
+  message("  → barcodeRanks() full done in ", round(as.numeric(elapsed), 2), " sec")
+
+  # Step 4: Loop through limits
+  sample_results_withretain <- list()
+  
+  for (limit_idx in seq_along(limits)) {
+    limit <- limits[limit_idx]
+    cat("### Limit:", limit, "\n\n")
+    message("  --- Processing limit = ", limit)
+    
+    # Step 4.1: barcodeRanks for subset
+    start <- Sys.time()
+    message("  │  • Running barcodeRanks() with lower = ", limit)
+    bcrank <- barcodeRanks(counts(sce), lower = limit)
+    elapsed <- Sys.time() - start
+    message("  │  → barcodeRanks() (above limit) done in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.2: Run emptyDrops
+    start <- Sys.time()
+    message("  │  • Running emptyDrops() with lower = ", limit)
+    e.out <- emptyDrops(counts(sce), lower = limit, test.ambient = TRUE)
+    elapsed <- Sys.time() - start
+    message("  │  → emptyDrops() done in ", round(as.numeric(elapsed), 2), " sec")
+
+    is.cell <- e.out$FDR <= FDR
+    real_cell_count <- sum(is.cell, na.rm = TRUE)
+    cell_count_table[paste0("Limit (with retain): ", limit), msc_id] <- real_cell_count
+    
+    # Step 4.3: Build sample_df
+    start <- Sys.time()
+    message("  │  • Creating classification table")
+    sample_df <- data.frame(
+      Total_UMI = raw_ncounts,
+      Total_Features = raw_feature_counts,
+      FDR = e.out$FDR,
+      Is_Cell = ifelse(is.cell, "Cell", "Non-Cell"),
+      Limit = limit
+    )
+    sample_results_withretain[[as.character(limit)]] <- data.frame(
+      Barcode = sce$Barcode[sample_df$Is_Cell == "Cell"],
+      FDR = sample_df$FDR[sample_df$Is_Cell == "Cell"]
+    )
+    elapsed <- Sys.time() - start
+    message("  │  → Table ready in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.4: Plot 1 - Barcode rank plot
+    start <- Sys.time()
+    message("  │  • Generating barcode rank plot")
+    rank_df <- data.frame(
+      rank = bcrank$rank,
+      total = bcrank$total,
+      is_cell = sample_df$Is_Cell,
+      total_umi = sample_df$Total_UMI
+    )
+    rank_df$category <- dplyr::case_when(
+      rank_df$total_umi <= limit ~ "Below_Limit",
+      rank_df$is_cell == "Cell" ~ "Cell",
+      TRUE ~ "Non-Cell"
+    )
+    rank_df <- rank_df[!duplicated(rank_df$rank) & !is.na(rank_df$total), ]
+
+    rank_colours <- c("Cell" = "red", "Non-Cell" = "black", "Below_Limit" = "grey60")
+
+    ggplot(rank_df, aes(x = rank, y = total, colour = category)) +
+      geom_point(size = 0.3, alpha = 0.6) +
+      scale_colour_manual(values = rank_colours) +
+      scale_x_log10() +
+      scale_y_log10() +
+      labs(
+        title = paste("MSC ID:", msc_id, "| Limit:", limit, "- Barcode Rank"),
+        x = "Barcode Rank", y = "Total UMI Count",
+        colour = "Classification"
+      ) +
+      geom_hline(yintercept = metadata(bcrank_whole)$inflection, linetype = "dashed", colour = "lightgreen") +
+      geom_hline(yintercept = metadata(bcrank_whole)$knee, linetype = "dashed", colour = "skyblue") +
+      annotate("text", x = 0, y = metadata(bcrank_whole)$inflection,
+               label = paste0("Inflection (whole data) ", round(metadata(bcrank_whole)$inflection)),
+               hjust = 0, vjust = -0.5, size = 3, colour = "lightgreen") +
+      annotate("text", x = 0, y = metadata(bcrank_whole)$knee,
+               label = paste0("Knee (whole data) ", round(metadata(bcrank_whole)$knee)),
+               hjust = 0, vjust = -0.5, size = 3, colour = "skyblue") +
+      geom_hline(yintercept = metadata(bcrank)$inflection, linetype = "solid", colour = "darkgreen") +
+      geom_hline(yintercept = metadata(bcrank)$knee, linetype = "solid", colour = "dodgerblue") +
+      annotate("text", x = 4000, y = metadata(bcrank)$inflection,
+               label = paste0("Inflection (above Limit) ", round(metadata(bcrank)$inflection)),
+               hjust = 0, vjust = 1.2, size = 3, colour = "darkgreen") +
+      annotate("text", x = 4000, y = metadata(bcrank)$knee,
+               label = paste0("Knee (above Limit) = ", round(metadata(bcrank)$knee)),
+               hjust = 0, vjust = 1.2, size = 3, colour = "dodgerblue") +
+      theme_minimal() -> p0
+    print(p0)
+    elapsed <- Sys.time() - start
+    message("  │  → Rank plot done in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.5: Histogram of ambient p-values
+    start <- Sys.time()
+    message("  │  • Plotting ambient P-value histogram")
+    if (!is.null(e.out$PValue)) {
+      ambient_pvals <- e.out$PValue[e.out$Total <= limit & e.out$Total > 0]
+      if (length(ambient_pvals) > 0) {
+        hist(
+          ambient_pvals,
+          xlab = "P-value",
+          main = paste("MSC ID:", msc_id, "| Limit:", limit),
+          col = "grey80"
+        )
+        legend("bottomleft", legend = paste("limit =", limit),
+               col = "dodgerblue", lty = 2, cex = 1.2)
+      }
+    }
+    elapsed <- Sys.time() - start
+    message("  │  → Histogram done in ", round(as.numeric(elapsed), 2), " sec")
+
+    # Step 4.6: Feature vs UMI plots
+    start <- Sys.time()
+    message("  │  • Plotting feature vs UMI scatter (full + zoomed)")
+
+    ggplot(subset(sample_df, Total_UMI >= 30), 
+       aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+    geom_point(alpha = 0.5, size = 0.3) +
+    scale_color_manual(values = c("Cell" = "red", "Non-Cell" = "black")) +
+    labs(
+      title = paste("MSC ID:", msc_id, "| Limit:", limit),
+      x = "Total UMI Count", y = "Total Feature Count (Non-Zero Genes)",
+      color = "Cell Status"
+      ) +
+    theme_minimal() -> p2
+    print(p2)
+
+    ggplot(subset(sample_df, Total_UMI >= 30), 
+       aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+    geom_point(alpha = 0.5, size = 0.3) +
+    scale_color_manual(values = c("Cell" = "red", "Non-Cell" = "black")) +
+    labs(
+      title = paste("MSC ID:", msc_id, "| Limit:", limit, "(Zoomed-in)"),
+      x = "Total UMI Count", y = "Total Feature Count (Non-Zero Genes)",
+      color = "Cell Status"
+      ) +
+    xlim(0, 3000) + ylim(0, 500) +
+    theme_minimal() -> p3
+    print(p3)
+
+    elapsed <- Sys.time() - start
+    message("  │  → Feature plots done in ", round(as.numeric(elapsed), 2), " sec")
+  }
+
+  start <- Sys.time()
+  # Reset plotting device
+  plot.new()
+  dev.off()
+  elapsed <- Sys.time() - start
+  message("  • Plotting device reset in ", round(as.numeric(elapsed), 2), " sec")
+
+  cat("\n\n")
+
+  start <- Sys.time()
+  # Store processed data
+  processed_data_withretain[[msc_id]] <- sample_results_withretain
+  elapsed <- Sys.time() - start
+  message("  • adding data in ", round(as.numeric(elapsed), 2), " sec")
+
+  # Sample-level timing summary
+  sample_elapsed <- difftime(Sys.time(), sample_start, units = "secs")
+  message("Finished ", msc_id, " (sample ", i, " of ", length(cellranger_dirs), ") in ",
+        round(as.numeric(sample_elapsed, units = "secs"), 2), " sec\n")
+
+}
+
+```
+# Summary table
+```{r warning=FALSE}
+# Display final cell count table
+#cat("\n## Number of Real Cells per Sample and Limit\n")
+# cell_count_table 
+kable(cell_count_table, caption = "Real cell count per sample across different limits")
+
+```
+
+
+
+```{r warning=FALSE}
+# gogo()
+```
+
+# Summary table
+```{r warning=FALSE}
+# Display final cell count table
+#cat("\n## Number of Real Cells per Sample and Limit\n")
+# cell_count_table 
+kable(cell_count_table, caption = "Real cell count per sample across different limits")
+
+```
+
+
+## Save data
+```{r}
+# saveRDS(processed_data_noretain, paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_wo_retain.RDS"))
+# saveRDS(processed_data_withretain, paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_w_retain.RDS"))
+```
+
+```{r}
+# saveRDS(cell_count_table, paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_w_wo_retain_cell_count_table.RDS"))
+```
+
+
+# Consider barrank approach
+
+```{r}
+# Prepare
+target_multipliers <- 1:5
+fixed_ranks <- c(30000, 40000, 50000)
+rank_table <- list()
+
+# Loop through all samples
+for (i in seq_along(cellranger_dirs)) {
+  d <- cellranger_dirs[i]
+  msc_id <- msc_ids[i]
+
+  print(paste0("Processing: ", msc_id))
+  # Load data and compute barcodeRanks
+  sce <- read10xCounts(d)
+  bcrank <- barcodeRanks(counts(sce), lower = 1)
+
+  # Get Total_loaded from counts table for this sample
+  this_loaded <- counts$Total_loaded[counts$Sample_Name == msc_id]
+
+  # Define rank targets
+  rank_targets <- c(fixed_ranks, this_loaded * target_multipliers)
+
+  # Find UMI totals at closest ranks
+  umi_at_ranks <- sapply(rank_targets, function(x) {
+    bcrank$total[which.min(abs(bcrank$rank - x))]
+  })
+
+  names(umi_at_ranks) <- as.character(rank_targets)
+  rank_table[[msc_id]] <- umi_at_ranks
+}
+
+# Combine into data frame
+rank_df <- do.call(rbind, rank_table)
+rank_df <- data.frame(Sample = rownames(rank_df), rank_df, row.names = NULL)
+colnames(rank_df) <- c("msc_id", "fixed_10000", "fixed_20000", "fixed_30000", "loadedx1", "loadedx2", "loadedx3", "loadedx4", "loadedx5")
+```
+
+## Table
+```{r}
+kable(rank_df, caption = "Lower limits that will be set based on the 'barrank' approach")
+```
+
+
+# Check with the numbers of loaded cells
+```{r}
+library("tidyr")
+library("tibble")
+```
+
+```{r}
+# Custom colour palette
+custom_palette <- c(
+  # Blue gradient: light to dark
+  "Limit (no retain): 50"  = "#DEEBF7",  # very light blue
+  "Limit (no retain): 100" = "#C6DBEF",
+  "Limit (no retain): 150" = "#9ECAE1",
+  "Limit (no retain): 200" = "#6BAED6",
+  "Limit (no retain): 300" = "#4292C6",
+  "Limit (no retain): 400" = "#2171B5",
+  "Limit (no retain): 500" = "#084594",  # darkest blue
+  
+  # Reference counts
+  "Loaded_cells" = "#FFA500",  # orange
+  "After_old_QC" = "#E31A1C"   # red
+)
+```
+
+
+## Without retain
+```{r, fig.width= 10, fig.height=4}
+# Reshape and filter relevant rows
+plot_data_noretain <- cell_count_table %>%
+  tibble::rownames_to_column("Limit") %>%
+  filter(Limit %in% c("Loaded_cells", "After_old_QC") |
+           grepl("^Limit \\(no retain\\):", Limit)) %>%
+  pivot_longer(-Limit, names_to = "Sample_Name", values_to = "Count") %>%
+  mutate(Source = Limit)
+
+# Factor for ordering
+plot_data_noretain$Sample_Name <- factor(plot_data_noretain$Sample_Name, levels = msc_ids)
+plot_data_noretain$Source <- factor(plot_data_noretain$Source,
+  levels = c("Loaded_cells",
+             paste0("Limit (no retain): ", limits),
+             "After_old_QC")
+)
+
+
+# Plot
+ggplot(plot_data_noretain %>% filter(!is.na(Count)), aes(x = Sample_Name, y = Count, colour = Source)) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_y_log10() +
+  scale_colour_manual(values = custom_palette) +
+  theme_minimal() +
+  labs(
+    title = "Cell Counts per Sample (EmptyDrops Without Retain)",
+    x = "Sample", y = "Cell Count (log10 scale)", colour = "Source"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+# Custom colour palette
+custom_palette <- c(
+  # Blue gradient: light to dark
+  "Limit (with retain): 50"  = "#DEEBF7",  # very light blue
+  "Limit (with retain): 100" = "#C6DBEF",
+  "Limit (with retain): 150" = "#9ECAE1",
+  "Limit (with retain): 200" = "#6BAED6",
+  "Limit (with retain): 300" = "#4292C6",
+  "Limit (with retain): 400" = "#2171B5",
+  "Limit (with retain): 500" = "#084594",  # darkest blue
+  
+  # Reference counts
+  "Loaded_cells" = "#FFA500",  # orange
+  "After_old_QC" = "#E31A1C"   # red
+)
+```
+
+
+## With retain
+```{r}
+# Reshape and filter relevant rows
+plot_data_withretain <- cell_count_table %>%
+  rownames_to_column("Limit") %>%
+  filter(Limit %in% c("Loaded_cells", "After_old_QC") |
+           grepl("^Limit \\(with retain\\):", Limit)) %>%
+  pivot_longer(-Limit, names_to = "Sample_Name", values_to = "Count") %>%
+  mutate(Source = Limit)
+
+# Factor for ordering
+plot_data_withretain$Sample_Name <- factor(plot_data_withretain$Sample_Name, levels = msc_ids)
+plot_data_withretain$Source <- factor(plot_data_withretain$Source,
+  levels = c("Loaded_cells",
+             paste0("Limit (with retain): ", limits),
+             "After_old_QC")
+)
+
+# Plot
+ggplot(plot_data_withretain %>% filter(!is.na(Count)), aes(x = Sample_Name, y = Count, colour = Source)) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +
+  scale_y_log10() +
+  scale_colour_manual(values = custom_palette) +
+  theme_minimal() +
+  labs(
+    title = "Cell Counts per Sample (EmptyDrops With Retain)",
+    x = "Sample", y = "Cell Count (log10 scale)", colour = "Source"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+

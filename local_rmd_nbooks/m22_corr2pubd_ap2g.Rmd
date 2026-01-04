@@ -1,0 +1,122 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(slingshot)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+# MSC Preprocessing
+
+
+## setup, read input files and exploratory visualizations and general functions
+
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+setwd('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+```{r}
+## read published data from lora-battle et al 2020
+ap2g_lf3_gns <- readxl::read_xlsx("../published_dsets/lora_batille_2020/gnes_main_fig5.xlsx")
+```
+
+```{r}
+## read published data from lora-battle et al 2020
+ap2g_lf3_gns <- readxl::read_xlsx("../published_dsets/lora_batille_2020/de_genes_file_s1.xlsx", sheet = "log2(FC)>3", skip = 3)
+```
+
+```{r}
+## read published data from lora-battle et al 2020
+ap2g_lf3_gns %>% filter(`~5-10h` >= 1 | `~5-10h` <= -1 )
+```
+
+```{r}
+ap2g_gns_up <- ap2g_lf3_gns %>% filter(`~5-10h` >= 1 ) %>% pull(Gene_id) %>% str_replace(., "_", "-")
+ap2g_gns_down <- ap2g_lf3_gns %>% filter(`~5-10h` <= -1 ) %>% pull(Gene_id) %>% str_replace(., "_", "-")
+
+```
+
+
+
+
+
+

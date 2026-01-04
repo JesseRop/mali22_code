@@ -1,0 +1,664 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  library(scales)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+})
+```
+
+
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Variable declarations
+
+```{r}
+##colors
+# sp_col_new <- c(`Late ring` = "#78C679", `Early trophozoite` = "#FEEEAA", `Female (LE)` = "#a97f2f", 
+# Female = "#551A8B", `Male (LE)` = "#7e5522", Male = "mediumpurple", 
+# `Gametocyte (male)` = "#1a6c8b", `Gametocyte (female)` = "#d1b252", 
+# Lab = "#D3D3D3", Unassigned = "#DCDCDC", `Failed QC` = "grey", 
+# `Not assigned` = "grey", Atlas = "grey", `Early ring` = "#D1EC9F", 
+# `Late trophozoite` = "#FEB24C", `Early schizont` = "#C9E8F1", 
+# `Late schizont` = "#85B1D3", `Gametocyte (developing)` = "thistle", 
+# `early female` = "#749E89", `late female` = "#4E6D58", Asexual = "#FF6961", 
+# `NULL` = "lightgrey", `Field unlabelled` = "#D2C1DC", "weak_score" = "#c9c9c9", "unclear" = "#dddddd")
+
+cell_call_mthd_col <- c("CellCr" = "#BC60D5", "CellEd" = "#99E564", "CellCb.5"= "#93DACC", "CellCb.8" = "#DC7886", "CellCb" = "#DC7886", "empty_bc" = '#e2deee', "nonCell" = 'lightgrey', "is_cell_cb" = "#E27C7E", "is_cell_ed" = "#3FA968", "is_cell_cr" = "#4B7DD8", is_cell_cr2 = "#4B7DD8")
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+
+```
+
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+```
+
+## Genotype clustering for MSC
+
+Read in clusters.tsv files with assignment of cells to strains and PCA plots metrics
+
+Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
+
+```{r}
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode$sample_nm)
+
+## mixed infections
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+
+# Remove poor quality samples
+poorQC_samples <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39") 
+
+# 72 hours cultured sample
+cultured_sample <- c("MSC12") 
+
+```
+
+```{r}
+# Remove poor quality samples and mixed species
+sample_name <- sample_name[!(sample_name %in% c(poorQC_samples, sample_mxd, cultured_sample))] %>% str_sort(., numeric = T)
+```
+
+
+```{r, message=F, warning=F}
+sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+sample_name_ed_cr
+```
+
+Read in seurat objects processed in farm
+```{r, message=F, warning=F}
+sample_name_cr <- c(paste0(sample_name, "_cbendr"))
+sample_name_cr
+```
+
+
+################## START Cellbender metrics for all cells ################## 
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_mdata <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender/cb_mdata.*'))) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(read_csv) 
+```
+
+
+```{r, message=F, warning=F, eval=T}
+all_cbender_mdata
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height=9, fig.width=8}
+all_cbender_mdata %>%
+  bind_rows(., .id = "donor") %>% 
+      filter(cell_probability > 0.9) %>%
+  group_by(donor) %>% 
+  mutate(bg_50 = sum(background_fraction > 0.5)) %>% 
+  ungroup() %>%
+  ggplot(aes(x = background_fraction)) +
+    geom_histogram() +
+    geom_text(aes(label=bg_50, x = 0.9, y = 200),  size = 3)+
+    geom_vline(xintercept = 0.5) +
+    facet_wrap(donor ~ ., scales = "free_y", ncol = 5)
+
+```
+
+
+
+################## END Cellbender metrics for all cells ################## 
+
+################## START OVerlap between cell calling methods ################## 
+
+```{r}
+## Read in cells that were called by cellbender i.e with a cell probability of greater than 0.5
+edrops_cbender_mdata_uni <- readRDS("data/processed/Pf/m2_all/edrops_cbender_mdata_uni.RDS") %>%
+  .[sample_name]
+
+```
+
+
+```{r, fig.width=10, fig.height=12}
+
+map(edrops_cbender_mdata_uni, ~.x %>% count(mthds_union)) %>%
+  bind_rows(., .id = "donor") %>%
+  ggplot(aes(y = n/1000, x = mthds_union, fill = mthds_union)) +
+  geom_col() +
+  # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+  geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.35))) +
+  facet_wrap(. ~ donor, ncol = 5, scales = "free_y") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(size = 13),
+        legend.position = "bottom")
+
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height=14, fig.width=12}
+map(c("gn", "umi"), ~{bind_rows(edrops_cbender_mdata_uni, .id = "donor") %>%
+    ggplot(aes(x = log10(!!rlang::sym(paste0('pf_',.x,'_count'))), y = log10(!!rlang::sym(paste0('hs_',.x,'_count'))), colour = mthds_union)) +
+    geom_point(size = 0.01) +
+    geom_density_2d() +
+    facet_wrap(donor ~ .,  ncol = 5) +
+    geom_hline(yintercept = log10(100)) +
+    geom_vline(xintercept = log10(100)) 
+})
+
+```
+
+```{r}
+edrops_cbender_pf100_mdata_uni <- map(edrops_cbender_mdata_uni, ~.x %>% filter(pf_umi_count >= 100))
+```
+
+
+
+```{r, fig.width=10, fig.height=10}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% count(mthds_union)) %>%
+  bind_rows(., .id = "donor") %>%
+  ggplot(aes(y = n/1000, x = mthds_union, fill = mthds_union)) +
+  geom_col() +
+  # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+  geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.35))) +
+  facet_wrap(. ~ donor, ncol = 5, scales = "free_y") +
+  # facet_wrap(. ~ donor, ncol = 7) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(size = 13),
+        legend.position = "bottom")
+
+
+```
+
+
+```{r, fig.width=10, fig.height=5}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% 
+      filter(mthds_union != "Ed") %>%
+      mutate("mthds_union_CbCr" = str_remove(mthds_union, "Ed")) %>% 
+      count(mthds_union_CbCr)) %>%
+  bind_rows(., .id = "donor") %>%
+  ggplot(aes(y = n/1000, x = mthds_union_CbCr, fill = mthds_union_CbCr)) +
+  geom_col() +
+  # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+  geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.5))) +
+  facet_wrap(. ~ donor, ncol = 10, scales = "free_y") +
+  # facet_wrap(. ~ donor, ncol = 7) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(size = 13),
+        legend.position = "bottom")
+
+
+```
+
+```{r, fig.width=10, fig.height=5}
+## Function to make line plots to compare the different cell calling methods and the overlap between them
+
+methds_ln_plt <- function(tbl, x_var = "donor", y_var, col_var = "mthds_union") {
+  ggplot(data = tbl, aes(x= !!rlang::sym(x_var), y = !!rlang::sym(y_var), colour = !!rlang::sym(col_var)))  +
+  geom_point(size = 3) +
+  geom_line(aes(group = !!rlang::sym(col_var)), size = 1) +
+  geom_hline(yintercept = .50) +
+  geom_hline(yintercept = .70) +
+  theme_classic() + 
+  theme(text = element_text(size =20),
+        axis.text.x = element_text(size =20, angle = 45, hjust = 1),
+        legend.position = "bottom")
+}
+
+```
+
+```{r, fig.width=10, fig.height=4}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% count(mthds_union) %>% 
+      filter(mthds_union != "Ed") %>%
+      mutate("cb_cr_ovlp" = ifelse(mthds_union %in% c("CrCbEd", "CrCb"), "yes", "no")) %>% 
+      group_by(cb_cr_ovlp) %>%
+      mutate(prop_ovlp = sum(n)) %>% distinct(cb_cr_ovlp, .keep_all = T) %>% ungroup() %>%
+      mutate(prop = prop_ovlp/sum(prop_ovlp)) %>% 
+      filter(cb_cr_ovlp == "yes")) %>%
+  bind_rows(., .id = "donor") %>%
+  methds_ln_plt(., x_var = "donor", y_var = "prop", col_var = "mthds_union") +
+  theme(legend.position = "none") + 
+  scale_y_continuous(expand = c(0, 0.01), limits = c(0, 1))
+
+
+```
+
+
+```{r, fig.width=10, fig.height=5}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% count(mthds_union)) %>%
+  bind_rows(., .id = "donor") %>%
+  methds_ln_plt(., x_var = "donor", y_var = "n", col_var = "mthds_union")
+
+```
+
+```{r, fig.width=10, fig.height=5}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% count(mthds_union) %>% mutate(prop = n/sum(n))) %>%
+  bind_rows(., .id = "donor") %>%
+  methds_ln_plt(., x_var = "donor", y_var = "prop", col_var = "mthds_union")
+
+
+```
+
+```{r, fig.width=10, fig.height=4}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% 
+      count(mthds_union) %>% 
+      mutate("cb_ed_ovlp" = ifelse(mthds_union %in% c("CrCbEd", "CbEd"), "yes", "no"),
+             "cr_cb_ovlp" = ifelse(mthds_union %in% c("CrCbEd", "CrCb"), "yes", "no"),
+             "cr_ed_ovlp" = ifelse(mthds_union %in% c("CrCbEd", "CrEd"), "yes", "no")) %>% 
+      group_by(cb_ed_ovlp) %>% mutate(cb_ed_sum = sum(n)) %>% 
+      group_by(cr_cb_ovlp) %>% mutate(cr_cb_sum = sum(n)) %>% 
+      group_by(cr_ed_ovlp) %>% mutate(cr_ed_sum = sum(n)) %>% 
+      ungroup() %>%
+      mutate(cell_total = sum(n)) %>% 
+      mutate(cb_ed_prop = cb_ed_sum/cell_total,
+             cr_cb_prop = cr_cb_sum/cell_total,
+             cr_ed_prop = cr_ed_sum/cell_total) %>%
+      pivot_longer(cols = matches("cb_ed_.*|cr_cb_.*|cr_ed_.*"), names_to = c("mthd_pair", ".value"), names_pattern = "(.._..)_(.*)") %>%
+      filter(ovlp == "yes") %>%
+      distinct(mthd_pair, .keep_all = T)
+    ) %>%
+  bind_rows(., .id = "donor") %>%
+  methds_ln_plt(., x_var = "donor", y_var = "prop", col_var = "mthd_pair")+ 
+  scale_y_continuous(expand = c(0, 0.01), limits = c(0, 1))
+
+
+
+```
+
+
+
+################## END OVerlap between cell calling methods ################## 
+
+################## START Barcode rank plots for raw and visualization of features of the removed versus included cells ################## 
+
+```{r, message=F, warning=F, eval=T}
+# ## read raw metadata
+# all_msc_raw_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_raw_mdata.RDS") %>%
+#   .[sample_name]
+
+```
+
+```{r}
+## Read raw cellranger metadata with the sum of Human and Pf reads
+all_msc_raw_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS") %>% .[sample_name]
+```
+
+
+
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+
+all_msc_raw_mdata[[2]] %>%
+  filter(!is.na(is_cell_cb)) %>%
+  count(is_cell_cb)
+
+```
+
+```{r}
+## read manual thresholds
+edrops_thresh <- readRDS("data/processed/Pf/m2_all/man_thresh.RDS")
+```
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+edrops_thresh_df <- edrops_thresh %>% as.data.frame() %>% rownames_to_column("donor") %>% rename("thresh" = ".")
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+## save raw metadata
+all_rank_ncount_cb_don <- readRDS("data/processed/Pf/m2_all/all_rank_ncount_cb_don.RDS")
+```
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+
+all_rank_ncount_cb_don %>%
+  filter(!is.na(is_cell_cb)) %>%
+  count(donor, is_cell_cb)
+
+```
+
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+edrops_thresh %>% as.data.frame() %>% rownames_to_column("donor") %>% rename("thresh" = ".")
+```
+
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+# kneeplt_facet_fn <- function(ncount_tbl, cell_call_methd, donor_group, numbr_of_cols = 4, mthd_col = cell_call_mthd_col){ 
+# 
+#   ncount_tbl %>%
+#   filter(!is.na(!!rlang::sym(cell_call_methd))) %>%
+#       ggplot(., aes(y = nCount_RNA, x= rank, colour = !!rlang::sym(cell_call_methd))) +
+#       # ggrastr::rasterise(geom_point(size=0.5), dpi=100) + ## Reducing the value increases the speed but makes the plot more blurry
+#       geom_point(size=0.5) + ## Reducing the value increases the speed but makes the plot more blurry
+#       geom_hline(aes(yintercept = man_thresh), colour = "red") +
+#       # geom_hline(yintercept = 100) +
+#       geom_hline(yintercept = 50) +
+#       theme_classic() +
+#      scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#               labels = trans_format("log10", math_format(10^.x)))+
+#      scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#               labels = trans_format("log10", math_format(10^.x)))+
+#    # facet_nested_wrap(vars(!!rlang::sym(donor_group), donor), ncol = 4) +
+#    facet_nested_wrap(vars(!!!rlang::syms(unique(c(donor_group, "donor")))), ncol = numbr_of_cols) +
+#    scale_color_manual(name= 'CellCall', values = mthd_col) +
+#       theme(axis.text=element_text(size=15), 
+#             axis.title=element_text(size=20,face="bold"), 
+#             legend.text = element_text(size=20), 
+#             legend.title = element_text(size=15,face="bold"),
+#             legend.position = "bottom",
+#             strip.text.x = element_text(size = 10, face = "bold")
+#     )+ 
+#       # annotation_logticks() +
+#       labs(x= 'Cell rank', y= paste0("Transcript", ' count'),
+#            # title = donor_nm
+#            )
+# }
+```
+
+```{r, fig.height= 6, fig.width= 10, eval=T}
+don_knee <- kneeplt_facet_fn(ncount_tbl = all_rank_ncount_cb_don, cell_call_methd = "is_cell_cb2", donor_group = "donor", numbr_of_cols = 7)
+don_knee
+```
+
+```{r, fig.height= 6, fig.width= 10, eval=T}
+don_knee +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color = guide_legend(title = 'Cell call', override.aes = list(size = 4), nrow = 1))
+```
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+map(c("p_map_cat"), ~{
+  kneeplt_facet_fn(ncount_tbl = all_rank_ncount_cb_don, cell_call_methd = "is_cell_cb", donor_group = .x, numbr_of_cols = 5)
+})
+```
+
+
+```{r, fig.height= 14, fig.width= 10, eval=T}
+map(c("p_map_cat", "hs_map_cat", "peak", "frac_load", "overload"), ~{
+  kneeplt_facet_fn(ncount_tbl = all_rank_ncount_cb_don, cell_call_methd = "is_cell_ed", donor_group = .x)
+})
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## save raw metadata
+all_rank_gn_umi_bp_don <- readRDS("data/processed/Pf/m2_all/all_rank_gn_umi_bp_don.RDS")
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=12}
+# scatter_facet_fn <- function(ncount_tbl, cell_call_methd, donor_group, numbr_of_cols = 4, raster_resln = 50, use_raster = T, mthd_col = cell_call_mthd_col){ 
+# 
+#   ncount_tbl %>%
+#     ggplot(aes(x = nFeature_RNA, y= nCount_RNA, color = !!rlang::sym(cell_call_methd))) +
+#     (if (use_raster) ggrastr::rasterise(geom_point(size=0.1), dpi=raster_resln) else geom_point(size=0.1)) +
+#     geom_hline(yintercept = c(50, 100)) + 
+#     geom_vline(xintercept = c(50, 100)) +
+#     theme_classic() +
+#     scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x)))+
+#     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x), labels = trans_format("log10", math_format(10^.x)))+
+#     facet_nested_wrap(vars(!!rlang::sym(donor_group), donor), ncol = 4) +
+#     scale_color_manual(name= 'CellCall', values = mthd_col) +
+#     theme(axis.text=element_text(size=15), 
+#             axis.title=element_text(size=20,face="bold"), 
+#             legend.text = element_text(size=20), 
+#             legend.title = element_text(size=15,face="bold"),
+#             legend.position = "bottom",
+#             strip.text.x = element_text(size = 10, face = "bold")
+#     )+ 
+#       # annotation_logticks() +
+#       labs(x= 'Gene count', y= paste0("Transcript", ' count'),
+#            # title = donor_nm
+#            )+
+#       labs(title = paste0(str_remove(cell_call_methd, "is_cell_"), "_", donor_group))
+# }
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=12}
+# Bad_cells with less than 300 genes
+map(c("is_cell_cb2", "is_cell_ed", "is_cell_cr")[1],  ~{ 
+  mthd = .x
+  
+  tbl = all_rank_gn_umi_bp_don %>%
+    filter(nFeature_RNA < 300 & (!!rlang::sym(mthd) %in% c("empty_bc", "nonCell") ))
+    
+  map(c("p_map_cat", "hs_map_cat", "peak", "frac_load", "overload")[1], ~{
+    
+    scatter_facet_fn(ncount_tbl = tbl, cell_call_methd = mthd, donor_group = .x, numbr_of_cols = 5, use_raster = T, raster_resln = 50)
+
+})
+})
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=12}
+# Good cells with less than 300 genes
+map(c("is_cell_cb2", "is_cell_ed", "is_cell_cr")[1],  ~{ 
+  mthd = .x
+  
+  tbl = all_rank_gn_umi_bp_don %>%
+    filter(nFeature_RNA < 300 & !(!!rlang::sym(mthd) %in% c("empty_bc", "nonCell") ))
+    
+  map(c("p_map_cat", "hs_map_cat", "peak", "frac_load", "overload")[1], ~{
+    
+    scatter_facet_fn(ncount_tbl = tbl, cell_call_methd = mthd, donor_group = .x, numbr_of_cols = 5, use_raster = F)
+
+})
+})
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=12}
+# All cells 
+map(c("is_cell_cb2", "is_cell_ed", "is_cell_cr")[1],  ~{ 
+  mthd = .x
+  
+  tbl = all_rank_gn_umi_bp_don 
+    
+  map(c("frac_load", "p_map_cat", "hs_map_cat", "peak", "overload")[1], ~{
+    
+    scatter_facet_fn(ncount_tbl = tbl, cell_call_methd = mthd, donor_group = .x, numbr_of_cols = 5, use_raster = T, raster_resln = 50)
+
+})
+})
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=12}
+# umi_box_vln_plt_fn <- function(ncount_tbl, cell_call_methd, numbr_of_cols = 4, box_or_vln, donor_group = "frac_load", gn_umi = "nCount_RNA", gn_umi_nm = "Transcript count", scales_free = "free_y", mthd_col = cell_call_mthd_col){ 
+# 
+#   ncount_tbl %>%
+#     ggplot(aes( y= !!rlang::sym(gn_umi), x = !!rlang::sym(cell_call_methd), color = !!rlang::sym(cell_call_methd))) + 
+#     (if (box_or_vln == "boxplot") {geom_boxplot()} else if (box_or_vln == "violin") {geom_violin()}) +
+#     geom_hline(yintercept = 20000) + 
+#     geom_hline(yintercept = 100) +
+#     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+#               labels = trans_format("log10", math_format(10^.x)))+ 
+#     theme_classic() +
+#    # facet_nested_wrap(vars(frac_load, donor), ncol = numbr_of_cols, scales = "free_y") +
+#     facet_nested_wrap(vars(!!!rlang::syms(unique(c(donor_group, "donor")))), ncol = numbr_of_cols, scales = scales_free) +
+#     scale_color_manual(name= 'CellCall', values = mthd_col) +
+#     theme(axis.text=element_text(size=15), 
+#           axis.text.x=element_text(angle=45, hjust = 1),
+#             axis.title=element_text(size=20,face="bold"), 
+#             legend.text = element_text(size=20), 
+#             legend.title = element_text(size=15,face="bold"),
+#             legend.position = "bottom",
+#             strip.text.x = element_text(size = 10, face = "bold")
+#     )+ 
+#       labs(x= 'Gene count', y= gn_umi_nm,
+#            title = paste0(str_remove(cell_call_methd, "is_cell_"), "_", donor_group)
+#            )
+# }
+
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=4.5}
+
+map(c("is_cell_cb2", "is_cell_ed", "is_cell_cr"), ~umi_box_vln_plt_fn(ncount_tbl = all_rank_gn_umi_bp_don, cell_call_methd = .x,  numbr_of_cols = 20, box_or_vln = "boxplot", scales_free = "fixed")) 
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=5}
+# All cells 
+map(c("is_cell_cb2", "is_cell_ed", "is_cell_cr")[1],  ~{ 
+  mthd = .x
+  
+  map(c("frac_load", "p_map_cat", "peak", "overload")[1], ~{
+    
+    umi_box_vln_plt_fn(ncount_tbl = all_rank_gn_umi_bp_don, cell_call_methd = mthd,  numbr_of_cols = 19, box_or_vln = "violin", donor_group = .x, scales_free = "fixed")
+
+})
+})
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=14, fig.height=8}
+# All cells 
+map(c("donor", "frac_load", "p_map_cat", "peak", "overload")[1:2], ~{
+  
+    tbl <- all_rank_gn_umi_bp_don %>% 
+      filter(is_cell_cb %in% c("CellCb.8", "CellCb.5") | is_cell_ed == "CellEd" | is_cell_cr == "CellCr" ) %>%
+      # filter(is_cell_cb %in% c("CellCb.8") | is_cell_ed == "CellEd" | is_cell_cr == "CellCr" ) %>% 
+      pivot_longer(cols = c(is_cell_cb, is_cell_cr, is_cell_ed), names_to = "Mthds", values_to = "CellCat") %>% 
+      filter(!(CellCat %in% c("empty_bc", "nonCell")))  %>%
+      mutate(across(Mthds, ~factor(., levels = c("is_cell_cb", "is_cell_ed", "is_cell_cr"))))
+      
+  
+    umi_box_vln_plt_fn(ncount_tbl = tbl, cell_call_methd = "Mthds",  numbr_of_cols = 10, box_or_vln = "violin", donor_group = .x, scales_free = "fixed")
+
+})
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=5}
+# All cells 
+map(c("frac_load", "p_map_cat", "peak", "overload")[1:2], ~{
+  
+    tbl <- all_rank_gn_umi_bp_don %>% 
+      filter(is_cell_cb %in% c("CellCb.8", "CellCb.5") | is_cell_ed == "CellEd" | is_cell_cr == "CellCr" ) %>%
+      # filter(is_cell_cb %in% c("CellCb.8", "CellCb.5") | is_cell_ed == "CellEd" | is_cell_cr == "CellCr" ) %>%
+      pivot_longer(cols = c(is_cell_cb, is_cell_cr, is_cell_ed), names_to = "Mthds", values_to = "CellCat") %>% 
+      filter(!(CellCat %in% c("empty_bc", "nonCell")))  %>%
+      mutate(across(Mthds, ~factor(., levels = c("is_cell_cb", "is_cell_ed", "is_cell_cr"))))
+      
+   
+    umi_box_vln_plt_fn(ncount_tbl = tbl, gn_umi = "nFeature_RNA", gn_umi_nm = "Gene count", cell_call_methd = "Mthds",  numbr_of_cols = 19, box_or_vln = "violin", donor_group = .x, scales_free = "fixed")
+
+})
+
+```
+
+
+################## END Barcode rank plots for raw and visualization of features of the removed versus included cells ################## 
+

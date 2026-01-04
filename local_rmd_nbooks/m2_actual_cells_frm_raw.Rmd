@@ -86,7 +86,7 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 ```{r}
 ##Boxplot labeling function
 source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
-source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 
 ```
@@ -176,384 +176,38 @@ source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>%
 edrops_thresh <- readRDS("data/processed/Pf/m2_all/man_thresh.RDS")
 ```
 
-
-
-
-```{r, fig.width=15, fig.height=5}
-donor_10x_mdata_sk21_summ <- readRDS("data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS") %>%
-  filter(donor %in% slct_sample_names) 
-
-```
-
-
-```{r, fig.width=15, fig.height=5}
-
-donor_10x_mdata_sk21_summ %>% count(frac_load, overload, frac_over, targeted_cells)
-```
-
-
-
 ```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
 all_cbender_mdata <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  # set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender_yascpCr/cb_mdata.*'))) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender/cb_mdata.*'))) %>% 
   .[sample_name] %>%
   .[!is.na(.)] %>%
   map(read_csv) 
 ```
 
-
 ```{r, message=F, warning=F, eval=T}
-all_cbender_mdata
-```
-
-
-```{r, message=F, warning=F, eval=T}
-imap(all_cbender_mdata, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = background_fraction, y = cell_probability)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.5) +
-    labs(title = .y)
-)
-```
-
-
-```{r, message=F, warning=F, eval=T, fig.height=9, fig.width=7}
-all_cbender_mdata %>%
-  bind_rows(., .id = "donor") %>% 
-      filter(cell_probability > 0.8) %>%
-  group_by(donor) %>% 
-  mutate(bg_50 = sum(background_fraction > 0.5)) %>% 
-  ungroup() %>%
-  ggplot(aes(x = background_fraction)) +
-    geom_histogram() +
-    geom_text(aes(label=bg_50, x = 0.8, y = 200),  size = 3)+
-    geom_vline(xintercept = 0.5) +
-    facet_wrap(donor ~ ., scales = "free_y", ncol = 5)
-
-```
-
-```{r, message=F, warning=F, eval=T, fig.height=8, fig.width=12}
-all_cbender_mdata %>%
-  bind_rows(., .id = "donor") %>% 
-      filter(cell_probability > 0.8) %>%
-  count(donor, background_fraction>0.5)
-
+## Just work with files that have cellbender output
+sample_name <- names(all_cbender_mdata)
 ```
 
 ```{r, message=F, warning=F, eval=T}
-imap(all_cbender_mdata, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = background_fraction, y = cell_size)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.5) +
-    labs(title = .y)
-)
-```
-
-```{r, message=F, warning=F, eval=T}
-imap(all_cbender_mdata, ~.x %>% 
-      filter(cell_probability > 0.5) %>%
-  ggplot(aes(x = cell_probability, y = cell_size)) +
-    geom_point(size = 0.1) +
-    geom_vline(xintercept = 0.9) +
-    labs(title = .y)
-)
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-all_cbender_mdata_pass.5 <- map(all_cbender_mdata, ~.x %>% filter(cell_probability>0.5) %>% pull(barcode))
-
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-all_cbender_mdata_pass.9 <- map(all_cbender_mdata, ~.x %>% filter(cell_probability>0.9) %>% pull(barcode))
-
-```
-
-## Save data
-```{r}
-part <- "Part1"
-outdir <- paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/sk_25_QC/PmML03_PowML03_QC_objects/", part, "/")
-
-# processed_data_noretain <- readRDS(paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_wo_retain.RDS"))
-```
-
-
-```{r}
-# processed_data_noretain_50 <- map(processed_data_noretain, ~.x[["50"]] %>% filter(!is.na(Barcode) )) %>% .[sample_name]
-```
-
-
-```{r}
-processed_data_w_retain <- readRDS("data/processed/Pf/m2_all/processed_data_w_retain.RDS")
-processed_data_wo_retain <- readRDS("data/processed/Pf/m2_all/processed_data_wo_retain.RDS")
-```
-
-```{r, fig.height=4.0, fig.width=4.0}
-# M48, M49, M60
-map(slct_sample_names, ~{
-  print(paste0(.x, "_"))
-  lst <- processed_data_wo_retain[str_detect(names(processed_data_wo_retain), paste0(.x, "_"))]
-  lst <- lst[!str_detect(names(lst), "_20_")]
-  names(lst) <- str_remove_all(names(lst), "MSC[0-9]+_|_retain")
-  print(names(lst))
-  lst <- map(lst, ~.x$Barcode)
-  ggvenn(lst,
-       show_percentage = F,
-       text_size = 4,
-       set_name_size = 4) +
-    labs(title = .x)
-})
-
-```
-
-```{r, fig.height=4.0, fig.width=4.0}
-# M48, M49, M60
-map(names(edrops_thresh[edrops_thresh >50]), ~{
-  print(paste0(.x, "_"))
-  lst <- processed_data_wo_retain[str_detect(names(processed_data_wo_retain), paste0(.x, "_"))]
-  lst <- lst[!str_detect(names(lst), "_20_")]
-  names(lst) <- str_remove_all(names(lst), "MSC[0-9]+_|_retain")
-  print(names(lst))
-  lst <- map(lst, ~.x$Barcode)
-  ggvenn(lst,
-       show_percentage = F,
-       text_size = 4,
-       set_name_size = 4) +
-    labs(title = .x)
-})
-
-```
-
-
-```{r}
-names(processed_data_w_retain )
-```
-
-
-```{r}
-wo_rtn_50 <- paste0(names(edrops_thresh), "_", edrops_thresh, "_wo_retain")
-w_rtn_50 <- paste0(names(edrops_thresh), "_", edrops_thresh, "_w_retain")
-
-wo_rtn_100 <- paste0(names(edrops_thresh), "_", "100", "_wo_retain")
-w_rtn_100 <- paste0(names(edrops_thresh), "_", "100", "_w_retain")
-```
-
-
-```{r}
-processed_data_noretain_50 <- processed_data_wo_retain[wo_rtn_50] %>% set_names(names(edrops_thresh)) %>% .[sample_name]
-processed_data_withretain_50 <- processed_data_w_retain[w_rtn_50] %>% set_names(names(edrops_thresh))%>% .[sample_name]
-
-processed_data_noretain_100 <- processed_data_wo_retain[wo_rtn_100] %>% set_names(names(edrops_thresh))%>% .[sample_name]
-processed_data_withretain_100 <-  processed_data_w_retain[w_rtn_100] %>% set_names(names(edrops_thresh))%>% .[sample_name]
-
-```
-
-
-```{r}
-overlap_tbl <- pmap(list(processed_data_noretain_50, processed_data_withretain_50, processed_data_noretain_100, processed_data_withretain_100), ~{
-  data.frame(
-  "Limit (no retain): 50" = length(..1$Barcode),
-  "Limit (retain): 50" = length(..2$Barcode),
-  "Overlap 50 (prop)" = length(intersect(..1$Barcode, ..2$Barcode))/ length(unique(c(..1$Barcode, ..2$Barcode))),
-  "Limit (no retain): 100" = length(..3$Barcode),
-  "Limit (retain): 100" = length(..4$Barcode),
-  "Overlap 100 (prop)" = length(intersect(..3$Barcode, ..4$Barcode))/ length(unique(c(..3$Barcode, ..4$Barcode))),
-  "Overlap 50.100 noRet (prop)" = length(intersect(..1$Barcode, ..3$Barcode))/ length(unique(c(..1$Barcode, ..3$Barcode))),
-  "Overlap all (prop)" = length(Reduce(intersect, list(..1$Barcode, ..2$Barcode, ..3$Barcode, ..4$Barcode)))/ length(unique(c(..1$Barcode, ..2$Barcode, ..3$Barcode, ..4$Barcode))),
-  check.names = F
-)
-  }) %>%
-  bind_rows(.id = "donor")
-
-overlap_tbl
+# ##Read BPcells matrices
+# all_cbender_mdata <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender/cb_mdata.*'))) %>% 
+#   .[sample_name] %>%
+#   .[!is.na(.)] %>%
+#   map(read_csv) 
 ```
 
 ```{r}
-
-overlap_tbl
-```
-
-
-```{r}
-# nms_cb <- names(all_cbender_mdata)
-
-overlap_tbl_cbender <- pmap(list(processed_data_noretain_50, processed_data_noretain_100, all_cbender_mdata_pass.5, all_cbender_mdata_pass.9), ~{
-# overlap_tbl_cbender <- pmap(list(processed_data_noretain_50, processed_data_noretain_100, all_cbender_mdata_pass.9, all_cbender_mdata_pass.5), ~{
-  data.frame(
-  "Limit (no retain): 50" = length(..1$Barcode),
-  "Limit (no retain): 100" = length(..2$Barcode),
-  "CBendr" = length(..3),
-  "CBendr.9" = length(..4),
-  "Overlap 50:CBendr (prop)" = length(intersect(..1$Barcode, ..3))/ length(unique(c(..1$Barcode, ..3))),
-  "Overlap 100:CBendr (prop)" = length(intersect(..2$Barcode, ..3))/ length(unique(c(..2$Barcode, ..3))),
-  "50 in CBendr" = sum(..1$Barcode %in% ..3),
-  "Overlap all (prop)" = length(Reduce(intersect, list(..1$Barcode, ..2$Barcode, ..3)))/ length(unique(c(..1$Barcode, ..2$Barcode, ..3))),
-  check.names = F
-)
-  }) %>%
-  bind_rows(.id = "donor")
-
-overlap_tbl_cbender
-
-```
-
-
-
-```{r, fig.width=10, fig.height=5}
-## Function to make line plots to compare the different cell calling methods and the overlap between them
-
-methds_ln_plt_nohline <- function(tbl, x_var = "donor", y_var, col_var = "mthds_union") {
-  ggplot(data = tbl, aes(x= !!rlang::sym(x_var), y = !!rlang::sym(y_var), colour = !!rlang::sym(col_var)))  +
-  geom_point(size = 4) +
-  geom_line(aes(group = !!rlang::sym(col_var)), size = 1) +
-  theme_classic() + 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(size =20, angle = 45, hjust = 1),
-        legend.position = "bottom")
-}
-
-```
-
-```{r, fig.width=14, fig.height=5}
-overlap_tbl_cbender %>% 
-  pivot_longer(cols = c("Limit (no retain): 50", "Limit (no retain): 100", "CBendr", "CBendr.9", "50 in CBendr"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-  mutate(across(donor, ~str_remove(., "_[0-9].*")),
-         Cells_log10 = log10(Cells)) %>%
-  methds_ln_plt_nohline(., x_var = "donor", y_var = "Cells_log10", col_var = "Cell_id_mthd")
-
-```
-
-
-
-```{r, fig.width=14, fig.height=4.3}
-overlap_tbl_cbender %>% 
-  pivot_longer(cols = c("Limit (no retain): 50", "Limit (no retain): 100", "CBendr", "CBendr.9", "50 in CBendr"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-  mutate(across(donor, ~str_remove(., "_[0-9].*"))) %>%
-  methds_ln_plt_nohline(., x_var = "donor", y_var = "Cells", col_var = "Cell_id_mthd")
-
-```
-
-
-```{r, fig.width=10, fig.height=5}
-## Function to make line plots to compare the different cell calling methods and the overlap between them
-
-methds_ln_plt <- function(tbl, x_var = "donor", y_var, col_var = "mthds_union") {
-  ggplot(data = tbl, aes(x= !!rlang::sym(x_var), y = !!rlang::sym(y_var), colour = !!rlang::sym(col_var)))  +
-  geom_point(size = 3) +
-  geom_line(aes(group = !!rlang::sym(col_var)), size = 1) +
-  geom_hline(yintercept = .50) +
-  geom_hline(yintercept = .70) +
-  theme_classic() + 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(size =20, angle = 45, hjust = 1),
-        legend.position = "bottom")
-}
-
-```
-
-```{r, fig.width=10, fig.height=4.3}
-overlap_tbl_cbender %>% 
-  pivot_longer(cols = c("Overlap 50:CBendr (prop)", "Overlap 100:CBendr (prop)"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-  mutate(across(donor, ~str_remove(., "_[0-9].*")))  %>%
-  methds_ln_plt(., x_var = "donor", y_var = "Cells", col_var = "Cell_id_mthd")
-
-```
-
-```{r, fig.width=10, fig.height=4.3}
-overlap_tbl_cbender %>% 
-  pivot_longer(cols = c("Overlap 50:CBendr (prop)", "Overlap 100:CBendr (prop)"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-  mutate(across(donor, ~str_remove(., "_[0-9].*")))  %>%
-  methds_ln_plt(., x_var = "donor", y_var = "Cells", col_var = "Cell_id_mthd") + 
-  scale_y_continuous(expand = c(0, 0.01), limits = c(0, 1))
-
-
-```
-
-
-
-```{r}
-# overlap_tbl_cbender %>% 
-#   pivot_longer(cols = -c(donor), names_pattern = "(.*)\\.(S.*)", names_to = c( "Dbt_method", ".value")) %>%
-#   ggplot(aes(x= donor, y = Sensitivity, color = Dbt_method))  +
-#   geom_point() +
-#   geom_line(aes(group = Dbt_method), linetype = "dotted")+
-#   geom_point(aes(y = Specificity)) +
-#   geom_line(aes(y = Specificity, group = Dbt_method))+
-#   scale_y_continuous( name = 'Sensitivity', sec.axis = sec_axis(~. *1,name = "Specificity"))
-
-```
-
-##### Loaded versus recovered cells
-
-```{r, fig.width=15, fig.height=5}
-
-mdata_10x_resc <- donor_10x_mdata_sk21_summ %>% left_join(overlap_tbl_cbender, by = "donor")
-```
-
-```{r, fig.width=14, fig.height=4.3}
-map(c("overload", "frac_load", "p_map_cat", "peak"), ~{
-
-  mdata_10x_resc %>% 
-    pivot_longer(cols = c("Limit (no retain): 50", "Limit (no retain): 100", "CBendr", "CBendr.9", "50 in CBendr"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-    mutate(across(donor, ~str_remove(., "_[0-9].*"))) %>%
-    ggplot(aes(x= donor, y = Cells, color = Cell_id_mthd))  +
-    geom_point(size = 4) +
-    geom_line(aes(group = Cell_id_mthd), size = 1) +
-    theme_classic()  +
-    facet_grid(cols = vars(!!rlang::sym(.x)), scales = "free_x", space =  "free_x") + 
-    theme(text = element_text(size =20),
-          axis.text.x = element_text(size =20, angle = 45, hjust = 1),
-          legend.position = "bottom")
-})
-```
-
-
-```{r, fig.width=14, fig.height=4.3}
-map(c("overload", "frac_load", "p_map_cat", "peak"), ~{
-
-  mdata_10x_resc %>% 
-  pivot_longer(cols = c("Overlap 50:CBendr (prop)", "Overlap 100:CBendr (prop)"), names_to = "Cell_id_mthd", values_to = "Cells") %>%
-  mutate(across(donor, ~str_remove(., "_[0-9].*"))) %>%
-  ggplot(aes(x= donor, y = Cells, color = Cell_id_mthd))  +
-  geom_point(size = 4) +
-  geom_line(aes(group = Cell_id_mthd), size = 1) +
-  geom_hline(yintercept = .50) +
-  geom_hline(yintercept = .70) +
-  facet_grid(cols = vars(!!rlang::sym(.x)), scales = "free_x", space =  "free_x") +
-  theme_classic() + 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(size =20, angle = 45, hjust = 1),
-        legend.position = "bottom")
-})
-```
-
-
-
-```{r, fig.width=15, fig.height=5}
-
-mdata_10x_resc %>% 
-  pivot_longer(cols = c("Limit (no retain): 50", "CBendr", "Limit (no retain): 100"), names_to = "Cell_id_mthd", values_to = "cellNo") %>%
-  ggplot(aes(x =  log10(parasites_loaded), y =  log10(cellNo))) +
-  geom_point(size = 4) +
-  geom_line(aes(group = Cell_id_mthd), size = 1) +
-  # scale_y_log10() +
-  # scale_x_log10() +
-  facet_wrap(Cell_id_mthd ~ .)
+processed_data_noretain_50 <- readRDS("data/processed/Pf/m2_all/processed_data_noretain_50.RDS") %>% .[sample_name]
 ```
 
 ```{r, fig.width=15, fig.height=5}
+donor_10x_mdata_sk21_summ <- readRDS("data/processed/Pf/m2_all/donor_10x_mdata_sk21_summ.RDS") %>%
+  filter(donor %in% sample_name) 
 
-mdata_10x_resc %>% 
-  pivot_longer(cols = c("Limit (no retain): 50", "CBendr", "Limit (no retain): 100"), names_to = "Cell_id_mthd", values_to = "cellNo") %>%
-  ggplot(aes(x = log10(rbcs_in_mix), y = log10(cellNo))) +
-  geom_point(size = 4) +
-  geom_line(aes(group = Cell_id_mthd), size = 1) +
-  facet_wrap(Cell_id_mthd ~ .)
 ```
 
 
@@ -563,185 +217,20 @@ donor_10x_mdata_sk21_summ %>% count(frac_load, overload, frac_over, targeted_cel
 ```
 
 
-```{r, fig.width=9, fig.height=4}
-
-mdata_10x_resc_cell_mthd <- mdata_10x_resc %>% 
-  pivot_longer(cols = c("Limit (no retain): 50", "CBendr", "Limit (no retain): 100"), names_to = "Cell_id_mthd", values_to = "cellNo") 
-
-```
-
-```{r, fig.width=9, fig.height=4}
-map(c("overload", "frac_load", "p_map_cat", "peak"), ~{
-
-  mdata_10x_resc_cell_mthd%>%
-  ggplot(aes(y =  cellNo, x = !!rlang::sym(.x) )) +
-  geom_boxplot() +
-  geom_point(size = 1) +
-  facet_wrap(Cell_id_mthd ~ .)+ 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(angle = 25, hjust = 1))
-})
-```
-
-
-
-```{r, fig.width=9, fig.height=4}
-
-mdata_10x_resc_cell_mthd %>%
-  ggplot(aes(y =  cellNo, x = frac_load )) +
-  geom_boxplot() +
-  geom_point(size = 1) +
-  geom_text_repel(data = mdata_10x_resc_cell_mthd %>% filter(cellNo > 20000), aes(label = donor), vjust = -0.5, color = "red", size = 5) +
-  facet_wrap(Cell_id_mthd ~ .)+ 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(angle = 25, hjust = 1))
-
-
-```
-
-
-```{r, fig.width=9, fig.height=4}
-
-mdata_10x_resc_cell_mthd %>%
-  ggplot(aes(y =  cellNo, x = frac_load )) +
-  geom_boxplot() +
-  geom_point(size = 1) +
-  geom_text_repel(data = mdata_10x_resc_cell_mthd %>% filter(overload == "Yes_20k"), aes(label = donor), vjust = -0.5, color = "red", size = 5) +
-  facet_wrap(Cell_id_mthd ~ .)+ 
-  theme(text = element_text(size =20),
-        axis.text.x = element_text(angle = 25, hjust = 1))
-
-
-```
-
-```{r, eval=FALSE}
-cell_count_table <- readRDS(paste0(outdir, "Part1_EmptyDrops_pmpo_samples_50_to_500_w_wo_retain_cell_count_table.RDS"))
-cell_count_table
+```{r}
+all_msc_bp_filt_noHsGns_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns_mdata.RDS") %>% .[sample_name]
 ```
 
 ```{r}
-
-# ed_counts_lndscape
+all_msc_bp_raw_noHsGns_mdata <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS") %>% .[sample_name]
 ```
 
-```{r, message=F, warning=F, eval=F}
-##Write BPcells matrices
-list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/", pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf//|/outs.*'))) %>% 
-  .[source_irods] %>%
-  set_names(names(source_irods)) %>%
-  # .[sample_name] %>%
-  map(~open_matrix_10x_hdf5(path = .)) %>% 
-  imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/counts_mtx'), overwrite = T))
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices. - prepared in m2_QC_prelim_stage_anno.RMD
-
-all_msc_bp_filt <- list.files("data/processed/Pf", pattern = "^counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/bpcells.*'))) %>%
-  # .[str_detect(., 'filtered')]  %>% 
-  .[sample_name] %>%
-  map(~open_matrix_dir(dir = .)) %>% 
-  imap(., ~CreateSeuratObject(counts = .x, project = paste0(.y, ".mrna")))
-
-```
-
-
-```{r, eval=F}
-## List filtered cellranger h5 matrices into R
-list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/", pattern = "raw_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T)
-```
-
-
-```{r, message=F, warning=F, eval=F}
-##Write BPcells matrices
-list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf/", pattern = "raw_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf//|/outs.*'))) %>% 
-  .[source_irods] %>%
-  set_names(names(source_irods)) %>%
-  # .[sample_name] %>%
-  map(~open_matrix_10x_hdf5(path = .)) %>% 
-  imap(., ~write_matrix_dir(mat = .x, dir = paste0('data/processed/Pf/', .y, '/bpcells/raw_counts_mtx'), overwrite = T))
-```
-
-
-```{r, message=F, warning=F, eval=T}
-#gogo()
-```
-
-```{r, message=F, warning=F, eval=T}
-##Read BPcells matrices
-all_msc_bp_raw <- list.files("data/processed/", pattern = "raw_counts_mtx$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed//Pf/|/bpcells.*'))) %>% 
-  .[sample_name] %>%
-  map(~open_matrix_dir(dir = .)) %>% 
-  imap(., ~CreateSeuratObject(counts = .x, project = paste0(.y, ".mrna"))) 
-```
-
-
-```{r}
-# all_msc_bp_raw_exp <- map(all_msc_bp_raw[1:5], ~.x %>% AggregateExpression)
-```
-
-
-```{r}
-pf_hs_gene_sum_fn <- function(seurat_obj){
-  
-  # Identify human and pf genes
-  pf_genes <- grep("^PF3D7", rownames(seurat_obj), value = TRUE)
-  hs_genes <- grep("^ENSG", rownames(seurat_obj), value = TRUE)
-  print(head(hs_genes))
-  # Extract expression matrix and subset to those genes
-  
-  
-  pf_matrix <- as(GetAssayData(seurat_obj, layer = "counts")[pf_genes, , drop = FALSE], Class = "dgCMatrix")  
-  hs_matrix <- as(GetAssayData(seurat_obj, layer = "counts")[hs_genes, , drop = FALSE], Class = "dgCMatrix")  
-  
-  # sum the umis and genes across all genes per cell
-  pf_umi_count <- colSums(pf_matrix)
-  hs_umi_count <- colSums(hs_matrix)
-  pf_gn_count <- colSums(pf_matrix>0)
-  hs_gn_count <- colSums(hs_matrix>0)
-
-  # Store in metadata
-  seurat_obj[["pf_umi_count"]] <- pf_umi_count
-  seurat_obj[["hs_umi_count"]] <- hs_umi_count
-  seurat_obj[["pf_gn_count"]] <- pf_gn_count
-  seurat_obj[["hs_gn_count"]] <- hs_gn_count
-  
-  # Keep only pf genes
-  seurat_obj <- subset(seurat_obj, features = pf_genes)
-  
-  return(seurat_obj)
-  
-}
-
-```
-
-
-```{r}
-## Count the pf and human genes and add to metadata for filtered set and also remove human genes
-all_msc_bp_filt_noHsGns <- map(all_msc_bp_filt, ~pf_hs_gene_sum_fn(seurat_obj = .x))
-```
-
-```{r}
-saveRDS(all_msc_bp_filt_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS")
-```
-
-```{r}
-## Count the pf and human genes and add to metadata for raw set and also remove human genes
-all_msc_bp_raw_noHsGns <- map(all_msc_bp_raw, ~pf_hs_gene_sum_fn(seurat_obj = .x))
-```
-
-```{r}
-saveRDS(all_msc_bp_raw_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
-```
 
 Save paths to raw MSC files in list - also needed for soupX below
 ```{r}
-imap(all_msc_bp_filt, ~{
-  .x@meta.data %>%
+imap(all_msc_bp_filt_noHsGns_mdata, ~{
+  # .x@meta.data %>%
+  .x %>%
     ggplot(aes(x = log10(pf_umi_count), y = log10(hs_umi_count))) +
     geom_point() +
     geom_hline(yintercept = log10(400)) +
@@ -751,8 +240,9 @@ imap(all_msc_bp_filt, ~{
 ```
 
 ```{r}
-imap(all_msc_bp_raw, ~{
-  .x@meta.data %>%
+imap(all_msc_bp_raw_noHsGns_mdata, ~{
+  # .x@meta.data %>%
+  .x %>%
     filter(pf_umi_count > 50) %>%
     ggplot(aes(x = log10(pf_umi_count), y = log10(hs_umi_count))) +
     geom_point(size = 0.01) +
@@ -774,7 +264,7 @@ Save paths to raw MSC files in list - also needed for soupX below
 
 
 ```{r}
-edrops_cbender_mdata <- pmap(list(processed_data_noretain_50, all_cbender_mdata, all_msc_bp_filt, all_msc_bp_raw), ~{
+edrops_cbender_mdata <- pmap(list(processed_data_noretain_50, all_cbender_mdata, all_msc_bp_filt_noHsGns_mdata, all_msc_bp_raw_noHsGns_mdata), ~{
   ..1 %>% 
     data.frame() %>% 
     mutate(is_cell = ifelse(FDR <= 0.01, "CellEd", "nonCell")) %>%
@@ -784,13 +274,14 @@ edrops_cbender_mdata <- pmap(list(processed_data_noretain_50, all_cbender_mdata,
                                            T ~ "nonCell")),
               by = c("Barcode" = "barcode"),
               suffix = c("_ed", "_cb")) %>%
-    full_join(..3@meta.data %>% 
+    full_join(#..3@meta.data %>% 
+              ..3 %>% 
                 rownames_to_column("bcode") %>% 
                 mutate("is_cell_cr" = "CellCr") %>% 
                 .[,c("bcode", "is_cell_cr")],
               .,
               by = c("bcode" = "Barcode")) %>%
-    left_join(., ..4@meta.data[, c("nFeature_RNA", "nCount_RNA", "pf_umi_count", "hs_umi_count", "pf_gn_count", "hs_gn_count")] %>% 
+    left_join(., ..4[, c("nFeature_RNA", "nCount_RNA", "pf_umi_count", "hs_umi_count", "pf_gn_count", "hs_gn_count")] %>% 
                 rownames_to_column("bcode"),
               by = c("bcode" = "bcode"))
     
@@ -968,6 +459,30 @@ map(edrops_cbender8_pf100_mdata_uni, ~.x %>% count(mthds_union)) %>%
 ```
 
 
+```{r}
+edrops_cbender_pf100_mdata_uni <- map(edrops_cbender_mdata_uni, ~.x %>% filter(pf_umi_count >= 100))
+```
+
+```{r, fig.width=10, fig.height=5}
+map(edrops_cbender_pf100_mdata_uni, ~.x %>% 
+      filter(mthds_union != "Ed") %>%
+      mutate("mthds_union_CbCr" = str_remove(mthds_union, "Ed")) %>% 
+      count(mthds_union_CbCr)) %>%
+  bind_rows(., .id = "donor") %>%
+  ggplot(aes(y = n/1000, x = mthds_union_CbCr, fill = mthds_union_CbCr)) +
+  geom_col() +
+  # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+  geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = 3.8, show.legend = F)+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.5))) +
+  facet_wrap(. ~ donor, ncol = 10, scales = "free_y") +
+  # facet_wrap(. ~ donor, ncol = 7) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(size = 13),
+        legend.position = "bottom")
+
+
+```
 
 
 ```{r, fig.width=10, fig.height=4}
@@ -1077,23 +592,20 @@ Run souporcell like below for the filtered barcodes of pf in mixed infections
 
 ```{r}
 # Add emptydrops metadata
-all_msc_bp_raw <- pmap(list(edrops_cbender_pf100_mdata, all_msc_bp_raw[names(edrops_cbender_pf100_mdata)]), ~{
+all_msc_bp_raw_noHsGns_mdata <- pmap(list(edrops_cbender_pf100_mdata, all_msc_bp_raw_noHsGns_mdata[names(edrops_cbender_pf100_mdata)]), ~{
   ..1 %>% 
-    column_to_rownames("bcode") %>%
-    # select(mthds_union) %>%
-    AddMetaData(..2, .) 
+    select(bcode, is_cell_cr, FDR, is_cell_ed, cell_probability, is_cell_cb) %>%
+    full_join(..2 %>% rownames_to_column("bcode"), by = "bcode") 
     
 })
 ```
 
 
-
-
 ```{r, message=F, warning=F, eval=T}
 ##Read BPcells matrices
-all_msc_raw_mdata <- map(all_msc_bp_raw, ~.x@meta.data %>% 
+all_msc_raw_mdata <- map(all_msc_bp_raw_noHsGns_mdata, ~.x %>% 
                            filter(nCount_RNA > 1) %>%
-                           rownames_to_column("bcode")  %>%
+                           column_to_rownames("bcode")  %>%
                            mutate(across(contains("is_cell"), ~replace_na(., "empty_bc")))
                          ) 
 ```
@@ -1139,6 +651,41 @@ strn_knee_p_10_fn <- function(dset = seu_mdata, donor_nm,  ft_count = "nCount_RN
 
 
 ```
+
+
+
+```{r, fig.height= 4, fig.width= 4, eval=T, fig.width=6, fig.height=4}
+map(edrops_cbender_mdata_uni, ~.x %>% 
+  filter(pf_umi_count < 1000) %>%
+  ggplot(aes(x = log10(hs_umi_count), y = log10(pf_umi_count), color= is_cell_cb)) +
+  geom_point(size = 0.01) +
+  geom_hline(yintercept = c(log10(100),log10(250)))
+)
+
+```
+
+```{r, fig.height= 4, fig.width= 4, eval=T, fig.width=6, fig.height=4}
+map(all_msc_raw_mdata, ~.x %>% 
+  filter(pf_umi_count < 1000) %>%
+  ggplot(aes(x = is_cell_cb, y = pf_umi_count)) +
+  geom_sina(size = 0.01) +
+  geom_hline(yintercept = c(100,250))
+)
+
+```
+
+
+```{r, fig.height= 4, fig.width= 4, eval=T, fig.width=15, fig.height=8}
+map(all_msc_raw_mdata, ~.x %>% 
+  filter(nCount_RNA < 1000) %>%
+  ggplot(aes(x = is_cell_cb, y = nCount_RNA)) +
+  geom_sina(size = 0.01) +
+  geom_hline(yintercept = 250)
+)
+
+```
+
+
 
 Find gene count cut offs
 ```{r, fig.height= 4, fig.width= 4, eval=T}
@@ -1523,13 +1070,13 @@ map(c("frac_load", "p_map_cat", "peak", "overload")[1:2], ~{
 
 
 ```{r}
-# all_msc_bp_edrops50 <- map(all_msc_bp_raw, ~subset(.x, subset = Is_Cell_100 == "Cell"))
-all_msc_bp_edrops50 <- map(all_msc_bp_raw, ~subset(.x, subset = is_cell_ed == "CellEd"))
+# all_msc_bp_edrops50 <- map(all_msc_bp_raw_noHsGns, ~subset(.x, subset = Is_Cell_100 == "Cell"))
+all_msc_bp_edrops50 <- map(all_msc_bp_raw_noHsGns, ~subset(.x, subset = is_cell_ed == "CellEd"))
 all_msc_bp_edrops50
 ```
 
 ```{r}
-all_msc_bp_cbendr <- map(all_msc_bp_raw, ~subset(.x, subset = is_cell_cb == "CellCb.5" | is_cell_cb == "CellCb.8"))
+all_msc_bp_cbendr <- map(all_msc_bp_raw_noHsGns, ~subset(.x, subset = is_cell_cb == "CellCb.5" | is_cell_cb == "CellCb.8"))
 ```
 
 
@@ -1570,7 +1117,7 @@ map(all_msc_bp_cbendr, ~{table(.x@meta.data$nFeature > 100)})
 
 
 ```{r, eval=T}
-cell_counts <- pmap(list(all_msc_bp_raw, all_msc_bp_filt, all_msc_bp_edrops50, all_msc_bp_cbendr), ~{
+cell_counts <- pmap(list(all_msc_bp_raw_noHsGns, all_msc_bp_filt_noHsGns_mdata, all_msc_bp_edrops50, all_msc_bp_cbendr), ~{
   data.frame("raw" = dim(..1)[2], "cr_filt" = dim(..2)[2], "edrops50" = dim(..3)[2], "cbendr" = dim(..4)[2])
   
 }) %>%
@@ -1583,6 +1130,9 @@ cell_counts <- pmap(list(all_msc_bp_raw, all_msc_bp_filt, all_msc_bp_edrops50, a
 cell_counts
 ```
 
+```{r, eval=T}
+gogo()
+```
 
 
 ```{r, eval=T}
@@ -1597,11 +1147,32 @@ for (i in 1:length(sample_name)) {
 
 ```
 
+
+```{r}
+all_msc_bp_filt_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS")
+```
+
+```{r}
+all_msc_bp_raw_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+```
+
+
+```{r}
+# Add emptydrops metadata
+all_msc_bp_raw_noHsGns <- pmap(list(edrops_cbender_pf100_mdata, all_msc_bp_raw_noHsGns[names(edrops_cbender_pf100_mdata)]), ~{
+  ..1 %>% 
+    column_to_rownames("bcode") %>%
+    # select(mthds_union) %>%
+    AddMetaData(..2, .) 
+    
+})
+```
+
 Remove cells with less than 100 pf reads
 ```{r, eval=T}
 ##write out for normalization processing in farm
 # all_msc_bp_filt_pf100
-all_msc_bp_filt_pf100 <- map(all_msc_bp_filt, ~subset(.x, subset = pf_umi_count >= 100))
+all_msc_bp_filt_pf100 <- map(all_msc_bp_filt_noHsGns, ~subset(.x, subset = pf_umi_count >= 100))
 
 ```
 
@@ -1619,11 +1190,11 @@ all_msc_bp_filt_pf100 <- list(all_msc_bp_filt_pf100, all_cbender_mdata, edrops_c
 ```
 
 ```{r}
-all_msc_bp_cbcr <- pmap(list(all_msc_bp_raw, all_msc_bp_cbendr, all_msc_bp_filt_pf100), ~subset(..1, cells = unique(c(colnames(..2), colnames(..3)))))
+all_msc_bp_cbcr <- pmap(list(all_msc_bp_raw_noHsGns, all_msc_bp_cbendr, all_msc_bp_filt_pf100), ~subset(..1, cells = unique(c(colnames(..2), colnames(..3)))))
 ```
 
 ```{r, eval=T}
-rm(all_msc_bp_raw)
+rm(all_msc_bp_raw_noHsGns)
 ```
 
 ```{r, message=FALSE}

@@ -1,0 +1,200 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(dreamlet)
+  library(muscat)
+  library(ExperimentHub)
+  library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(BiocParallel)
+  library(ggh4x)
+  library(condiments)
+  library(DESeq2)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
+  
+})
+```
+
+
+#  integration of all MSC
+
+### Common functions
+## setup 
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+
+```{r setup}
+
+# optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =5, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+
+```
+
+
+Integrated asexual
+```{r}
+m2_lasse_asex_harmony_pc_noM55_pt <- readRDS("data/processed/Pf/m2_lasse_asex_harmony_pc_noM55_pt.RDS")
+
+```
+
+
+
+```{r}
+## Creating new stage variables which are need to fit in with old code
+v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data %>% 
+  mutate(StageFL = stage,
+         StageFL_ND = stage,
+         dset = dset_labmrg,
+         StrainDon = paste0(str_remove(donor, "SC"), "_", Strain_DN),
+         pseudotime = slingPseudotime_1,
+         pseudotime_fld_only = slingPseudotime_1,
+         stage = stage,
+         strain = Strain_DN) %>% 
+  select(StageFL, StageFL_ND, dset,StrainDon,pseudotime, pseudotime_fld_only,  strain) %>% 
+  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, .)
+```
+
+
+Visualize all cells including mixed infections
+```{r, fig.width=3, fig.height=3.5}
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, split.by = "dset", reduction = "umap.harmony_pc_man", group.by = "StageFL_ND", pt.size = 0.1) + 
+  scale_color_manual(values = sp_fld_colors)+
+  theme(legend.position = "none", 
+        axis.text = element_blank(), 
+        plot.title  = element_blank())+
+  # guides(x = "axis_nested") +
+  labs(x = "UMAP_1", y="UMAP_2") 
+```
+
+###################### PSEUDOTIME CHUNKING START - SEU  ############################################
+
+## pseudotime chunks used for all the DE methods below and can be used for DEseq2 above as well
+### Calculate pseudotime chunks
+```{r}
+##Generate pseudotime chunks categories with range of highest and lowest pseudotime values and breaks numbers to ensure balanced representation of cells and drop the cells without strain information
+cat_n<-3
+
+##Remove those without pseudotime
+m2_asex_harmony_tr_pt_chunks <- m2_asex_harmony_tr[,!is.na(m2_asex_harmony_tr@meta.data[,'pseudotime'])]
+
+      # print(sce_obj)
+m2_asex_harmony_tr_pt_chunks@meta.data[,c('PT_grp_unbal', 'PT_grp')] <- m2_asex_harmony_tr_pt_chunks@meta.data[,c( "pseudotime"), drop=F] %>%
+        data.frame() %>% 
+        mutate(PT_grp_unbal = cut(!!rlang::sym("pseudotime"),  
+                               breaks = c(-Inf, seq(min(!!rlang::sym("pseudotime")),  max(!!rlang::sym("pseudotime")), round((max(!!rlang::sym("pseudotime")) - min(!!rlang::sym("pseudotime")))/cat_n, 2)), Inf)),
+               pt_rank = dense_rank(!!rlang::sym("pseudotime")),
+               PT_grp = cut(pt_rank,  
+                               breaks = c(-Inf, seq(min(pt_rank),  max(pt_rank), round((max(pt_rank) - min(pt_rank))/cat_n, 2)), Inf))
+               ) %>%
+  mutate(ptime_grp_rnk = dense_rank(factor(PT_grp_unbal)),
+         ptime_bal_grp_rnk = dense_rank(factor(PT_grp)),
+         PT_grp_unbal = paste0("PT.", ptime_grp_rnk-1),
+         PT_grp = paste0("PT.", ptime_bal_grp_rnk-1)
+         ) %>%
+        dplyr::select(PT_grp_unbal, PT_grp)
+
+```
+
+
+```{r}
+DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_pc_man", group.by = "PT_grp")
+```
+
+
+```{r}
+m2_asex_harmony_tr_pt_chunks@meta.data[,c("PT_grp", "donor")] %>% as.data.frame() %>% dplyr::count(PT_grp)
+```
+
+```{r}
+DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_pc_man", group.by = "PT_grp_unbal")
+```
+
+```{r}
+m2_asex_harmony_tr_pt_chunks@meta.data[,c("PT_grp_unbal", "donor")] %>% as.data.frame() %>% dplyr::count(PT_grp_unbal)
+```
+
+```{r}
+# m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp_unbal %in% c("PT.3", "PT.4", "PT.5", "PT.6", "PT.7")]
+m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp %in% c("PT.1", "PT.2", "PT.3")]
+```
+
+```{r}
+m2_asex_harmony_tr_pt_sset@meta.data[,c("PT_grp", "donor")] %>% as.data.frame() %>% dplyr::count(donor, PT_grp)%>% group_by(donor) %>% mutate(prop = round(n/sum(n), digits = 2))
+```

@@ -115,13 +115,13 @@ Transfer clusters.tsv files with assignment of cells to strains and PCA plots me
 
 ```{r}
 
-slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
-## get relevant sample names
-pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
-
-##Sample ID
-sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
-smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+# slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+# ## get relevant sample names
+# pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+# 
+# ##Sample ID
+# sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+# smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
 
 ```
 
@@ -132,6 +132,36 @@ smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
 # sample_name <- sample_name[!(sample_name %in% poorQC_samples)] %>% str_sort(., numeric = T)
 ```
 
+```{r}
+
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+# slct_sample_names <-c("MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
+
+
+# ## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# 
+# # slct_sample_names[-c(sample_rm)]
+slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+## get relevant sample names
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+
+##Sample IDs
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
+
+```
+
+```{r, message=F, warning=F, eval=T}
+## Save manual selection of thresholds
+man_thresh <- readRDS("data/processed/Pf/m2_all/man_thresh.RDS")
+```
+
 Read in seurat objects processed in farm
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
@@ -139,21 +169,109 @@ Read in seurat objects processed in farm
 
 sample_names <- rep(sample_name, 2) 
 # sample_name_all <- c(sample_name, paste0(sample_name, "_150"), paste0(sample_name, "_edrops50"))
-sample_name_all <- c(paste0(sample_name, "_cr"), paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+# sample_name_all <- c(paste0(sample_name, "_cr"), paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+sample_name_all <- c(paste0(sample_name, "_cr"), paste0(sample_name, "_edrops", man_thresh[sample_name]), paste0(sample_name, "_cbendr"))
+
+```
+
+
+
+###### Compare cellranger and cellbender for MSC33 and MSC50_SLO since these are strange samples with some cells missing in cellbender but in present in cellranger and emptydrops
+```{r, message=F, warning=F}
+slct_sample_names_33_50 <-c("MSC50_SLO", "MSC33", "MSC70") %>% str_sort(., numeric = T)
+sample_name_cr_cb_33_50 <- c(paste0(slct_sample_names_33_50, "_cr"), paste0(slct_sample_names_33_50, "_cbendr"))
+sample_name_cr_cb_33_50
+```
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_seu_prelim_stg_norm_m55_M50SLO <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops50)_prelim_stg_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_prelim.*'))) %>% 
+# all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
+  .[sample_name_cr_cb_33_50] %>%
+  map(readRDS)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(all_seu_prelim_stg_norm_m55_M50SLO, ~DimPlot(.x, dims = c(1,2), label = F, group.by = "sR_fine_stg") + labs(title = .y) +scale_color_manual(values = sp_col_new))
+
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_gene_mdata_m55_M50SLO <- list.files("data/processed/Pf", pattern = "cb_gene_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender/cb_gene_mdata.*'))) %>% 
+  .[slct_sample_names_33_50] %>%
+  .[!is.na(.)] %>%
+  map(read_csv) 
+```
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_gene_mdata_m55_M50SLO[["MSC33"]] %>% arrange(desc(ambient_expression)) 
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_mdata_m55_M50SLO <- list.files("data/processed/Pf", pattern = "cb_mdata.csv$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/cbender/cb_mdata.*'))) %>% 
+  .[slct_sample_names_33_50] %>%
+  .[!is.na(.)] %>%
+  map(read_csv) 
+```
+
+
+```{r, message=F, warning=F, eval=T}
+##Read BPcells matrices
+all_cbender_mdata_m55_M50SLO[["MSC33"]] %>% head
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_seu_prelim_stg_norm_m33_cr <- all_seu_prelim_stg_norm_m55_M50SLO[['MSC33_cr']]@meta.data %>%
+  rownames_to_column('barcode') %>%
+  mutate("in_cb" = ifelse(barcode %in% colnames(all_seu_prelim_stg_norm_m55_M50SLO[['MSC33_cbendr']]), "yes", "no")) %>% 
+  left_join(., all_cbender_mdata_m55_M50SLO[['MSC33']], by = "barcode", suffix = c(".x", ".y")) %>%
+  column_to_rownames('barcode') %>%
+  select(in_cb, contains(".y")) %>%
+  AddMetaData(all_seu_prelim_stg_norm_m55_M50SLO[['MSC33_cr']],. )
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_seu_prelim_stg_norm_m33_cr, dims = c(1,2), label = F, group.by = "in_cb") 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_seu_prelim_stg_norm_m33_cr@meta.data %>% 
+  ggplot(aes(x = in_cb, y = background_fraction.y)) +
+  geom_boxplot()
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(all_seu_prelim_stg_norm_m55_M50SLO, ~DimPlot(.x, dims = c(1,2), label = F, group.by = "sR_fine_stg") + labs(title = .y) +scale_color_manual(values = sp_col_new))
 
 ```
 
 
 ```{r, message=F, warning=F}
 # slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
-sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+# sample_name_ed_cr <- c(paste0(sample_name, "_edrops50"), paste0(sample_name, "_cbendr"))
+sample_name_ed_cr <- c(paste0(sample_name, "_edrops", man_thresh[sample_name]), paste0(sample_name, "_cbendr"))
+
 sample_name_ed_cr
 ```
 
-
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops50)_prelim_stg_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_seu_prelim_stg_norm <- list.files("data/processed/Pf", pattern = "bpseu_(cr|cbendr|edrops[0-9]+)_prelim_stg_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpseu|_prelim.*'))) %>% 
 # all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
@@ -270,69 +388,6 @@ std_theme <- theme(axis.text=element_text(size=18),
 # gogo()
 ```
 
-## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
-```{r, eval=FALSE}
-## !!!!!!NB -CONSIDER FORE REMOVAL LATER
-#filter out cells with high ncountRNA 
-# all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
-#   map2(., ncount_filt, ~.x  %>%
-#          subset(., nCount_RNA < .y )
-#   )
-
-```
-
-Get mt_filt based on automatic removal of quantiles
-```{r}
-all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm%>% 
-  map(., ~{
-    
-    mit_fts <- rownames(.x)[str_detect(rownames(.x), "MIT")]
-    api_fts <- rownames(.x)[str_detect(rownames(.x), "API")]
-    
-    .x %>% PercentageFeatureSet(., features = mit_fts, col.name = 'percent.mt') %>%
-    PercentageFeatureSet(., features = api_fts, col.name = 'percent.api') 
-})
-
-```
-
-```{r}
-mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.995, na.rm = T)))
-# mt_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.mt"], 0.99, na.rm = T)))
-# api_filt <- unlist(map(all_seu_prelim_stg_norm, ~quantile(.x@meta.data[, "percent.api"], 0.995, na.rm = T)))
-
-```
-
-
-```{r, results='asis'}
-pmap(list(all_seu_prelim_stg_norm, mt_filt, names(all_seu_prelim_stg_norm)), ~{
-    FeatureScatter(..1, feature1 = "nCount_RNA", feature2 = "percent.mt", group.by = "sR_fine_stg", pt.size = 1)+ 
-      scale_color_manual(values = sp_col_new) +
-      geom_hline(yintercept = ..2)  +
-      labs(title = ..3) +
-      std_theme
-
-  })
-
-```
-
-```{r}
-map2(all_seu_prelim_stg_norm, mt_filt, ~.@meta.data %>% dplyr::count(percent.mt>.y ))
-```
-
-## !!!!!!NB - RECONSIDER FILTRATION PROPERLY LATER
-```{r, eval=FALSE}
-## !!!!!!NB -CONSIDER FORE REMOVAL LATER
-#filter out cells with high mitochondrial count
-all_seu_prelim_stg_norm <- all_seu_prelim_stg_norm %>%
-  map2(., mt_filt, ~.x  %>%
-         subset(., percent.mt < .y )
-  )
-
-```
-
-
-
-
 
 ```{r, warning=FALSE, message=FALSE, fig.width=4, fig.height=4.5}
 ## in cellbender but not in edrops
@@ -390,7 +445,7 @@ plts[[29]]
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=4}
-imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 4) + 
+imap(all_seu_prelim_stg_norm, ~FeaturePlot(.x, label = T, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2) + 
        labs(title = .y) )
 
 ```

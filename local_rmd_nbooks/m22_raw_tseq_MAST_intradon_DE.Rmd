@@ -1,0 +1,1838 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  # library(dreamlet)
+  # library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#  integration of all MSC
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+```{r}
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =7, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =1, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+```
+
+Integrated asexual
+```{r}
+## subset where field parasites are for slingshot
+# all_asex_merged_int_no_actv_harmony_pt2 <- readRDS("data/processed/Pf/m2_all/all_asex_merged_int_no_actv_harmony_pt2.RDS")
+# m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony_pt.RDS")
+# m2_scvi_asex_noM12_harmony <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony.RDS")
+# m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
+m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/asex_noM55_jcC_harmony_no_comtd_pt.RDS")
+
+
+```
+
+```{r}
+## subset where field parasites are for slingshot
+# m2_scvi_asex_noM12_harmony_pt2 <- readRDS("data/processed/Pf/m2_all/m2_scvi_asex_noM12_harmony_pt2.RDS")
+# m2_scvi_asex_noM12_harmony_sce_ss <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony_sce_ss.RDS")
+# m2_scvi_asex_noM12_harmony_sce_ss <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_sce_ss.RDS")
+m2_scvi_asex_noM12_harmony_sce_ss <- readRDS("data/processed/Pf/asex_noM55_jcC_harmony_no_comtd_sce_ss3.RDS")
+
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+##Generate pseudotime chunks categories with range of highest and lowest pseudotime values and breaks numbers to ensure balanced representation of cells and drop the cells without strain information
+
+ptime_chunk_calc_fn <- function(sce_obj, ptime, chunk_num) {
+  # v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[,c('ptime_cat', 'ptime_bal_cat')] 
+  sce_obj@colData[,c('ptime_cat', 'ptime_bal_cat')] <- sce_obj@colData[,c( ptime), drop=F] %>%
+          data.frame() %>% 
+          mutate(ptime_cat = cut(!!rlang::sym(ptime),  
+                                 breaks = c(-Inf, seq(min(!!rlang::sym(ptime)),  max(!!rlang::sym(ptime)), round((max(!!rlang::sym(ptime)) - min(!!rlang::sym(ptime)))/chunk_num, 2)), Inf)),
+                 pt_rank = dense_rank(!!rlang::sym(ptime)),
+                 ptime_bal_cat = cut(pt_rank,  
+                                 breaks = c(-Inf, seq(min(pt_rank),  max(pt_rank), round((max(pt_rank) - min(pt_rank))/chunk_num, 2)), Inf))
+                 ) %>%
+    mutate(ptime_grp_rnk = dense_rank(factor(ptime_cat)),
+           ptime_bal_grp_rnk = dense_rank(factor(ptime_bal_cat)),
+           ptime_cat = factor(paste0("ptime_", ptime_grp_rnk), levels = paste0("ptime_", 1:max(ptime_grp_rnk)) ),
+           ptime_bal_cat = factor(paste0("ptime_", ptime_bal_grp_rnk), levels = paste0("ptime_", 1:max(ptime_bal_grp_rnk)) )
+           ) %>%
+          dplyr::select(ptime_cat, ptime_bal_cat)
+  
+  return(sce_obj)
+}
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Calculate pseudotime chunks
+m2_scvi_asex_noM12_harmony_sce_ss<- ptime_chunk_calc_fn(sce_obj = m2_scvi_asex_noM12_harmony_sce_ss, ptime = "slingPseudotime_1", chunk_num = 60)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+## subset cells that contain 2 or more sbp1 and cells that contain 2 or more ap2g UMI
+
+ap2g_cells_all <- subset(m2_scvi_asex_noM12_harmony_pt, subset= `PF3D7-1222600` > 0, slot = 'counts')
+
+```
+
+
+```{r}
+m2_scvi_asex_noM12_harmony_sce_ss@colData[,c('ap2g_exp_all')] <- ifelse(colnames(m2_scvi_asex_noM12_harmony_sce_ss) %in% colnames(ap2g_cells_all), "yes", "no")
+```
+
+
+```{r}
+m2_scvi_asex_noM12_harmony_sce_ss@colData[,c('ap2g_exp_all', 'stage')] %>% as.data.frame() %>% count(stage, ap2g_exp_all) %>% group_by(stage) %>% mutate(prop = round(n/sum(n), 2))
+```
+
+```{r}
+DimPlot(m2_scvi_asex_noM12_harmony_pt, cells.highlight = colnames(m2_scvi_asex_noM12_harmony_pt[,m2_scvi_asex_noM12_harmony_pt$stage == "Gametocyte (developing)"]), reduction = 'umap.harmony_pc_man')
+
+```
+
+```{r}
+m2_scvi_asex_noM12_harmony_sce_ss@colData[,c('ap2g_or_dev_gam')] <- ifelse(colnames(m2_scvi_asex_noM12_harmony_sce_ss) %in% colnames(ap2g_cells_all) | m2_scvi_asex_noM12_harmony_sce_ss@colData[, 'stage'] == "Gametocyte (developing)", "yes", "no")
+```
+
+```{r}
+m2_scvi_asex_noM12_harmony_sce_ss@colData[,c('ap2g_exp_all', 'ap2g_or_dev_gam')] %>% as.data.frame() %>% count(ap2g_exp_all, ap2g_or_dev_gam)
+```
+
+######################### START - Unbalanced alternative to increase power ###########
+```{r, warning=FALSE, message=FALSE}
+# Chunks where theres more than 20 of GamPos cells
+# ap2g_pos_n <- m2_scvi_asex_noM12_harmony_sce_ss@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>%
+ap2g_pos_n <- m2_scvi_asex_noM12_harmony_sce_ss@colData[, c('ap2g_or_dev_gam', 'ptime_bal_cat')] %>%
+  data.frame()  %>%
+  rownames_to_column('bcode')  %>% 
+  # filter(ap2g_exp_all == "yes") %>% 
+  # count(ap2g_exp_all, ptime_bal_cat)  
+  filter(ap2g_or_dev_gam == "yes") %>% 
+  count(ap2g_or_dev_gam, ptime_bal_cat) 
+
+ap2g_pos_n
+
+ap2g_pos_n_lm <-ap2g_pos_n %>% filter(n >=10)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+m2_scvi_asex_noM12_harmony_sce_ss_unbal <- m2_scvi_asex_noM12_harmony_sce_ss[, m2_scvi_asex_noM12_harmony_sce_ss@colData$ptime_bal_cat %in% ap2g_pos_n_lm$ptime_bal_cat]
+
+# m2_scvi_asex_noM12_harmony_sce_ss_unbal@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>% data.frame() %>% count(ptime_bal_cat, ap2g_exp_all)
+m2_scvi_asex_noM12_harmony_sce_ss_unbal@colData[, c('ap2g_or_dev_gam', 'ptime_bal_cat')] %>% data.frame() %>% count(ptime_bal_cat, ap2g_or_dev_gam)
+
+```
+
+######################### END - Unbalanced alternative to increase power ###########
+
+
+```{r, warning=FALSE, message=FALSE}
+# gogo()
+
+```
+
+
+```{r}
+##Subsample the cells within pseudotime chunks calculated above to ensure balanced representation of field and lab cells along trajectories 
+
+# ds_grp <- c("ap2g_exp_all")
+
+balanced_cells_fn <- function(sce_obj, dsample_condtn, ptime_strategy, multpl=1) {
+  
+  set.seed(989778)
+  
+  ##Revert order in filter https://stackoverflow.com/questions/70951525/filter-dataframe-within-a-group-with-one-column-meeting-an-and-condition-in-r
+  # balanced_cells_tbl_str <- list(msc14_sub_sce_unbal_ptchunks, grps, grps2)  %>%
+  balanced_cells_tbl_str <- m2_scvi_asex_noM12_harmony_sce_ss@colData[,c('ptime_cat', 'ptime_bal_cat', dsample_condtn, 'donor')] %>% 
+      as.data.frame() %>% 
+      rownames_to_column('cell_bc') %>% 
+      # group_by(across(all_of(c(ptime_strategy, dsample_condtn)))) %>% 
+      group_by(across(all_of(c(ptime_strategy, 'donor', dsample_condtn)))) %>% 
+      mutate(cnt  = sum(!is.na(!!rlang::sym(dsample_condtn)))) %>% 
+               # group_by(across(all_of(c(ptime_strategy)))) %>% 
+               group_by(across(all_of(c(ptime_strategy, 'donor')))) %>% 
+               mutate(max_cnt = max(cnt)) %>% 
+               mutate(max2_cnt = max(cnt[cnt != max_cnt], na.rm = TRUE)*multpl) %>%
+               # group_by(ptime_bal_cat, !!rlang::sym(dsample_condtn)) %>% 
+               group_by(!!rlang::sym(ptime_strategy), donor, !!rlang::sym(dsample_condtn)) %>% 
+               mutate(samp = sample(n())) %>%
+               mutate(samp = sample(n())) %>%
+               filter(samp <= max2_cnt) %>%
+               ungroup() #%>%
+               # mutate(across(ptime_bal_cat, droplevels))
+  
+  
+  ##Subset the balanced cells for the 3 objects
+  # m2_asex_ap2g_bal_sce <- m2_scvi_asex_noM12_harmony_sce_ss[,balanced_cells_tbl_str$cell_bc]
+  
+  return(balanced_cells_tbl_str)
+
+}
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# bal_cells_df <- balanced_cells_fn(sce_obj = m2_scvi_asex_noM12_harmony_sce_ss, dsample_condtn = "ap2g_exp_all" , ptime_strategy = "ptime_bal_cat", multpl = 1)
+bal_cells_df <- balanced_cells_fn(sce_obj = m2_scvi_asex_noM12_harmony_sce_ss, dsample_condtn = "ap2g_or_dev_gam" , ptime_strategy = "ptime_bal_cat", multpl = 1)
+# bal_cells_df <- balanced_cells_fn(sce_obj = m2_scvi_asex_noM12_harmony_sce_ss, dsample_condtn = "Strain_DN" , ptime_strategy = "ptime_bal_cat", multpl = 1)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+######################### !!!!!NOTE - Unbalanced alternative to increase power replacing balanced with unbalanced - switch to return balanced or viceversa 
+m2_asex_ap2g_bal_sce <- m2_scvi_asex_noM12_harmony_sce_ss[, bal_cells_df$cell_bc]
+# m2_asex_ap2g_bal_sce <- m2_scvi_asex_noM12_harmony_sce_ss_unbal
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# m2_asex_ap2g_bal_sce$donor <- str_remove_all(m2_asex_ap2g_bal_sce$orig.ident, "SC|.mrna")
+m2_asex_ap2g_bal_sce$donor <- str_remove_all(m2_asex_ap2g_bal_sce$orig.ident, ".mrna")
+
+```
+
+```{r, results="asis", eval=T}
+# balanced_cells_tbl_str %>% count(ptime_bal_cat, ap2g_exp_all)
+```
+
+### Retain cells with strains having more than 10 in each stage
+
+
+```{r}
+# m2_asex_ap2g_bal_sce <- m2_asex_ap2g_bal_sce[, m2_asex_ap2g_bal_sce@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>% 
+m2_asex_ap2g_bal_sce <- m2_asex_ap2g_bal_sce[, m2_asex_ap2g_bal_sce@colData[, c('ap2g_or_dev_gam', 'ptime_bal_cat')] %>% 
+                                               data.frame()  %>% 
+                                               rownames_to_column('bcode') %>% 
+                                               group_by(ptime_bal_cat) %>% 
+                                               # filter(n() >=20) %>% 
+                                               filter(n() >=100) %>% 
+                                               pull(bcode)]
+
+# table(m2_asex_ap2g_bal_sce@colData[, 'ap2g_exp_all'])
+table(m2_asex_ap2g_bal_sce@colData[, 'ap2g_or_dev_gam'])
+```
+
+```{r, results="asis", eval=T}
+# m2_asex_ap2g_bal_sce@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>% data.frame() %>% count(ptime_bal_cat, ap2g_exp_all)
+m2_asex_ap2g_bal_sce@colData[, c('ap2g_or_dev_gam', 'ptime_bal_cat')] %>% data.frame() %>% count(ptime_bal_cat, ap2g_or_dev_gam)
+
+```
+
+
+```{r}
+m2_asex_ap2g_bal_sce@colData[,c('ap2g_or_dev_gam', 'donor')] %>% as.data.frame() %>% count(donor, ap2g_or_dev_gam)
+```
+
+```{r, results="asis", fig.width=4, fig.height=3}
+
+tm <- theme_classic()+
+  theme(axis.text=element_blank(), 
+        axis.title=element_blank(),
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size =15, face = "bold") )
+
+gbox_theme<- theme(axis.text=element_text(size=15),
+        axis.title=element_text(size=15,face="bold"), 
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold"),
+        legend.position = "bottom")
+        
+dens_thme <- theme(axis.text=element_text(size=22),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=22,face="bold"), 
+        legend.text = element_text(size = 15) ,
+        legend.title = element_text(size = 15, face = "bold"),
+        legend.position = "bottom")
+
+
+
+```
+
+```{r, results="asis", fig.width=5, fig.height=3.5}
+library("ggpubr")
+
+# umap_meta_df <- reducedDims(m2_scvi_asex_noM12_harmony_sce_ss)$UMAP[,c(1,2)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_scvi_asex_noM12_harmony_sce_ss@colData[,c("slingPseudotime_1", "orig.ident", "StrainDon", "ap2g_exp_all", "donor")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") 
+umap_meta_df <- reducedDims(m2_scvi_asex_noM12_harmony_sce_ss)$UMAP.HARMONY_PC_MAN[,c(1,2)] %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_scvi_asex_noM12_harmony_sce_ss@colData[,c("slingPseudotime_1", "orig.ident", "ap2g_or_dev_gam", "donor")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") 
+
+tbl = umap_meta_df[umap_meta_df$cell_bc %in% colnames(m2_asex_ap2g_bal_sce),]
+
+tbl %>%
+  ggplot(., aes(x = slingPseudotime_1, col=ap2g_or_dev_gam, fill=ap2g_or_dev_gam)) + 
+  geom_density(aes(y = ..count..*0.3), size=2, bw = 0.3, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  dens_thme +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+
+tbl %>%
+  ggboxplot(., y = "slingPseudotime_1",x="ap2g_or_dev_gam", col="ap2g_or_dev_gam") + 
+  stat_compare_means(method = "wilcox.test") +gbox_theme
+
+
+```
+
+
+```{r}
+## plot balanced symptomatic vs assymptomatic by pseudotime
+m2_scvi_asex_noM12_harmony_bal <- m2_scvi_asex_noM12_harmony_pt[,colnames(m2_asex_ap2g_bal_sce)]
+m2_scvi_asex_noM12_harmony_bal@meta.data$pseudotime <- m2_asex_ap2g_bal_sce$slingPseudotime_1
+m2_scvi_asex_noM12_harmony_bal@meta.data$ptime_cat <- m2_asex_ap2g_bal_sce$ptime_cat
+m2_scvi_asex_noM12_harmony_bal@meta.data$ptime_bal_cat <- m2_asex_ap2g_bal_sce$ptime_bal_cat
+# m2_scvi_asex_noM12_harmony_bal@meta.data$ap2g_exp_all <- m2_asex_ap2g_bal_sce$ap2g_exp_all
+m2_scvi_asex_noM12_harmony_bal@meta.data$ap2g_or_dev_gam <- m2_asex_ap2g_bal_sce$ap2g_or_dev_gam
+m2_scvi_asex_noM12_harmony_bal$donor <- str_remove_all(m2_scvi_asex_noM12_harmony_bal$orig.ident, ".mrna")
+
+```
+
+```{r}
+# m2_scvi_asex_noM12_harmony_bal@meta.data$ap2g <- ifelse(m2_scvi_asex_noM12_harmony_bal@meta.data$ap2g_exp_all == "yes", "ap2gPos", "ap2gNeg")
+# m2_asex_ap2g_bal_sce$ap2g <- ifelse(m2_asex_ap2g_bal_sce$ap2g_exp_all == "yes", "ap2gPos", "ap2gNeg")
+
+m2_scvi_asex_noM12_harmony_bal@meta.data$gam <- ifelse(m2_scvi_asex_noM12_harmony_bal@meta.data$ap2g_or_dev_gam == "yes", "GamPos", "GamNeg")
+m2_asex_ap2g_bal_sce$gam <- ifelse(m2_asex_ap2g_bal_sce$ap2g_or_dev_gam == "yes", "GamPos", "GamNeg")
+
+```
+
+```{r}
+FeaturePlot(m2_scvi_asex_noM12_harmony_bal, reduction = "umap.harmony_pc_man", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "gam")
+
+```
+
+```{r}
+## plot balanced symptomatic vs assymptomatic by pseudotime
+# v3_m2_asex_harmony_ss_res_fld_pt_bal <- v3_m2_asex_harmony_ss_res_fld_pt[,colnames(m2_asex_sympto_bal_sce)]
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- m2_asex_sympto_bal_sce$slingPseudotime_1
+# v3_m2_asex_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- m2_asex_sympto_bal_sce$ptime_cat
+
+DimPlot(m2_scvi_asex_noM12_harmony_bal, reduction = "umap.harmony_pc_man", group.by = "ptime_bal_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "gam")
+
+```
+
+
+#### Put subseted objects into a list and calculate metrics need for plotting and tradeseq input
+```{r}
+str_cols = c("SC1" = "#dcbeff", "SC5" = "#008080")
+lins = rep(1,length(m2_asex_ap2g_bal_sce))
+# lins_m = rep(c(1,2),4)
+
+m2_asex_ap2g_bal_sds <- SlingshotDataSet(m2_asex_ap2g_bal_sce)
+m2_asex_ap2g_bal_ptime <- slingPseudotime(m2_asex_ap2g_bal_sce)[,1] 
+m2_asex_ap2g_bal_cw <- slingCurveWeights(m2_asex_ap2g_bal_sce)[,1]
+
+```
+
+
+
+```{r}
+## Batch design correction for tradeseq
+m2_asex_ap2g_bal_u_don <- model.matrix(~  donor, m2_asex_ap2g_bal_sce@colData[, c("donor", "gam")] %>% data.frame())
+
+# ## tradeseq manual example - Batch design correction for tradeseq
+# counts <- as.matrix(countMatrix)
+# 
+# batch <- factor(rep(c("A", "B"), each = ncol(counts)/2))
+# U <- model.matrix(~batch)
+# sceBatch <- fitGAM(counts = counts,
+#                    U = U,
+#                    sds = crv, 
+#                    nknots = 6, 
+#                    verbose = FALSE)
+```
+
+
+```{r}
+## create directory
+system(paste0("mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/"))
+
+saveRDS(m2_asex_ap2g_bal_sce, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_sce.RDS')
+
+saveRDS(m2_asex_ap2g_bal_ptime, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_ptime.RDS')
+
+saveRDS(m2_asex_ap2g_bal_cw, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_cw.RDS')
+
+saveRDS(m2_asex_ap2g_bal_u_don, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_u_don.RDS')
+
+```
+
+
+
+```{r, results="asis", eval=T}
+gogo()
+## Tradeseq script
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq_batch.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_batch_nf.R --condtn "gam" --knots "4" --gns_cut "5"  --resume
+
+```
+
+
+```{r, results="asis", eval=T}
+gogo()
+## Tradeseq script
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_nf.R --condtn "gam" --knots "4" --gns_cut "5"  --resume
+
+```
+
+```{r, results="asis", eval=T}
+m2_asex_ap2g_bal_batch_ts <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_batch_ts.RDS")
+m2_asex_ap2g_bal_batch_de <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/gam/m2_asex_ap2g_bal_batch_de.RDS")
+```
+
+
+```{r, results="asis", eval=T}
+m2_asex_ap2g_bal_batch_de %>% arrange(desc(waldStat))
+```
+
+```{r}
+##NOTE!!! replace the conditional test file with the newly generated one which applied 7 clusters
+##Ajusting the global and pairwise pvalues - old p values discarded
+m2_asex_ap2g_bal_batch_de <- m2_asex_ap2g_bal_batch_de %>%
+                             mutate(across(starts_with('pvalue'), ~p.adjust(., "fdr"))) %>%
+                             arrange(desc(waldStat)) %>%
+                             rownames_to_column('gene_id')
+
+```
+
+
+```{r}
+
+m2_asex_ap2g_bal_batch_de <- left_join(m2_asex_ap2g_bal_batch_de, Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene, Ka_Ks, `Transcript Product Description`, TM_domains, `Computed GO Functions`), by = 'gene_id') %>% 
+        mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene))
+
+```
+
+
+```{r, results="asis", eval=T}
+m2_asex_ap2g_bal_batch_de %>% arrange(pvalue)
+```
+
+#### smoothers for select genes that are differentially expressed between strains {.tabset}
+
+#### Plot smoothers function
+
+
+```{r, results='asis'}
+# cat('## Visualize field parasites {.tabset}   \n')
+tde_smooth_plt <- function(tde_obj_lst = asex_bal_ts[1],
+                           cond_obj_lst = cond_gns_de_asx[1],
+                           pw_comp= 'waldStat_M33_SC5vM33_SC7', 
+                           n_gns = c(1:5),
+                           lege_pos = "bottom",
+                           wstat = 20,
+                           pval_cond = "pvalue",
+                           pval = 0.05
+)
+{
+  
+  list(tde_obj_lst, cond_obj_lst) %>% 
+    pmap(.,possibly(~{
+      
+      gns = ..2 %>% filter(!!rlang::sym(pw_comp) > wstat & !!rlang::sym(pval_cond)  < pval) %>% filter(!is.na(gene_id)) %>%  arrange(desc(!!rlang::sym(pw_comp)))  %>% pull(gene_id) %>% .[n_gns]
+      
+      gn_names = ..2 %>% filter(!!rlang::sym(pw_comp) > wstat & !!rlang::sym(pval_cond)  < pval) %>% filter(!is.na(gene_id))  %>% arrange(desc(!!rlang::sym(pw_comp))) %>% pull(Gene) %>% .[n_gns]
+      print(gn_names)
+      
+      tde = ..1
+      
+      list(gns, gn_names) %>% 
+        pmap(., possibly(~{
+          plotSmoothers(tde, 
+                        assays(tde)$counts,
+                        gene = ..1,
+                        alpha = 1, 
+                        border = TRUE) +
+            labs(title = ..2) +
+            theme(text = element_text(size = 14),
+                  legend.position = lege_pos) +
+            guides(color = guide_legend(override.aes = list(size = 2), title.position = "top", ncol = 1))
+        }, 'missing'))
+    }, 'missing'))
+}
+
+```
+
+
+```{r, results='asis', warning=F, message=F}
+
+tde_smooth_plt(tde_obj_lst = list(m2_asex_ap2g_bal_batch_ts),
+               cond_obj_lst = list(m2_asex_ap2g_bal_batch_de),
+               pw_comp= 'waldStat',
+               n_gns = c(1:20)
+)
+
+```
+
+Heatmap plotting function
+```{r}
+### Annotation groups for the header ie column
+tseq_de_hmap <- function(tseq = asex_bal_ts[[1]], de_tbl , pnts = 30, rnames = F, comp_grps, Pv = 0.05,  wstat =30){
+  
+  # gns = de_tbl %>% filter(if_any(matches("pvalue.*"), ~. < 0.05)) %>% pull(gene_id)
+  gns = de_tbl %>% filter(pvalue < Pv & waldStat >= wstat) %>% pull(gene_id)
+
+  # print(str(gns))
+  ##Edited from the original version to allow the labelling of rows with gene names
+  msc_yhatSmooth_w_annot <- predictSmooth(tseq, gene = gns, nPoints = pnts, tidy = FALSE) %>% 
+        t() %>%scale() %>% t() %>% as.data.frame()%>% 
+        rownames_to_column('gene_id') %>% 
+        left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
+        mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene)) %>% 
+        dplyr::select(-c(gene_id)) %>% 
+        column_to_rownames('Gene')
+  
+  msc_yhatSmooth <- msc_yhatSmooth_w_annot %>% 
+    dplyr::select(-c(Ka_Ks)) 
+  
+  # print(str(msc_yhatSmooth))
+  msc_col_annot <- predictSmooth(tseq, gene = gns, nPoints = pnts, tidy = T)  %>% 
+        mutate(point = paste0("point", rep(rep(1:pnts,length(unique(tseq@colData$tradeSeq$conditions))),length(gns))), 
+               lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
+        rownames_to_column('No')  %>% 
+        dplyr::select(lin_id,time,condition)%>% 
+        distinct()%>% 
+        column_to_rownames('lin_id') %>%
+        rename('Pseudotime' = time, 'Strain' = condition)
+  # print(str(msc_col_annot))
+
+  hmap<- ComplexHeatmap::Heatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix(),
+                         cluster_columns = FALSE,
+                         cluster_rows = FALSE,
+                         show_row_names = {{rnames}}, 
+                         show_column_names = F, 
+                         # main = comp_grps,
+                         show_heatmap_legend = T,
+                         # silent = TRUE,
+                         # left_annotation = rowAnnotation(df= msc_yhatSmooth_w_annot %>% select(Ka_Ks)),
+                         top_annotation = HeatmapAnnotation(df= msc_col_annot %>% dplyr::select( Strain,Pseudotime) ,
+                                                            # cols = list(Strain = msc_col_annot %>% mutate(cols = ifelse(Strain == 'M49_SC1') ~ '#e7a06b', '#9cb4cf') %>%  pull(cols) ), 
+                                                            annotation_legend_param = list(Strain = list(title = "Strain"), 
+                                                                                           direction = "horizontal", 
+                                                                                           title_gp = gpar(fontsize = 14), labels_gp = gpar(fontsize = 14)),
+                                                            show_legend = c(TRUE, FALSE) ##https://support.bioconductor.org/p/82447/
+                                                            ),
+                         # fontsize = 14,
+                         # heatmap_legend_param = list(ncol = 1, nrow = 4, legend_direction = "vertical", by_row = T),
+            # heatmap_legend_param = list(direction = "horizontal", legend_gp = gpar(fontsize = lgsize)),
+            heatmap_legend_param = list(title = "Expression",
+                                        title_gp = gpar(fontsize = 14),
+                                        labels_gp = gpar(fontsize = 14),
+                                        direction = "horizontal",
+                                        labels_rot = 90#,
+                                        # grid_width = unit(6, "mm"),
+                                        # legend_width = unit(lg_width, "cm")
+                                        ),
+            row_names_gp = grid::gpar(fontsize = 14)
+                         # 
+      ) %>%
+  ##Merging legends into 1 column. Could be set to F
+  draw(., newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom")
+    
+  return(hmap)
+  # print(hmap)
+  # print(pheatmap::pheatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matrix()))
+      # cat('\n')
+      # cat("\n")
+    
+}
+```
+
+```{r, results='asis', warning=F, message=F, fig.width=6, fig.height=6}
+
+tseq_de_hmap(tseq = m2_asex_ap2g_bal_batch_ts, de_tbl= m2_asex_ap2g_bal_batch_de, pnts = 30, rnames = T, comp_grps = "gam", Pv = 0.05)
+
+```
+
+
+
+## MAST DE adjusting for pseudotime
+
+MAST DE on the entire dataset before subsampling. Subsampling is not necessary for MAST and also for tradeseq
+### Prepare dataset
+Normalizing and scaling the data in the subseted seurat objects - may have been done before on the larger parent object but just repeating since will not change anything as it starts from the raw counts.
+
+Adding pseudotime metadata from the single cell experiment object 
+Scaling is for visualization
+
+
+```{r}
+##REMEMBER TO REMOVE CLUSTERS WITH VERY FEW CELLS AND DOUBLETS SEURAT
+# msc_gam_combi_noLE_de <- msc_gam_combi_noLE_de[, cells_de]
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# Add to metadata the dataset/conditions and ptime cat
+all_asex_de_bal_nosct <- m2_scvi_asex_noM12_harmony_bal
+all_asex_de_bal_nosct[["SCT"]] <- NULL
+DefaultAssay(all_asex_de_bal_nosct) <- "RNA"
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+all_gns = unique(rownames(all_asex_de_bal_nosct))
+
+m2_asex_ap2g_bal_seu <- all_asex_de_bal_nosct %>%
+         NormalizeData(., normalization.method = "LogNormalize", scale.factor = 10000, verbose = FALSE) %>%
+         ScaleData(., features = all_gns,  verbose = FALSE)
+
+m2_asex_ap2g_bal_seu <- list(m2_asex_ap2g_bal_seu) %>% set_names("gam")
+
+```
+
+### Actual MAST DE between pairwise strains and fieldvslab 
+
+MAST DE adjusting for pseudotime as a latent variable
+
+```{r, message=FALSE, warning=FALSE}
+de_idents <- c("gam")
+m2_asex_ap2g_bal_mast <- map2(m2_asex_ap2g_bal_seu, de_idents, ~SetIdent(.x, value=.y))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+saveRDS(m2_asex_ap2g_bal_mast, 'data/processed/Pf/m2_all/m2_asex_ap2g_bal_mast.RDS')
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+##shortcut to run relevant donors subsets only
+m2_asex_ap2g_bal_mast_noM55M54 <- subset(m2_asex_ap2g_bal_mast[["gam"]], subset = donor %in% c("MSC68", "MSC66", "MSC70", "MSC60", "MSC49"))
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+##!! NB Rerun only when the DE inputs change - takes looooonng
+
+## Mast DE of dataset with male low (ml) included - shouldnt have any contribution as each stage handled differently
+## Including lab and field strain DE
+## !!!min.cells.group added for mh in the strain_dset where there's only balancing in lab VS field - we need to remove later
+
+pts <- "pseudotime"
+pts_all<- c(rep(pts,1))
+pts_all<- pts
+
+### !!! NOTE - RUNNING FOR NECESSARY DONORS, WILL REVERT LATER
+# ap2g_ub_pairwise_mkrs_pt_ml <- list(m2_asex_ap2g_bal_mast, pts, de_idents, names(m2_asex_ap2g_bal_mast)) %>%
+ap2g_ub_pairwise_mkrs_pt_ml <- list(list(m2_asex_ap2g_bal_mast_noM55M54), pts, de_idents, names(m2_asex_ap2g_bal_mast)) %>%
+  pmap(.,  ~{
+    # ide = ..3
+    # a = combn(levels(droplevels(..1@meta.data[,..3])), 2,simplify = F) 
+    a = combn(unique(..1@meta.data[,..3]), 2,simplify = F) 
+    obj = ..1
+    pseudos = ..2
+    
+    print(class(obj))
+    print(paste("running ...", ..4))
+    map(a, ~print(paste(.x[1], "n ", .x[2])))
+    
+    # map(a, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], latent.vars = pseudos, logfc.threshold = 0, test.use = 'MAST', min.cells.group = 1) %>% rownames_to_column('gene_id'))
+    map(a, ~FindMarkers(obj, 
+                        ident.1 = .x[1], 
+                        ident.2 = .x[2], 
+                        # latent.vars = c("donor", pseudos), 
+                        latent.vars = c(pseudos), 
+                        logfc.threshold = 0, 
+                        test.use = 'MAST', 
+                        min.cells.group = 1) %>% 
+          rownames_to_column('gene_id')) %>%
+      set_names(map(a, ~paste(., collapse = '_vs_') %>% str_remove_all(' '))) %>%
+      bind_rows(., .id = 'pw_comparison')
+    
+  }#, 'missing genes')
+  )
+
+saveRDS(ap2g_ub_pairwise_mkrs_pt_ml,'data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_pt_ml.RDS')
+# saveRDS(ap2g_ub_pairwise_mkrs_pt_ml_don,'data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_pt_ml_don.RDS')
+# c(ap2g_ub_pairwise_mkrs_pt_ml_lf, ap2g_ub_pairwise_mkrs_pt_ml)
+
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+##!! NB Rerun only when the DE inputs change - takes looooonng
+### Getting all genes for gsea - saved as RDS and analysis done in functional_GO_n_lit_comparison.RMD
+
+# ap2g_ub_pairwise_mkrs_pt_ml_gsea_full <- list(m2_asex_ap2g_bal_mast, rep(pts,2), de_idents) %>%
+#   pmap( ~{
+#     # ide = ..3
+#     a = combn(levels(..1@meta.data[,..3]), 2,simplify = F) 
+#     obj = ..1
+#     pseudos = ..2
+#     map(a, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], latent.vars = pseudos, logfc.threshold = 0, test.use = 'MAST', min.pct = -Inf, min.diff.pct = -Inf) %>% rownames_to_column('gene_id')) %>%
+#       set_names(map(a, ~paste(., collapse = '_vs_') %>% str_remove_all(' '))) %>%
+#       bind_rows(., .id = 'pw_comparison')
+#     
+#   })
+# saveRDS(ap2g_ub_pairwise_mkrs_pt_ml_gsea_full,'data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_pt_ml_gsea_full.RDS')
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+ap2g_ub_pairwise_mkrs_pt_ml<- readRDS('data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_pt_ml.RDS')
+
+```
+
+
+MAST DE not adjusting for pseudotime (no pseudotime - npt)
+```{r, message=FALSE, warning=FALSE, eval=F}
+##!! NB Rerun only when the DE inputs change - takes looooonng - also not necessary. Only used to assess effect of adjusting for pseudotime
+ap2g_ub_pairwise_mkrs_npt_ml <- list(m2_asex_ap2g_bal_mast, rep(pts,1), de_idents) %>%
+  pmap( ~{
+    # a = combn(levels(..1@meta.data[,..3]), 2,simplify = F) 
+    a = combn(unique(..1@meta.data[,..3]), 2,simplify = F) 
+    obj = ..1
+    pseudos = ..2
+    map( a, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], logfc.threshold = 0, latent.vars = "donor", test.use = 'MAST') %>% rownames_to_column('gene_id')) %>%
+      set_names(map(a, ~paste(., collapse = '_vs_') %>% str_remove_all(' '))) %>%
+      bind_rows(., .id = 'pw_comparison')
+    
+  })
+
+saveRDS(ap2g_ub_pairwise_mkrs_npt_ml,'data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_npt_ml.RDS')
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+ap2g_ub_pairwise_mkrs_npt_ml<- readRDS('data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_npt_ml.RDS')
+
+```
+
+#### Comparing MAST DE results when we adjust for pseudotime and when we dont
+
+```{r, message=FALSE, warning=FALSE}
+# ap2g_ub_pairwise_mkrs_npt_ml <- ap2g_ub_pairwise_mkrs_npt_ml %>% map(. %>% mutate(across(pw_comparison, ~str_replace_all(.,c('Field_vs_Lab' = 'Field_vs_Lab')))))
+
+```
+
+#### Comparing MAST DE results when we adjust for pseudotime and when we dont
+```{r, fig.width= 8, fig.height=3, eval=F}
+## !! NB - also not necessary. Only used to assess effect of adjusting for pseudotime
+list(ap2g_ub_pairwise_mkrs_pt_ml, ap2g_ub_pairwise_mkrs_npt_ml) %>%
+  pmap(
+    ~..1 %>% 
+      left_join(., ..2, by = c('gene_id', 'pw_comparison'), suffix =c(".pt", ".npt")) %>%
+      ggplot(., aes(x=log10(p_val_adj.pt), y=log10(p_val_adj.npt))) + 
+      geom_point() + 
+      facet_grid(.~pw_comparison, scales = "free_x") +
+      geom_vline( xintercept = -3)+
+      geom_hline( yintercept = -3) +
+      geom_abline()
+  )
+
+```
+
+
+#### Comparing MAST DE results when we adjust for pseudotime and when we dont
+```{r, fig.width= 8, fig.height=3, eval=F}
+## !! NB - also not necessary. Only used to assess effect of adjusting for pseudotime
+ap2g_ub_pairwise_mkrs_pt_ml
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+ap2g_ub_pairwise_mkrs_pt_ml_anot <- map(ap2g_ub_pairwise_mkrs_pt_ml, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")]))
+
+ap2g_ub_pairwise_mkrs_pt_ml_anot
+```
+
+```{r, warning=FALSE, message=FALSE}
+## cells that contain 2 or more gam UMI
+map(ap2g_ub_pairwise_mkrs_pt_ml_anot, ~.x  %>% filter(p_val_adj < 0.05 & avg_log2FC > 0))
+
+## https://www-nature-com.ezp.lib.cam.ac.uk/articles/nature24280.pdf - PF3D7-0406500 and HDA1 are high in gam positive cells
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## cells that contain 2 or more gam UMI
+imap(ap2g_ub_pairwise_mkrs_pt_ml_anot, ~.x %>% filter(p_val_adj < 0.05 & avg_log2FC < 0))
+
+## https://www-nature-com.ezp.lib.cam.ac.uk/articles/nature24280.pdf - PF3D7-0406500 and HDA1 are high in gam positive cells
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## cells that contain 2 or more gam UMI
+c("PF3D7-0113600", "PF3D7-1301800", "PF3D7-1222600")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+ap2g_ub_pairwise_mkrs_pt_ml_anot[[1]] %>% filter(gene_id %in% c("PF3D7-0113600", "PF3D7-1301800", "PF3D7-1222600"))
+```
+
+
+#### female high vs female low DE visualization
+```{r, fig.width=6, fig.height=6}
+map(list(ap2g_ub_pairwise_mkrs_pt_ml_anot[[1]] %>% filter(Gene != "AP2-G"), 
+         ap2g_ub_pairwise_mkrs_pt_ml_anot[[1]] %>% filter(Gene != "AP2-G") %>% filter(p_val_adj < 0.05), 
+         ap2g_ub_pairwise_mkrs_pt_ml_anot[[1]] %>% filter(Gene != "AP2-G") %>% filter(!(abs(avg_log2FC) > 5 & p_val_adj > 0.05)),
+         ap2g_ub_pairwise_mkrs_pt_ml_anot[[1]]), ~{
+  EnhancedVolcano(.x,
+                  lab = .x$Gene,
+                  selectLab =.x %>% 
+                    # filter(p_val_adj < 0.05 & (avg_log2FC > 1 | avg_log2FC < -1) & !str_detect(Gene, 'PF3D7')) %>%
+                    filter(p_val_adj < 0.05 & (avg_log2FC > 1 | avg_log2FC < -1) ) %>%
+                    pull(Gene),
+                  x = 'avg_log2FC',
+                  y = 'p_val_adj',
+                  pCutoff = 0.05,
+                  FCcutoff = 1,
+                  pointSize = 3.0,
+                  labSize = 7.0,
+                  title = '',
+                  subtitle = "",
+                  titleLabSize = 0,
+                  subtitleLabSize = 0,
+                  axisLabSize = 24,
+                  drawConnectors = TRUE,
+                  legendLabels =c(expression(Log[2] ~ FC), "p-value"),
+                  gridlines.minor = FALSE)
+})
+```
+
+
+```{r}
+##!!!!!NOTE - remove the empty MSC1_fle
+# ap2g_ub_pairwise_mkrs_pt_ml_sst <- ap2g_ub_pairwise_mkrs_pt_ml[c(1:5, 7:20)]
+# m2_asex_ap2g_bal_seu_sst <- m2_asex_ap2g_bal_seu[c(1:5,7:20)]
+ap2g_ub_pairwise_mkrs_pt_ml_sst <- ap2g_ub_pairwise_mkrs_pt_ml
+m2_asex_ap2g_bal_seu_sst <- m2_asex_ap2g_bal_seu
+cond_gns_005_ub_de_sst <- list(m2_asex_ap2g_bal_batch_de)
+pts <- "pseudotime"
+pts_sst <- pts
+
+```
+
+### MAST VS Tradeseq analsys
+####  MAST gene QC
+List genes expressed in less than 5 cells in each subset objects used as MAST input that were also removed when running tradeseq fitGAM
+
+```{r}
+# map2(ap2g_ub_pairwise_mkrs_pt_ml_sst, m2_asex_ap2g_bal_seu_sst, ~.x %>% filter(gene_id %in% rownames(.y)[!(rowSums(.y@assays$RNA@counts != 0) > 5)])) %>% bind_rows(., .id = 'Stage')
+
+map2(ap2g_ub_pairwise_mkrs_pt_ml_sst, m2_asex_ap2g_bal_seu_sst, ~.x %>% filter(gene_id %in% rownames(.y)[!(rowSums(.y@assays$RNA@layers$counts != 0) > 5)])) %>% bind_rows(., .id = 'Stage')
+
+```
+
+Remove genes above ????NB NB - refer line 734
+```{r}
+ap2g_ub_pairwise_mkrs_pt_ml_sst <- map2(ap2g_ub_pairwise_mkrs_pt_ml_sst, m2_asex_ap2g_bal_seu_sst, ~.x %>% filter(gene_id %in% rownames(.y)[(rowSums(.y@assays$RNA@layers$counts != 0) > 5)]))
+
+```
+
+#### MAST & Tradeseq merge
+Merge MAST results with tde results so as to use cut-off accounting for both methods (P<0.05 MAST & waldstat >10 TDE)
+```{r, fig.width= 8, fig.height=3, warning=FALSE}
+mast_tde_corr_tbls_w_na <- list(cond_gns_005_ub_de_sst[1], ap2g_ub_pairwise_mkrs_pt_ml_sst[1]) %>% 
+    # pmap(~{ left_join(..1 %>% dplyr::select(gene_id, waldStat, pvalue), ..2, by = 'gene_id') %>%
+    pmap(~{ full_join(..2, ..1 %>% dplyr::select(gene_id, waldStat, pvalue),  by = 'gene_id')})
+  
+
+```
+
+
+##### MAST & Tradeseq NA genes 
+Check the genes with missing values in either test - tradeseq/MAST
+Thrown out probably because of not meeting the log fold threshold
+```{r, fig.width= 8, fig.height=3, warning=FALSE}
+##mast missing
+map(mast_tde_corr_tbls_w_na, ~.x %>% dplyr::count(pw_comparison, is.na(waldStat), is.na(p_val_adj))) %>% bind_rows(.id = 'stage') %>% filter(`is.na(p_val_adj)` == T)
+
+##tde missing
+map(mast_tde_corr_tbls_w_na, ~.x %>% dplyr::count(pw_comparison, is.na(waldStat), is.na(p_val_adj))) %>% bind_rows(.id = 'stage') %>% filter(`is.na(waldStat)` == T)
+
+```
+
+Remove mast missing genes above
+```{r}
+map(mast_tde_corr_tbls_w_na,  ~.x %>% filter(is.na(waldStat)) %>% ggplot(., aes(x = pw_comparison, y =avg_log2FC)) +geom_violin())
+```
+
+```{r}
+map(mast_tde_corr_tbls_w_na,  ~.x %>% filter(is.na(waldStat)) %>% ggplot(., aes(x = log10(p_val_adj), y =avg_log2FC)) +geom_point())
+```
+
+
+
+```{r}
+map(mast_tde_corr_tbls_w_na,  ~.x %>% filter(is.na(p_val_adj)) %>% ggplot(., aes(x = waldStat, y =log10(pvalue))) +geom_point() + geom_hline(yintercept = 0.05) +geom_vline(xintercept = 10))
+```
+
+```{r}
+map(mast_tde_corr_tbls_w_na,  ~.x %>% filter(is.na(waldStat) |is.na(p_val_adj)) %>% dim)
+
+```
+
+```{r}
+mast_tde_corr_tbls <- map(mast_tde_corr_tbls_w_na,  ~.x %>% filter(!is.na(waldStat) & !is.na(p_val_adj)))
+
+```
+
+```{r}
+##Number of DE genes
+map(mast_tde_corr_tbls, ~.x |> filter(p_val_adj < 0.05 & waldStat>10) |> pull(gene_id) |> unique() |> length())
+
+```
+
+```{r}
+saveRDS(mast_tde_corr_tbls, 'data/processed/Pf/m2_all/mast_tde_corr_tbls.RDS')
+
+```
+
+
+#### MAST & Tradeseq correlation
+function to plot correlation between MAST and tradeseq and visualize disparities between the 2 methods for the different pairwise strain comparisons
+```{r}
+pw_corr_plot <- function(g_tbls = mast_tde_corr_tbls){
+  for (i in 1:length(g_tbls)) {
+    tryCatch({
+      pt<-ggplot(g_tbls[[i]], aes(x=waldStat, y=log10(p_val_adj))) +
+              # geom_point() + 
+              # facet_grid(.~pw_comparison, scales = "free_x") +
+              geom_point(aes(color = pw_comparison)) +
+              stat_cor(method = "pearson", label.x = 50, label.y = -6)+ 
+              geom_vline( xintercept = 10)+
+              geom_hline( yintercept = log10(0.05))+
+              theme_classic()+
+              theme(axis.text=element_text(size=20), 
+                    axis.title=element_text(size=18,face="bold"), 
+                    legend.text = element_text(size = 16) ,
+                    legend.title = element_text(size = 18, face = "bold"),
+                    strip.text.x = element_text(size = 16, face = "bold"))
+      return(pt)
+    }, error = function(e) {
+      message(as.character('ss')) # exclude this line to return NULL quietly
+      return(NULL)
+    })
+  }
+}
+```
+
+```{r}
+pw_corr_plot <- function(g_tbls = mast_tde_corr_tbls){
+
+      ggplot(g_tbls, aes(x=waldStat, y=-log10(p_val_adj))) +
+              # geom_point() + 
+              # facet_grid(.~pw_comparison, scales = "free_x") +
+              geom_point(aes(color = pw_comparison)) +
+              # scale_color_manual(values = fld_strns_nf54_7g8_comps_col, name = "Comparison") +
+              stat_cor(method = "pearson", label.x = 40, label.y = 5)+ 
+              geom_vline( xintercept = 10)+
+              geom_hline( yintercept = -log10(0.05))+
+              labs(x = "tradeSeq waldStat", y = "Adjusted\nMAST P(-log10)") +
+              theme_classic()+
+              theme(axis.text=element_text(size=20), 
+                    axis.title=element_text(size=18,face="bold"), 
+                    legend.text = element_text(size = 16) ,
+                    legend.title = element_text(size = 18, face = "bold"),
+                    strip.text.x = element_text(size = 16, face = "bold"))
+}
+```
+
+
+Correlation between MAST and tradeseq 
+```{r}
+# pw_corr_plot(g_tbls = mast_tde_corr_tbls)
+de_corr_plts <- map(mast_tde_corr_tbls, ~{
+  pw_corr_plot(.x )
+  } )
+
+de_corr_plts
+```
+
+#### MAST & Tradeseq association strength disparities
+##### Tradeseq disparities
+Genes significatnt in MAST (adjusted P < 0.05) but not in tradeseq (waldStat < 10)
+
+###### Assess smoothened expression of individuals genes 
+Make dataframe with genes counts per cell for plotting ggplots of gene expression over pseudotime
+```{r}
+#pts8<-  c(pts, pts)
+
+gn_tble_gg_smoother <- list(m2_asex_ap2g_bal_seu_sst, pts_sst) %>%
+  pmap(~{
+    mtx <- ..1@assays$RNA@layers$data %>% as.matrix() 
+    colnames(mtx) <- colnames(..1)
+    rownames(mtx) <- rownames(..1)
+    
+    mtx %>% t() %>% as.data.frame() %>% rownames_to_column('cell_bc') %>% 
+         left_join(., ..1@meta.data  %>% 
+                     dplyr::select(..2, gam, harmony_clusters_ss) %>% 
+                     rownames_to_column('cell_bc'), by = 'cell_bc') 
+  })
+
+```
+
+```{r}
+#pts8<-  c(pts, pts)
+
+# gn_tble_gg_smoother <- list(m2_asex_ap2g_bal_seu_sst, pts_sst) %>%
+#   pmap(~..1@assays$RNA@layers$data %>% as.matrix() %>% t() %>% as.data.frame() %>% 
+#          bind_cols(..1@meta.data %>% dplyr::select(pseudotime, gam, harmony_clusters_ss) %>% rownames_to_column('cell_bc'), .) 
+#   )
+
+
+```
+
+Grouping plots from same stage and pairwise strain comparison into separate pages
+
+```{r}
+strns_comps =  c('ap2gNeg_vs_ap2gPos')
+
+stg_strn_mast_gns_smooth_plts <- function(gn_xprsn_tbls =  gn_tble_gg_smoother, 
+                                          gns_strn = map(ap2g_ub_pairwise_mkrs_pt_ml_sst, 
+                                                         . %>%
+                                                           filter(p_val_adj < 10e-20 & (avg_log2FC > 1 | avg_log2FC < -1))  %>% 
+                                                           arrange(p_val_adj) %>%
+                                                           dplyr::select(gene_id, pw_comparison)), 
+                                          stage_nms = names(ap2g_ub_pairwise_mkrs_pt_ml_sst), 
+                                          comp_g = 'pw_comparison',
+                                          top_gns = 10,
+                                          ptimes = pts_sst
+) {
+  list(gn_xprsn_tbls, gns_strn, stage_nms, ptimes) %>%
+    pmap(., ~{
+      mast_de_tbl = ..1
+      gns = ..2
+      nms = ..3
+      psdotime = ..4
+      
+      list(strns_comps) %>%
+        pmap(#possibly(
+          ~{
+          pw_mast <- mast_de_tbl %>% 
+            filter(str_detect(gam, str_replace_all(..1, c('_vs_'='|', 'SC' = '', 'm[0-9]*_' = ''))))
+          print(pw_mast)
+          # print(mast_de_tbl)
+          gns_l = gns %>% filter(!!rlang::sym(comp_g) == .x) %>% pull(gene_id) %>% head(., n = top_gns)
+          # pdf(paste0('../plots/',nms,..1,'.pdf' ))
+          print(gns_l)
+          
+          plot_list <- map(gns_l, 
+                           ~ggplot(pw_mast, aes(x = !!rlang::sym(psdotime) , y = log2((!!rlang::sym(.x))+1), color = gam)) + 
+                             geom_point() + 
+                             geom_smooth(method = 'gam', formula = y ~ s(x, bs = "cs")) +
+                             theme(legend.position="none")
+          )
+          
+          print(length(plot_list))
+          
+          # extract the legend from one of the plots
+          lege <- cowplot::get_legend(
+            # create some space to the left of the legend
+            plot_list[[1]] + 
+              guides(color = guide_legend(nrow = 1)) +
+              theme(legend.position = "bottom")
+          )
+          
+          
+          ttl_lege <- plot_grid(ggdraw() + 
+                                  draw_label(paste0(nms, '_', ..1),
+                                             fontface = 'bold',
+                                             x = 0,
+                                             hjust = 0
+                                  ),
+                                lege, ncol = 2, nrow = 1)
+          
+          pl1 <- plot_grid(plotlist = plot_list, ncol = 4, nrow = 5) 
+          print(class(pl1))
+          
+          pls <- plot_grid(ttl_lege, pl1, rel_heights = c(0.1, 1), ncol = 1)
+          print(pls)
+          
+          return(list(pl1) %>% set_names(..1))
+          
+          f          # save_plot(paste0("../plots/", nms, '_', ..1, "top_mast_de_gns_smooth.pdf"), plot = pl1, base_height = 13, base_width = 16)
+          
+        }
+        #, 'error')
+        ) 
+    }
+    )
+}
+
+```
+
+Function to save plots in pdfs named by stage and pairwise strain comparison in which it is DE. The plots are generated above with the stage_strain_pw_de_comp function
+```{r}
+stg_strn_mast_gns_smooth_plts_saver = function(plts_cnm = 'top_sig', plt_lst = top_sig_gns_plts) {
+  imap(unlist(map(plt_lst, 
+                  ~unlist(.x, recursive = F, use.names = T)), 
+              recursive = F), 
+       possibly(~save_plot(paste0("plots/", .y, "_",plts_cnm,".pdf"), 
+                           plot = .x, 
+                           base_height = 13, 
+                           base_width = 16), 
+                otherwise = 'error'))
+}
+```
+
+
+Table of genes significatnt in MAST (adjusted P < 0.05) but not in tradeseq (waldStat < 10)
+```{r, fig.width= 8, fig.height=3}
+
+##MASt signal is in ok ie pvalue less than 0.0001 - TDE signal too low i.e waldstat <10
+
+tde_disparities <- list(mast_tde_corr_tbls, ap2g_ub_pairwise_mkrs_pt_ml_sst) %>%
+  pmap(
+    ~..1 %>%
+      filter(!str_detect(pw_comparison, 'SC._vs_Lab')) %>%
+      filter(waldStat < 10 & p_val_adj < 0.05) 
+  )
+
+```
+
+
+
+Visualize disparities
+```{r, warning=FALSE, message=F, eval=FALSE, fig.width=8, fig.height=8}
+tde_disparities_gns_plts <- stg_strn_mast_gns_smooth_plts(gn_xprsn_tbls = gn_tble_gg_smoother, 
+                                                          gns_strn = map(tde_disparities, 
+                                                                         . %>%
+                                                                           # filter(p_val_adj < 0.9) %>%
+                                                                           arrange(desc(waldStat)) %>% 
+                                                                           dplyr::select(gene_id, pw_comparison)), 
+                                                          stage_nms = names(ap2g_ub_pairwise_mkrs_pt_ml_sst), 
+                                                          ptimes = pts_sst,
+                                                          comp_g = 'pw_comparison',
+                                                          top_gns = 5)
+
+```
+
+```{r, warning=FALSE, message=F, eval=FALSE}
+tde_disparities_gns_plts
+```
+
+Save tradeseq disparities
+```{r, eval=FALSE}
+# stg_strn_mast_gns_smooth_plts_saver(plts_cnm = 'tde_disparities', plt_lst = tde_disparities_gns_plts)
+```
+
+##### MAST disparities
+Genes significatnt in  tradeseq (waldStat > 10) but not in  MAST (adjusted P > 0.05)
+```{r, fig.width= 8, fig.height=3}
+##TDE signal is in check - MAST signal too low
+
+mast_disparities <- list(mast_tde_corr_tbls, ap2g_ub_pairwise_mkrs_pt_ml_sst) %>%
+  pmap(
+    ~..1 %>%
+      filter(!str_detect(pw_comparison, 'SC._vs_Lab')) %>%
+      filter(waldStat > 10 & p_val_adj > 0.05) 
+  )
+
+
+
+```
+
+
+
+Correlation between MAST and tradeseq 
+```{r}
+# pw_corr_plot(g_tbls = mast_tde_corr_tbls)
+map(mast_disparities, ~{
+  pw_corr_plot(.x %>% filter(!str_detect(pw_comparison, 'SC._vs_[L|N|7].*'))%>% filter(!str_detect(pw_comparison, 'NF54_A')))
+  } )
+
+```
+Individual gene tradeseq normalised counts visualization smoothers
+
+```{r, results='asis', warning=F, message=F}
+tde_smooth_plt(tde_obj_lst = list(m2_asex_ap2g_bal_batch_ts),
+               cond_obj_lst = list(m2_asex_ap2g_bal_batch_de),
+               pw_comp= 'waldStat', 
+               n_gns = c(1:5)
+)
+
+```
+
+
+individual genes Seurat normalized counts with MAST disparities plots
+```{r, eval=FALSE}
+mast_disparities_gns_plts <- stg_strn_mast_gns_smooth_plts(gn_xprsn_tbls = gn_tble_gg_smoother, 
+                                                           gns_strn = map(mast_disparities, 
+                                                                          . %>%
+                                                                            # filter(p_val_adj < 0.9) %>%
+                                                                            arrange(desc(waldStat)) %>% 
+                                                                            dplyr::select(gene_id, pw_comparison)), 
+                                                           stage_nms = names(ap2g_ub_pairwise_mkrs_pt_ml_sst), 
+                                                           ptimes = pts_sst,
+                                                           comp_g = 'pw_comparison',
+                                                           top_gns = 10)
+
+
+
+```
+
+##### Borderline genes
+Save bordeline significant genes
+```{r, warning=FALSE, message=F, eval=FALSE}
+# stg_strn_mast_gns_smooth_plts_saver(plts_cnm = 'mast_disparities', plt_lst = mast_disparities_gns_plts)
+```
+
+
+Top gene tradeseq and MAST
+```{r, eval=F}
+top_tde_mast_sig_gns_plts <-stg_strn_mast_gns_smooth_plts(gn_xprsn_tbls = gn_tble_gg_smoother,  
+                                                          gns_strn = map(mast_tde_corr_tbls, 
+                                                                         . %>%
+                                                                           filter(p_val_adj < 0.05 & waldStat > 10) %>%
+                                                                           filter(!str_detect(pw_comparison, 'SC._vs_Lab')) %>%
+                                                                           arrange(desc(waldStat)) %>% 
+                                                                           dplyr::select(gene_id, pw_comparison)), 
+                                                          stage_nms = names(ap2g_ub_pairwise_mkrs_pt_ml_sst), 
+                                                          ptimes = pts_sst,
+                                                          comp_g = 'pw_comparison',
+                                                          top_gns = 10)
+
+
+
+```
+
+
+Save bordeline significant genes
+```{r, warning=FALSE, message=F, eval=FALSE}
+# stg_strn_mast_gns_smooth_plts_saver(plts_cnm = 'top_tde_mast_sig', plt_lst = top_tde_mast_sig_gns_plts)
+```
+
+#### MAST sig genes with tradeseq smoothened heatmaps 
+
+function for getting genes to plot
+```{r}
+##Function for making table of genes and accompanying annotations for heatmap - table kept out of the plotting functions since we will be modifying it alot and it might be helpful to look at the results before making the heatmap
+# strns_lab_comps <- c('SC2_vs_SC5', 'SC2_vs_SC7', 'SC5_vs_SC7', 'SC2_vs_Lab', 'SC5_vs_Lab', 'SC7_vs_Lab')
+
+## Get all the strains present in the comparisons
+# strns_lab_comps <- c('SC1_vs_SC2', 'SC1_vs_SC3', 'SC1_vs_SC6', 'SC2_vs_SC3', 'SC2_vs_SC5',  'SC2_vs_SC6', 'SC2_vs_SC7', 'SC3_vs_SC6',  'SC5_vs_SC7','SC1_vs_Lab', 'SC2_vs_Lab', 'SC3_vs_Lab',  'SC5_vs_Lab', 'SC6_vs_Lab', 'SC7_vs_Lab')
+# strns_lab_comps <- c("SC1_vs_SC2", "SC1_vs_SC3", "SC1_vs_SC6", "SC2_vs_SC3", "SC2_vs_SC4", "SC2_vs_SC5", "SC2_vs_SC6", "SC2_vs_SC7", "SC3_vs_SC6",  "SC4_vs_SC5", "SC4_vs_SC6",  "SC4_vs_SC7", "SC5_vs_SC6", "SC5_vs_SC7", "SC6_vs_SC7","SC1_vs_Lab", "SC2_vs_Lab", "SC3_vs_Lab", "SC4_vs_Lab", "SC5_vs_Lab", "SC6_vs_Lab", "SC7_vs_Lab")
+
+# lfstrains_comps <- strns_comps_w_lab
+lfstrains_comps <- c('ap2gNeg_vs_ap2gPos')
+
+strn_comps_gns_anno_2_plt = function(
+    pval = 10e-10,
+    wstat= 10,
+    stg_pw_gns = mast_tde_corr_tbls[[1]],
+    avglfc_top = 0.5,
+    avglfc_botom = -0.5,
+    comp_lvls='Field_vs_Lab',
+    sig_strns_annotn_2_keep = 'Field_vs_Lab',
+    strns_annotn_2_omit = 'SC._vs_Lab',
+    nf54_batch_omit = "EMPTY",
+    topgn = 1000000) {
+  
+  gns2plt <- stg_pw_gns %>% 
+    filter(p_val_adj < pval &  (avg_log2FC > avglfc_top | avg_log2FC < avglfc_botom ) & waldStat > wstat) %>% 
+    mutate(lfc_rank = dense_rank(dplyr::desc(abs(avg_log2FC)))) %>%
+    filter(lfc_rank <= topgn) %>% ### !!! NOTE - This will work unpredictably when omitting some comparisons (pw_comparisons) downstream
+    mutate(dir = case_when(avg_log2FC > avglfc_top ~ 'Upregulated', 
+                           avg_log2FC < avglfc_botom ~ 'Downregulated')) %>%
+    mutate(across(dir, ~factor(., levels=c('Upregulated', 'Downregulated')))) %>%
+    dplyr::select(pw_comparison, gene_id, dir) %>% 
+    mutate(across(pw_comparison, ~droplevels(factor(., levels = comp_lvls)))) %>%
+    arrange(pw_comparison, dir) %>%
+    pivot_wider(names_from = 'pw_comparison', values_from = 'dir') %>%
+    filter(if_any(matches(sig_strns_annotn_2_keep), ~!is.na(.))) %>%
+    filter(if_any(-c(matches(strns_annotn_2_omit), matches(nf54_batch_omit), gene_id), ~!is.na(.))) %>%
+    {
+      if(T %in% (str_detect(names(.),strns_annotn_2_omit))) 
+        mutate(.,FieldvsLab_c = case_when(
+          if_any(matches(strns_annotn_2_omit), ~ . == 'Downregulated') & if_any(matches(strns_annotn_2_omit), ~ . == 'Upregulated') ~ 'both',
+          if_any(matches(strns_annotn_2_omit), ~ . == 'Downregulated') ~ 'Downregulated',
+          if_any(matches(strns_annotn_2_omit), ~ . == 'Upregulated') ~ 'Upregulated')) 
+      else 
+        .
+    } %>% 
+    dplyr::select(-c(matches(strns_annotn_2_omit),matches(nf54_batch_omit))) %>%
+    arrange(across(-one_of("gene_id")))%>%
+    column_to_rownames('gene_id')
+  
+  return(gns2plt)
+  
+}
+
+```
+
+
+```{r}
+
+# hmap_gn_tbls <- list(mast_tde_corr_tbls, 
+#                      c(as.list(rep('Field_vs_Lab', 8)),rep(list(lfstrains_comps), 20)),
+#                      c(as.list(rep('Field_vs_Lab', 8)),rep('^[7|N|m[0-9]*_S].*_vs_[7|N|m[0-9]*_S]*', 20))) %>%
+hmap_gn_tbls <- list(mast_tde_corr_tbls, 
+                     c(lfstrains_comps),
+                     c(lfstrains_comps)) %>%
+  pmap(#possibly(
+    ~{
+      strn_comps_gns_anno_2_plt(pval = 0.05,
+                                wstat= 10,
+                                stg_pw_gns = ..1,
+                                avglfc_top = 0,
+                                avglfc_botom = -0,
+                                comp_lvls=..2,
+                                sig_strns_annotn_2_keep = ..3,
+                                strns_annotn_2_omit = 'm[0-9]*_SC._vs_[L|N|7].*')
+      
+    }
+    #, 'e')
+  )
+
+
+```
+
+heatmap function
+```{r}
+# # sVs_order <- paste0(c('SC1', 'SC2', 'SC3', 'SC4', 'SC5', 'SC6', 'SC7'), ), c('7G8', 'NF54','NF54_A',  'Lab'))
+# sVs_order <- strain_dset_lvls_don
+# # sVs_order_minus_nf54O <- c('SC1', 'SC2', 'SC3', 'SC4', 'SC5', 'SC6', 'SC7','7G8', 'NF54','Lab')
+# sVs_order_minus_nf54O <- strain_dset_lvls_don[!strain_dset_lvls_don %in%"NF54_A"]
+
+##Function for plotting heatmap
+hmap_pw_strns_lab_tde = function(ts_dset= msc_g_noLE_ref_ts_sce_ub_de[[2]],
+                                 gns_tbl = hmap_gn_tbls[[2]],
+                                 cap_no = 7,
+                                 split_col = 'Condition',
+                                 ptime = pts[[2]],
+                                 col_map = strain_cols_n,
+                                 strn_row_anno_order = sVs_order,
+                                 strn_conds = 'Condition',
+                                 pt_labl = 'Pseudotime',
+                                 hmap_mode='seurat_smooth',
+                                 seu_dset = msc_g_noLE_v3_combi_afm_seu_sst[[2]],
+                                 seu_comps = 'dset',
+                                 chunk_size = 0.02,
+                                 rnames = F,
+                                 rsize = 6,
+                                 lgsize = 10, ## legend titles font size (pseudotime & Scaled expression)
+                                 lblsize = 10,
+                                 lg_width = 4,
+                                 csize = 12, ## Column/conditions header font size (strains lab etc)
+                                 anno_fsize = 15,
+                                 anno_trsize = 15,
+                                 strn2dsample = 'Lab',
+                                 shw_anno_head = T,
+                                 shw_left_bar_anno=T,
+                                 botom_pad = 26,
+                                 strain2omit_top_bar = 'Placeholder_when_we_dont_want_to_omit_any_group') {
+  ## If else option to specify the commands based on the selected  heatmap mode - tde_smooth, seurat, seurat_smooth
+  ## tde_smooth - plotting the smoothened tradeseq gene expression from fitting GAMs (generalised additive models)
+  if (hmap_mode == 'tde_smooth') {
+    
+    ##Cells groupings order, pseudotime, points calculation
+    cells_anno = predictSmooth(ts_dset, gene = rownames(gns_tbl), nPoints = 20, tidy = T)  %>% 
+      mutate(point = paste0("point", rep(rep(1:20,length(unique(ts_dset@colData$tradeSeq$conditions))),length(rownames(gns_tbl)))), 
+             lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
+      rownames_to_column('No')  %>% 
+      dplyr::select(lin_id,time,condition)%>% 
+      distinct()%>% 
+      column_to_rownames('lin_id') %>%
+      # filter(!str_detect(condition, strain2omit_top_bar)) %>%
+      filter(!(condition %in% strain2omit_top_bar)) %>%
+      rename('Pseudotime' = time, 'Condition' = condition) %>%
+      mutate(across(Condition, ~droplevels(factor(., levels = strn_row_anno_order))))
+    
+    ##Get cells order
+    cells_order <- rownames(cells_anno)
+    
+    ##Order and scale gene expression matrix appropriately
+    xprsn_mtx <- predictSmooth(ts_dset, gene = rownames(gns_tbl), nPoints = 20, tidy = FALSE) %>%
+      .[,cells_order] %>%
+      t() %>%
+      scale() %>% 
+      .[,rownames(gns_tbl)] %>%
+      t() %>% 
+      as.matrix()
+    
+    ## seurat - plotting the raw seurat gene expression
+  } else if (hmap_mode == 'seurat') {
+    
+    cells_anno = seu_dset@meta.data %>% 
+      rownames_to_column('cell_bc') %>%
+      # filter(!str_detect(!!rlang::sym(seu_comps), strain2omit_top_bar))%>%
+      filter(!(!!rlang::sym(seu_comps) %in% strain2omit_top_bar)) %>%
+      mutate(across(!!rlang::sym(seu_comps), ~droplevels(factor(., levels = strn_row_anno_order)))) %>% 
+      arrange(!!rlang::sym(seu_comps), !!rlang::sym(ptime)) %>% 
+      dplyr::add_count(!!rlang::sym(seu_comps), name ='grp_t') %>%  
+      group_by(!!rlang::sym(seu_comps)) %>%
+      mutate(samp = sample(x=n())) %>%
+      ungroup() %>%
+      filter(!(!!rlang::sym(seu_comps) == strn2dsample & samp > min(grp_t))) %>%
+      column_to_rownames('cell_bc') %>%
+      dplyr::select(!!rlang::sym(seu_comps), !!rlang::sym(ptime)) %>%
+      rename('Pseudotime' = !!rlang::sym(ptime), 'Condition' = !!rlang::sym(seu_comps))
+    print('lkl')
+    print(cells_anno %>% dplyr::count(Condition))
+    
+    print('lkl')
+    print(head(rownames(cells_anno)))
+    
+    print('lkl')
+    print(head(cells_anno ))
+    
+    cells_order <- rownames(cells_anno)
+    
+    # xprsn_mtx <- seu_dset@assays$RNA@scale.data %>%
+    xprsn_mtx <- seu_dset@assays$RNA@layers$scale.data %>% as.matrix() 
+    colnames(xprsn_mtx) <- colnames(seu_dset)
+    rownames(xprsn_mtx) <- rownames(seu_dset)
+    
+    xprsn_mtx <- xprsn_mtx %>%
+      .[,cells_order] %>%
+      t()  %>% 
+      .[,rownames(gns_tbl)]%>% 
+      t()  %>% 
+      as.matrix()
+    print('lkl')
+    print(dim(cells_anno))
+    print('lkl')
+    print(dim(xprsn_mtx))
+    
+  }
+  
+  ## seurat_smooth - plotting the smoothened seurat gene expression where several cells are grouped together and the mean is calculated. The mean of this group is then used to represent all the cells therein. The group (strain/lab cluster) with the lowest is used to decided the number of chunks to make. These results in the largest cluster being equal to the smallest. - NEED TO CONFIRM IF THIS IS ACCURATE
+  else if (hmap_mode == 'seurat_smooth') {
+    ##Heatmaps with smoothing grouping cells within 0.1 pseudotime values
+    
+    chunked_cells <- seu_dset@meta.data %>% 
+      mutate(ptime_cat = cut(!!rlang::sym(ptime), 
+                             breaks = c(seq(min(!!rlang::sym(ptime)), max(!!rlang::sym(ptime)), chunk_size), max(!!rlang::sym(ptime))), 
+                             right = F, 
+                             include.lowest = T)) %>% 
+      mutate(grp_id = paste0(!!rlang::sym(seu_comps), str_remove_all(ptime_cat, '\\[|\\)'))) %>%
+      # filter(!str_detect(!!rlang::sym(seu_comps), strain2omit_top_bar))%>% 
+      filter(!(!!rlang::sym(seu_comps) %in% strain2omit_top_bar)) %>%
+      mutate(across(grp_id, ~str_replace_all(., ' |,', '_')))%>% 
+      rownames_to_column('cell_bc')
+    
+    
+    ##Prepare the Stage and ptime annotation for the columns ie cell groupings
+    
+    cells_anno = chunked_cells %>% 
+      mutate(across(!!rlang::sym(seu_comps), ~droplevels(factor(., levels = strn_row_anno_order)))) %>% 
+      arrange(!!rlang::sym(seu_comps), !!rlang::sym(ptime))  %>% 
+      group_by(grp_id) %>%
+      mutate(pt_mean = mean(!!rlang::sym(ptime))) %>% 
+      distinct(grp_id, pt_mean, .keep_all = T) %>% 
+      column_to_rownames('grp_id') %>%
+      dplyr::select(!!rlang::sym(seu_comps), pt_mean) %>%
+      rename('Pseudotime' = pt_mean, 'Condition' = !!rlang::sym(seu_comps))
+    
+    cells_order <- rownames(cells_anno)
+    
+    ##Get matrix for counts and convert to dataframe
+    # counts_t <-  seu_dset@assays$RNA@scale.data %>% as.matrix() %>% t() %>% as.data.frame() %>% rownames_to_column('cell_bc')
+    counts_t <- seu_dset@assays$RNA@layers$scale.data %>% as.matrix() 
+    colnames(counts_t) <- colnames(seu_dset)
+    rownames(counts_t) <- rownames(seu_dset)
+    counts_t <- counts_t %>% t() %>% as.data.frame() %>% rownames_to_column('cell_bc')
+    
+    xprsn_mtx <- chunked_cells %>% 
+      dplyr::select(cell_bc, grp_id) %>% 
+      left_join(., counts_t, by='cell_bc') %>% 
+      group_by(grp_id) %>% 
+      summarise(across(starts_with('PF3D7'), mean)) %>%
+      column_to_rownames('grp_id') %>%
+      .[,rownames(gns_tbl)]%>%
+      t()  %>%
+      .[,cells_order] %>%
+      as.matrix()
+    
+    # Troubleshooting
+    # print(dim(cells_anno))
+    # print(dim(xprsn_mtx))
+    
+    # print(head(rownames(cells_anno)))
+    # print(head(colnames(xprsn_mtx)))
+    
+  }
+  
+  
+  
+  ##Cells annotation
+  ##Pseudotime bar color function
+  ptime_color_func = colorRamp2(breaks = c(min(cells_anno[cells_order, 'Pseudotime']), 
+                                           max(cells_anno[cells_order, 'Pseudotime'])), 
+                                colors=c("white",  "#004225"))
+  
+  ##Combine cells annotation (strains/conditions and pseudotime) colors
+  column_ha = HeatmapAnnotation(df = cells_anno[cells_order, , drop = FALSE] %>% 
+                                  dplyr::select(strn_conds, pt_labl),
+                                col = c(list(cells_anno[cells_order, , drop = FALSE] %>% 
+                                               pull(!!rlang::sym(strn_conds)) %>% 
+                                               unique()%>% 
+                                               as.character() %>% 
+                                               col_map[.]) %>% set_names(strn_conds),
+                                        list(ptime_color_func) %>% set_names(pt_labl)
+                                ),
+                                show_legend= list(F) %>% set_names(strn_conds) %>% unlist(),
+                                # annotation_legend_param = list(list(direction = "horizontal")) %>% set_names(pt_labl),
+                                annotation_legend_param = list(list(direction = "horizontal", 
+                                                                    title_gp=gpar(fontsize = lgsize), 
+                                                                    labels_gp = gpar(fontsize = lblsize),
+                                                                    legend_width = unit(4.5, "cm"),
+                                                                    labels_rot = 90)) %>%
+                                  set_names(pt_labl),
+                                annotation_name_gp = gpar(fontsize = anno_trsize, fontface = "bold"),
+                                show_annotation_name = shw_anno_head#,
+                                # list(anno_block(labels = strn_row_anno_order %>% str_replace(., "train ", "") ) %>% set_names(strn_conds))
+                                
+  )
+  
+  ##Genes annotation colors
+  ##Bar coloring
+  row_ha = rowAnnotation(df = gns_tbl[rownames(xprsn_mtx),colnames(gns_tbl), drop = FALSE],
+                         col = rep(list(c('Upregulated' = '#e7a06b', 'Downregulated' = '#9cb4cf' , 'both' = '#7068af')),  # #9bbbe0 	#e0c09b #7068af '#BF4184' '#0079C1' '#9E384D' '#E976A8' '#FF8040' '#A65100'
+                                   each = length(colnames(gns_tbl)))%>% 
+                           set_names( colnames(gns_tbl)),
+                         # annotation_legend_param = rep(list(list(
+                         #   title = "Direction",
+                         #   labels = c('Upregulated', 'Downregulated', 'both'),
+                         #   at = c('Upregulated', 'Downregulated', 'both')
+                         # )), times=length(colnames(gns_tbl[rownames(xprsn_mtx),colnames(gns_tbl), drop = FALSE])))%>% set_names( colnames(gns_tbl[rownames(xprsn_mtx),colnames(gns_tbl), drop = FALSE]))
+                         show_legend= rep(F, times = length(colnames(gns_tbl))) %>% set_names(colnames(gns_tbl)[1:length(colnames(gns_tbl))]),
+                         # show_legend= rep(F, times = length(colnames(gns_tbl))-1) %>% set_names(colnames(gns_tbl)[2:length(colnames(gns_tbl))]),
+                         annotation_name_gp = gpar(fontsize = anno_fsize, fontface = "bold"),
+                         show_annotation_name = shw_left_bar_anno
+  )
+  
+  xprsn_mtx %>%
+    Heatmap(.,
+            cluster_columns = F,
+            show_column_names = F,
+            cluster_rows = F,
+            row_labels = Pf3D7_genes_plasmoDB %>%
+              left_join(data.frame(gene_id=rownames(xprsn_mtx)), ., by=c('gene_id')) %>%  pull(Gene),
+            show_row_names = {{rnames}},
+            left_annotation = row_ha,
+            top_annotation = column_ha,
+            column_split = cells_anno[cells_order,split_col],
+            use_raster = F,
+            # heatmap_legend_param = list(direction = "horizontal", legend_gp = gpar(fontsize = lgsize)),
+            heatmap_legend_param = list(direction = "horizontal", 
+                                        title_gp = gpar(fontsize = lgsize),
+                                        labels_gp = gpar(fontsize = lblsize),
+                                        labels_rot = 90,
+                                        # grid_width = unit(6, "mm"),
+                                        legend_width = unit(lg_width, "cm")),
+            row_names_gp = grid::gpar(fontsize = rsize),
+            # column_labels = strn_row_anno_order %>% str_replace(., "train", "") %>% set_names(strn_row_anno_order),
+            column_title_gp = gpar(fontsize = csize, fontface = "bold"),
+            # column_title_rot = 90,
+            name = "Scaled expression"
+    ) %>%
+    ##Merging legends into 1 column. Could be set to F
+    draw(.,newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", padding = unit(c(botom_pad, 2, 2, 2), "mm"))
+}
+
+```
+
+
+
+```{r}
+# sVs_order <- paste0(c('SC1', 'SC2', 'SC3', 'SC4', 'SC5', 'SC6', 'SC7'), ), c('7G8', 'NF54','NF54_A',  'Lab'))
+# sVs_order <- strain_dset_lvls_don
+strain_dset_lvls_don <- list(c("GamNeg", "GamPos"))
+sVs_order <- strain_dset_lvls_don
+# sVs_order_minus_nf54O <- c('SC1', 'SC2', 'SC3', 'SC4', 'SC5', 'SC6', 'SC7','7G8', 'NF54','Lab')
+# sVs_order_minus_nf54O <- strain_dset_lvls_don[!strain_dset_lvls_don %in%"NF54_A"]
+sVs_order_minus_nf54O <- strain_dset_lvls_don[!strain_dset_lvls_don %in%"NF54_A"]
+
+
+```
+
+All sig genes MAST padj <0.05 and tradeseq waldstat 10
+Tradeseq smooth
+NB!!! - RRERUNNING TRADESEQ TO CHANGE CONDITION NAMES SHOULD SORT THE ERROR IN TRADESEQ PLOTS
+```{r}
+
+ap2g_cols <- c('GamPos' = "#808000",
+              'GamNeg' = '#3cb44b')
+
+# fVl_order <- c('Field', 'Lab')
+
+hmap_gn_tbls <- list(mast_tde_corr_tbls, 
+                     c(lfstrains_comps),
+                     c(lfstrains_comps)) %>%
+  pmap(#possibly(
+    ~{
+    strn_comps_gns_anno_2_plt(pval = 0.05, 
+                              wstat= 10,
+                              stg_pw_gns = ..1,
+                              avglfc_top = 0,
+                              avglfc_botom = -0,
+                              comp_lvls=..2,
+                              sig_strns_annotn_2_keep = ..3,
+                              # strns_annotn_2_omit = 'm[0-9]*_SC._vs_[L|N|7].*',
+                              # strns_annotn_2_omit = 'SC._vs_[L|N|7].*', ##Retain FieldvsLab_c which adds left bar annotation for field combined versus lab combined
+                              strns_annotn_2_omit = 'SC._vs_[L|N|7].*|FieldvsLab_c', ##Remove FieldvsLab_c which adds left bar annotation for field combined versus lab combined
+                              nf54_batch_omit='^.*_vs_NF54_A')
+    
+  }
+  # , 'e')
+  )
+
+list(list(m2_asex_ap2g_bal_batch_ts), 
+     hmap_gn_tbls, 
+     pts_sst, 
+     sVs_order,
+     list(ap2g_cols),
+     rep(c(F), 1), 
+     rep(c(8), 1),
+     rep(13, 1)) %>%
+  pmap(#possibly(
+    ~{hmap_pw_strns_lab_tde(ts_dset= ..1,
+                            gns_tbl=..2,
+                            cap_no = 20,
+                            split_col = 'Condition',
+                            ptime = ..3,
+                            strn_row_anno_order = ..4,
+                            col_map = ..5,
+                            strn_conds = 'Condition',
+                            pt_labl = 'Pseudotime',
+                            hmap_mode='tde_smooth',
+                            rnames = ..6,
+                            rsize = ..7,
+                            anno_fsize = ..8)}
+     #, 'e')
+  )
+
+
+```
+
+!!!NB only use MAST P value and disregard waldstat
+```{r}
+
+hmap_gn_tbls_MAST <- list(mast_tde_corr_tbls, 
+                     c(lfstrains_comps),
+                     c(lfstrains_comps)) %>%
+  pmap(#possibly(
+    ~{
+    strn_comps_gns_anno_2_plt(pval = 0.05, 
+                              wstat= 0,
+                              # wstat= 10, #WSTAT_OFF
+                              stg_pw_gns = ..1,
+                              avglfc_top = 0,
+                              avglfc_botom = -0,
+                              comp_lvls=..2,
+                              sig_strns_annotn_2_keep = ..3,
+                              # strns_annotn_2_omit = 'm[0-9]*_SC._vs_[L|N|7].*',
+                              # strns_annotn_2_omit = 'SC._vs_[L|N|7].*', ##Retain FieldvsLab_c which adds left bar annotation for field combined versus lab combined
+                              strns_annotn_2_omit = 'SC._vs_[L|N|7].*|FieldvsLab_c', ##Remove FieldvsLab_c which adds left bar annotation for field combined versus lab combined
+                              nf54_batch_omit='^.*_vs_NF54_A')
+    
+  }
+  # , 'e')
+  )
+
+```
+
+```{r, fig.width=8, fig.height=4.5}
+# don_objs <- names(msc_g_noLE_ref_ts_sce_ub_de)[str_detect(names(msc_g_noLE_ref_ts_sce_ub_de), "_don$")]
+
+all_labvfld_hms_w_gns_labl<- list(list(m2_asex_ap2g_bal_batch_ts), 
+     # hmap_gn_tbls,  #WSTAT_OFF
+     hmap_gn_tbls_MAST,
+     pts_sst[1], 
+     sVs_order,
+     list(ap2g_cols),
+     m2_asex_ap2g_bal_seu_sst[1],
+     rep('gam', 1),
+     rep(c(0.02), 1),
+     rep(T, 1), 
+     rep(11, 1),
+     c(rep(14, 1)),
+     c(rep(F, 1)),
+     c(rep(T, 1)),
+     c(rep(11, 1)),
+     c(rep(11, 1)),
+     c(rep(2.8, 1)),
+     c(rep(15, 1)),
+     c(rep(18, 1)),
+     c(rep('', 1))) %>%
+  pmap(#possibly(
+    ~{hmap_pw_strns_lab_tde(ts_dset= ..1,
+                            gns_tbl=..2,
+                            cap_no = 20,
+                            split_col = 'Condition',
+                            ptime = ..3,
+                            strn_row_anno_order = ..4,
+                            col_map = ..5,
+                            strn_conds = 'Condition',
+                            pt_labl = 'Pseudotime',
+                            hmap_mode='seurat',
+                            seu_dset = ..6,
+                            seu_comps = ..7,
+                            chunk_size = ..8,
+                            rnames = ..9,
+                            rsize = ..10,
+                            anno_fsize = ..11,
+                            shw_anno_head = ..12,
+                            shw_left_bar_anno = ..13,
+                            lgsize = ..14,
+                            lblsize = ..15,
+                            lg_width = ..16,
+                            strn2dsample = 'Lab',
+                            csize = ..17,
+                            botom_pad = ..18,
+                            strain2omit_top_bar = ..19)}
+    #, 'e')
+  )
+
+all_labvfld_hms_w_gns_labl
+```
+
+
+```{r, fig.width=8, fig.height=4.5}
+# don_objs <- names(msc_g_noLE_ref_ts_sce_ub_de)[str_detect(names(msc_g_noLE_ref_ts_sce_ub_de), "_don$")]
+
+all_labvfld_hms_w_gns_labl<- list(list(m2_asex_ap2g_bal_batch_ts), 
+     # hmap_gn_tbls,  #WSTAT_OFF
+     hmap_gn_tbls_MAST,
+     pts_sst[1], 
+     sVs_order,
+     list(ap2g_cols),
+     m2_asex_ap2g_bal_seu_sst[1],
+     rep('gam', 1),
+     rep(c(0.02), 1),
+     rep(T, 1), 
+     rep(11, 1),
+     c(rep(14, 1)),
+     c(rep(F, 1)),
+     c(rep(T, 1)),
+     c(rep(11, 1)),
+     c(rep(11, 1)),
+     c(rep(2.8, 1)),
+     c(rep(15, 1)),
+     c(rep(18, 1)),
+     c(rep('', 1))) %>%
+  pmap(#possibly(
+    ~{hmap_pw_strns_lab_tde(ts_dset= ..1,
+                            gns_tbl=..2,
+                            cap_no = 20,
+                            split_col = 'Condition',
+                            ptime = ..3,
+                            strn_row_anno_order = ..4,
+                            col_map = ..5,
+                            strn_conds = 'Condition',
+                            pt_labl = 'Pseudotime',
+                            hmap_mode= 'seurat_smooth',
+                            seu_dset = ..6,
+                            seu_comps = ..7,
+                            chunk_size = ..8,
+                            rnames = ..9,
+                            rsize = ..10,
+                            anno_fsize = ..11,
+                            shw_anno_head = ..12,
+                            shw_left_bar_anno = ..13,
+                            lgsize = ..14,
+                            lblsize = ..15,
+                            lg_width = ..16,
+                            strn2dsample = 'Lab',
+                            csize = ..17,
+                            botom_pad = ..18,
+                            strain2omit_top_bar = ..19)}
+    #, 'e')
+  )
+
+all_labvfld_hms_w_gns_labl
+```
+
+
+
+

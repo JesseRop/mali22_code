@@ -1,0 +1,48 @@
+---
+title: "pkgs_load_trial_sk25"
+output: html_document
+date: "2024-04-19"
+---
+```{r}
+# suppressPackageStartupMessages({
+library(Seurat)
+  library(sctransform)
+  library(glmGamPoi)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  library(scmap)
+  # library(ggsankey)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+# })
+```

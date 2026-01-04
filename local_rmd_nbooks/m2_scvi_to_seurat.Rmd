@@ -1,0 +1,367 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  # library(dreamlet)
+  # library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#  integration of all MSC
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r}
+obj_names = c('M55', 'no_M55')
+
+```
+
+```{r}
+map(obj_names, ~Convert(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_", .x,".h5ad"), dest = "h5seurat", overwrite = T))
+```
+
+```{r}
+m2_all_scvi_seu <- map(obj_names, ~LoadH5Seurat(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_", .x,".h5seurat"), meta.data = FALSE, misc = FALSE)) %>% set_names(obj_names)
+```
+
+```{r}
+m2_all_scvi_mdata <- map(obj_names, ~read_csv(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_mdata_", .x,".csv"))) 
+```
+
+
+
+```{r}
+m2_all_scvi_seu <- map2(m2_all_scvi_seu, m2_all_scvi_mdata, ~AddMetaData(.x, .y %>% column_to_rownames("...1")))
+```
+
+
+```{r}
+m2_all_scvi_seu
+
+```
+
+
+```{r}
+map(m2_all_scvi_seu, ~DimPlot(.x, group.by = "leiden", reduction = "umap", label = T))
+
+```
+
+
+```{r}
+# saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/m2_all_scvi_seu.RDS")
+saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/m2_all_scvi_seu3.RDS")
+
+```
+
+```{r}
+# m2_all_scvi_seu <- readRDS("data/processed/Pf/m2_all/m2_all_scvi_seu3.RDS")
+
+```
+
+```{r}
+# m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg.RDS")
+# m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_mrg3.RDS")
+m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_mrg3.RDS")
+
+```
+
+```{r}
+m2_all_raw_mrg <- JoinLayers(m2_all_raw_mrg)
+m2_all_raw_mrg <- NormalizeData(m2_all_raw_mrg)
+```
+
+```{r}
+m2_all_raw_mrg_list <- list(m2_all_raw_mrg, m2_all_raw_mrg[,m2_all_raw_mrg$orig.ident != "MSC55.mrna"]) %>% set_names(obj_names)
+
+```
+
+
+```{r}
+###!!!!! NOTE - CHEATING - Rerun scvi - unassigned and doublet strains have been removed from seurat object but this update object has not been reran in jupyter
+# map(m2_all_scvi_seu, m2_all_raw_mrg_list, ~.x[,colnames(.x) %in% colnames(.y)])
+```
+
+```{r}
+m2_all_raw_mrg_list <- map(m2_all_scvi_seu, ~m2_all_raw_mrg[,colnames(.x)]) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Add scvi dimensions to the seurat object
+for (nm in names(m2_all_raw_mrg_list)) {
+  m2_all_raw_mrg_list[[nm]][["scvi_umap"]] <- m2_all_scvi_seu[[nm]][["umap"]]
+  m2_all_raw_mrg_list[[nm]][["scvi"]] <- m2_all_scvi_seu[[nm]][["scVI"]]
+  m2_all_raw_mrg_list[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")] <- m2_all_scvi_seu[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")]
+}
+```
+
+
+```{r}
+m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~AddMetaData(.x, 
+                                  .x@meta.data %>%
+                                    mutate(stage = stage_fld,
+                                           stage_afm = case_when(stage %in% c("Early ring", "Late ring", "Early trophozoite", "Late trophozoite", "Schizont", "Gametocyte (developing)") ~ "Asexual",
+                                                               stage %in% c("Female", "Female (LE)") ~ "Female",
+                                                               stage %in% c("Male", "Male (LE)") ~ "Male"),
+                                           stage_ag = case_when(stage_afm %in% c("Female", "Female (LE)","Male", "Male (LE)") ~ "Gametocyte",
+                                                                T ~ stage_afm)) %>%
+                                    select(stage_afm, stage_ag)
+                                  ))
+
+```
+
+
+
+```{r}
+map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+
+```
+
+```{r, fig.height=6, fig.width=10}
+map(m2_all_raw_mrg_list, ~DimPlot(.x, reduction = "scvi_umap", group.by = "stage_fld", cols = sp_col_new, pt.size = 0.01, raster = F))
+```
+
+```{r}
+# map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "umap.rpca_sct_PC10", label = T))
+
+```
+
+```{r}
+# saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS")
+# saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
+imap(m2_all_raw_mrg_list, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/m2_all_raw_mrg_", .y, "_3.RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+m2_all_raw_mrg_list_umap_mdata <- map(m2_all_raw_mrg_list, ~{
+  .x@meta.data %>% 
+    rownames_to_column("bcode") %>%
+      left_join(., .x@reductions$scvi_umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") %>%
+      left_join(., .x@reductions$scvi@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode")
+})
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Save the clean umaps for plotting
+# saveRDS(m2_all_raw_mrg_list_umap_mdata, "data/processed/Pf/m2_all/all_stgs_figs/m2_all_raw_mrg_list_umap_mdata.RDS")
+imap(m2_all_raw_mrg_list_umap_mdata, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/m2_all_raw_mrg_", .y, "_umap_mdata_3.RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(m2_all_raw_mrg_list)) {
+  m2_all_raw_mrg_list[[nm]][["RNA"]]$data <- as(m2_all_raw_mrg_list[[nm]][["RNA"]]$data, Class = "dgCMatrix")
+  # Idents(m2_all_raw_mrg_list[[nm]]) <- "leiden"
+}
+```
+
+
+```{r}
+# saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS")
+# saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
+
+```
+
+
+```{r}
+m2_all_raw_mrg_list_stg <- map(m2_all_raw_mrg_list, ~SplitObject(.x, split.by= "stage_afm")) %>% unlist(., recursive = F)
+```
+
+
+```{r}
+map(m2_all_raw_mrg_list_stg, ~.x@meta.data %>% count(stage_afm, leiden) %>% arrange(desc(n)))
+
+```
+
+
+```{r}
+m2_all_raw_mrg_list_stg <- map(m2_all_raw_mrg_list_stg, ~SetIdent(.x, value = "leiden"))
+
+```
+
+
+```{r}
+scvi_markers <- map(m2_all_raw_mrg_list_stg, ~FindAllMarkers(.x ))
+```
+
+
+```{r}
+map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+scvi_markers_anot <- map(scvi_markers, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+# scvi_markers_anot
+```
+
+
+```{r}
+# saveRDS(scvi_markers_anot, "data/processed/Pf/m2_all/scvi_markers_anot.RDS")
+saveRDS(scvi_markers_anot, "data/processed/Pf/m2_all/scvi_markers_anot3.RDS")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(scvi_markers_anot, ~.x %>% 
+  # filter(gene %in% gns) %>% 
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 5) %>% 
+    slice_max(order_by = avg_log2FC, n = 5))
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+map2(scvi_markers_anot[c("M55.Female", "no_M55.Female")], list(c("8"), c("9", "13", "10")), ~.x %>% 
+  filter(cluster %in% .y) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 10)%>% 
+    slice_min(order_by = pct.2, n = 10))
+```
+
+Cluster 9 - activated like 
+
+Gamete top marker - PF3D7_0825800 https://www.nature.com/articles/s41586-025-09653-0
+Ngwa activated gametocytes https://opus.bibliothek.uni-wuerzburg.de/opus4-wuerzburg/frontdoor/deliver/index/docId/6822/file/PhD_thesis_Che_Julius_Ngwa_final.pdf
+
+```{r, warning=FALSE, message=FALSE}
+## Ngwa activated gametocytes https://opus.bibliothek.uni-wuerzburg.de/opus4-wuerzburg/frontdoor/deliver/index/docId/6822/file/PhD_thesis_Che_Julius_Ngwa_final.pdf
+ngwa_up_activ_gam <- c("PF3D7_0827800", "Pf3D7_1246200", "PF3D7_1218800", "PF3D7_1239400", "PF3D7_0704100", "PF3D7_0417400", "PF3D7_1321000", "PF3D7_131670") %>% str_replace(., "_", "-")
+
+map(scvi_markers_anot[c("M55.Female", "no_M55.Female")], ~.x %>% 
+  filter(gene %in% ngwa_up_activ_gam) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+  arrange(desc(avg_log2FC)) )
+```
+```{r, warning=FALSE, message=FALSE}
+## Gamete top marker - PF3D7_0825800 https://www.nature.com/articles/s41586-025-09653-0
+map(m2_all_raw_mrg_list, ~FeaturePlot(.x, features = c("PF3D7-0825800"), order =T, ncol = 1))
+
+```
+```{r, warning=FALSE, message=FALSE}
+map2(scvi_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("18","21", "8"), c("14","20", "9")), ~.x %>% 
+  filter(cluster %in% .y) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 10))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=6}
+map(m2_all_raw_mrg_list_stg[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = c("PF3D7-0829900", "PF3D7-1229200", "PF3D7-1222600", "PF3D7-1102500", "PF3D7-0818900"), order =T, ncol = 3))
+
+```
+
+cold-activated noncoding RNAs Temperature Regulated Untranslated Lncrna (tru-lncRNA) 
+https://www.sciencedirect.com/science/article/pii/S0378111923003578 
+https://www.nature.com/articles/s41564-021-00940-w
+https://pmc.ncbi.nlm.nih.gov/articles/PMC12235521/
+https://onlinelibrary.wiley.com/doi/10.1111/1744-7917.13383
+```{r, warning=FALSE, message=FALSE}
+cold_activated_RNAs <- c("PF3D7-1148100", "PF3D7-1148200", "PF3D7-1148500", "PF3D7-1370500", "PF3D-1370800", "PF3D7-1370900")
+```
+
+
+```{r, fig.width=14, fig.height=8}
+map(m2_all_raw_mrg_list_stg[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = cold_activated_RNAs, order =T, ncol = 3))
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+map2(scvi_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("14","16", "17"), c("16","15", "10")), ~.x %>% 
+  filter(cluster %in% .y) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 30))
+```

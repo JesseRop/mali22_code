@@ -194,11 +194,13 @@ msc_w_cln_strns_w_don_mdata %>%
 
 ```{r, fig.width= 7, fig.height=3.5}
 stage_dist_plot <- msc_w_cln_strns_w_don_mdata %>%
-  filter(donor != "M12") %>%
-  count(condition, donor, stage_ag, stage) %>% 
-  mutate(Stage_ag = factor(stage_ag, levels = c("Gametocytes", "Asexual")),
+  filter(donor != "M12")%>% 
+  mutate(Stage_ag = factor(str_extract(stage_ag, "^."), levels = c("A", "G")),
+         # Stage_ag = factor(stage_ag, levels = c("Gametocyte", "Asexual")),
          across(condition, ~str_extract(., "^.")),
-         Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic")) %>% 
+         Condition = ifelse(condition == "A", "Asymptomatic", "Symptomatic"),
+         across(stage, droplevels)) %>%
+  count(Condition, donor, Stage_ag, stage, .drop = F) %>% 
   group_by(donor, Stage_ag) %>% 
   # filter(n>20) %>%
   mutate("total" = sum(n), 
@@ -216,7 +218,7 @@ stage_dist_plot +
   theme(strip.text.y.right = element_text(angle = 360),
         axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "bottom")  +
-    guides(fill = guide_legend(title = "Stage", title.position = "top", nrow = 1))
+    guides(fill = guide_legend(title = "Stage", title.position = "top", nrow = 2))
   
 
 ```

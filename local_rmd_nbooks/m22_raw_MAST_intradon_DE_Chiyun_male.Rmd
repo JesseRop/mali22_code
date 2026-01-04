@@ -150,15 +150,15 @@ map(all_sct_intgrtd_male_lst, ~DimPlot(.x, reduction = "umap.rpca_sct_PC10", gro
 
 
 ```{r}
-pmap(list(all_sct_intgrtd_male_lst, c(0,5.1), c(-10.5,-2)),  ~DimPlot(..1, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = F, pt.size = 0.4) + geom_vline(xintercept =  ..2) + geom_hline(yintercept =  ..3))
+pmap(list(all_sct_intgrtd_male_lst, c(-2,-3), c(-4,2.5)),  ~DimPlot(..1, reduction = "umap.rpca_sct_PC10", group.by = "rpca_sct_PC10_clusters", label = F, pt.size = 0.4) + geom_vline(xintercept =  ..2) + geom_hline(yintercept =  ..3))
 ```
 
 ```{r}
-all_sct_intgrtd_male <- pmap(list(all_sct_intgrtd_male_lst, c(0,5.1), c(-10.5,-2)),  ~..1[, ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_1"] > ..2 & ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_2"] > ..3]
+all_sct_intgrtd_male <- pmap(list(all_sct_intgrtd_male_lst, c(-2,-3), c(-4,2.5)),  ~..1[, ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_1"] < ..2 & ..1@reductions[["umap.rpca_sct_PC10"]]@cell.embeddings[, "umaprpcasctPC10_2"] > ..3]
 )
 ```
 
-```{r}
+```{r, eval=F}
 map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "umap.rpca_sct_PC10", cells.highlight = colnames(.x[,.x$rpca_sct_PC10_clusters == "25"])))
 ```
 
@@ -186,7 +186,7 @@ map(all_sct_intgrtd_male, ~table(.x$orig.ident))
 
 ```{r}
 ## Donors with more than 50 cells
-don_50 <- map(all_sct_intgrtd_male, ~table(.x$donor) %>% data.frame() %>% filter(Freq >= 100) %>% pull(Var1) %>% as.character)
+don_50 <- map(all_sct_intgrtd_male, ~table(.x$donor) %>% data.frame() %>% filter(Freq >= 40) %>% pull(Var1) %>% as.character)
 ```
 
 ```{r}
@@ -198,7 +198,7 @@ all_sct_intgrtd_male <- map2(all_sct_intgrtd_male, don_50, ~subset(.x, subset = 
 ```{r, warning=FALSE, message=FALSE}
 # run standard seurat normalization
 all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~NormalizeData(.x))
-all_sct_intgrtd_male <- map2(all_sct_intgrtd_male, c(1000, 200), ~FindVariableFeatures(.x, nfeatures = .y))
+all_sct_intgrtd_male <- map2(all_sct_intgrtd_male, c(1000, 100), ~FindVariableFeatures(.x, nfeatures = .y))
 all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~ScaleData(.x, verbose = F))
 
 ```
@@ -219,7 +219,7 @@ all_sct_intgrtd_male <- map(all_sct_intgrtd_male, ~FindClusters(.x, resolution =
 ```{r, warning=FALSE, message=FALSE}
 # run sctransform
 map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "pca"))
-map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "pca", group.by = "orig.ident"))
+map(all_sct_intgrtd_male, ~DimPlot(.x, reduction = "pca", group.by = "orig.ident", label = T))
 
 
 ```
@@ -355,11 +355,37 @@ male_mks_anot <- map(male_mks, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("ge
 male_mks_anot
 ```
 
+```{r, warning=FALSE, message=FALSE}
+map(male_mks_anot, ~.x %>% 
+  # filter(gene %in% gns) %>% 
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 10) %>% 
+    slice_max(order_by = avg_log2FC, n = 10))
+```
+
 
 ```{r, warning=FALSE, message=FALSE}
-male_mks_anot[["male"]] %>% filter(cluster == "6" & avg_log2FC >0)# %>% filter( avg_log2FC >1)
-male_mks_anot[["male"]] %>% filter(cluster == "6" & avg_log2FC >0 & pct.2 < 0.1)# %>% filter( avg_log2FC >1)
+male_mks_anot[["male"]] %>% filter(cluster == "3" & avg_log2FC >0)# %>% filter( avg_log2FC >1)
+male_mks_anot[["male"]] %>% filter(cluster == "3" & avg_log2FC >0 & pct.2 < 0.1)# %>% filter( avg_log2FC >1)
 
+```
+
+```{r, warning=FALSE, message=FALSE}
+male_mks_anot[["male"]] %>% filter(cluster == "2" & avg_log2FC >0)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(male_mks_anot, ~.x %>% 
+  filter(gene %in% gns) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 10) %>% 
+    slice_max(order_by = avg_log2FC, n = 10))
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=4}

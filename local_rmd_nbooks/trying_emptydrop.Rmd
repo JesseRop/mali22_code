@@ -1,0 +1,177 @@
+---
+title: "EmptyDrop with lower UMI limits"
+output: 
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: true
+    code_folding: hide
+    df_print: paged
+    theme: cerulean
+---
+
+https://support.bioconductor.org/p/9151199/#9151459
+
+
+```{r}
+library("knitr")
+library("ggplot2")
+library("DropletUtils")
+library("gridExtra")
+
+dir <- "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/"
+outdir <- "/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/rdata/PmML03_PowML03_QC_objects/"
+
+species_name <- "PmML03"
+sp_bc_raw <- list.files(paste0(dir, "cellranger_matrices/", species_name, "_matrices"),
+                        pattern = "raw_feature_bc_matrix",
+                        full.names = TRUE,
+                        recursive = TRUE,
+                        include.dirs = TRUE
+)
+
+# Extract Sanger Sample ID from file paths
+sanger_ids <- basename(dirname(dirname(sp_barcodes_dirs_to_show))) # Extracts sample IDs from paths
+msc_ids <- c("MSC5", "MSC15", "MSC16", "MSC21_22_23", "MSC27", "MSC35", 
+             "MSC36", "MSC42", "MSC44", "MSC47", "MSC52", "MSC36_JC")
+
+sp_barcodes_dirs_to_show <- sp_bc_raw
+
+# Initialize table to store the number of real cells for each sample at each limit
+cell_count_table <- data.frame(
+  Limit = c("Raw Data", as.character(limits)),
+  matrix(NA, nrow = length(limits) + 1, ncol = length(sanger_ids))
+)
+colnames(cell_count_table) <- c("Limit", msc_ids)
+```
+
+```{r}
+# Storage for processed data (is.cell results per sample and limit)
+processed_data <- list()
+```
+
+```{r}
+# Loop through each sample
+for (i in seq_along(sp_barcodes_dirs_to_show)) {
+  d <- sp_barcodes_dirs_to_show[i]
+  
+  cat("\n### Processing Sample:", sanger_ids[i], " (MSC ID:", msc_ids[i], ")\n")
+
+  # Load raw data ONCE per sample
+  sce <- read10xCounts(d)
+
+  # Compute total UMI counts per barcode (raw data)
+  raw_ncounts <- colSums(counts(sce))
+  
+  # Compute total feature count (non-zero genes) for raw data
+  raw_feature_counts <- colSums(counts(sce) > 0)
+
+  # Store initial count before filtering in table
+  cell_count_table[1, i + 1] <- length(raw_ncounts)
+
+  # Storage for `is.cell` results across all limits
+  sample_results <- list()
+
+  # Loop through limits for this sample
+  for (limit_idx in seq_along(limits)) {
+    limit <- limits[limit_idx]
+    cat("\nProcessing limit:", limit, " for Sample:", sanger_ids[i], "\n")
+    
+    # Run emptyDrops with the current limit
+    e.out <- emptyDrops(counts(sce), lower=limit, test.ambient=TRUE)
+
+    # Identify real cells
+    is.cell <- e.out$FDR <= 0.01
+    real_cell_count <- sum(is.cell, na.rm=TRUE)
+
+    # Store real cell count in table
+    cell_count_table[limit_idx + 1, i + 1] <- real_cell_count
+
+    # Store results
+    sample_results[[as.character(limit)]] <- data.frame(
+      Total_UMI = raw_ncounts,
+      Total_Features = raw_feature_counts,
+      FDR = e.out$FDR,
+      Is_Cell = ifelse(is.cell, "Cell", "Non-Cell"),
+      Limit = limit
+    )
+  }
+
+  # Store processed data for this sample
+  processed_data[[sanger_ids[i]]] <- sample_results
+}
+
+```
+## Plots for limits 100-500
+
+```{r warning=FALSE}
+# Generate plots for all samples and limits at once
+for (limit_idx in seq_along(limits)) {
+  limit <- limits[limit_idx]
+  cat("\n### Displaying All Samples for Limit:", limit, "\n")
+
+  # Loop through all samples and plot their data for this limit
+  for (i in seq_along(sanger_ids)) {
+    sample_id <- sanger_ids[i]
+    
+    if (!is.null(processed_data[[sample_id]][[as.character(limit)]])) {
+      sample_data <- processed_data[[sample_id]][[as.character(limit)]]
+
+      cat("\n### Plotting Sample:", sample_id, " (MSC ID:", msc_ids[i], ") for Limit:", limit, "\n")
+
+      # === PLOT 1: FDR vs Total UMI Count ===
+      ggplot(sample_data, aes(x = Total_UMI, y = FDR, color = Is_Cell)) +
+        geom_point(alpha = 0.5, size = 0.3) +
+        scale_color_manual(values = c("red", "black")) +
+        labs(title = paste("MSC ID:", msc_ids[i], "| Sample:", sample_id, "| Limit:", limit),
+             x = "Total UMI Count",
+             y = "False Discovery Rate (FDR)",
+             color = "Cell Status") +
+        theme_minimal() -> p1
+      print(p1)
+
+      # === PLOT 2: Total Feature Count vs Total UMI Count ===
+      ggplot(sample_data, aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+        geom_point(alpha = 0.5, size = 0.3) +
+        scale_color_manual(values = c("red", "black")) +
+        labs(title = paste("MSC ID:", msc_ids[i], "| Sample:", sample_id, "| Limit:", limit),
+             x = "Total UMI Count",
+             y = "Total Feature Count (Non-Zero Genes)",
+             color = "Cell Status") +
+        theme_minimal() -> p2
+      print(p2)
+
+      # === PLOT 3: Zoomed-In (0-1000 UMI) ===
+      ggplot(sample_data, aes(x = Total_UMI, y = Total_Features, color = Is_Cell)) +
+        geom_point(alpha = 0.5, size = 0.3) +
+        scale_color_manual(values = c("red", "black")) +
+        labs(title = paste("MSC ID:", msc_ids[i], "| Sample:", sample_id, "| Limit:", limit),
+             x = "Total UMI Count",
+             y = "Total Feature Count (Non-Zero Genes)",
+             color = "Cell Status") +
+        xlim(0, 3000) +
+        ylim(0, 500) +
+        theme_minimal() -> p3
+      print(p3)
+    }
+  }
+}
+```
+
+
+
+## Table
+```{r warning=FALSE}
+# Display final cell count table
+cat("\n## Number of Real Cells per Sample and Limit\n")
+kable(cell_count_table, caption = "Real cell count per sample across different limits")
+
+```
+
+
+## Save data
+```{r}
+saveRDS(processed_data, paste0(outdir, "Part1_EmptyDrops_pm_samples_100_to_500.RDS"))
+```
+
+

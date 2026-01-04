@@ -74,7 +74,7 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_1vcf_header.R")
-source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_preQC_1VCF_final_header.R")
+source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_headers/m2_pbulk_gtypes_preQC_1VCF_final_header.R")
 
 ```
 
@@ -357,10 +357,15 @@ ss_cln_all_mtx <- list(ss_cln_gt_tbl_ag, ss_cln_gt_tbl_s, ss_cln_gt_tbl_a, ss_cl
 ```{r, warning=FALSE, eval=T}
 # prev_sv_dir = 
 # strn_c_new_mdata_m22_min_qcd <- readRDS(paste0("data/processed/",species, "/" , gtyp_step, "/strn_c_new_mdata_m22_min_qcd.RDS"))
+# msc_w_cln_strns_mdata <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns_mdata.RDS")
 msc_w_cln_strns_mdata <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns_mdata.RDS")
+
 msc_w_cln_strns_mdata_strains <- msc_w_cln_strns_mdata %>% 
-  mutate(stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes"),
-         StrainQCd_Man = strain)  %>% 
+  # mutate(stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocytes"),
+  #        StrainQCd_Man = strain)  %>% 
+  mutate(stage_ag = ifelse(stage %in% c("Early ring", "Late ring", "Early trophozoite"), "Asexual", "Gametocytes"),
+         StrainQCd_Man = Strain_DN,
+         StrainDon = paste0(str_remove(donor, "SC"),"_",Strain_DN))  %>% 
   select(StrainQCd_Man, StrainDon, stage_ag, donor)
 ```
 
@@ -990,31 +995,36 @@ saveRDS(dcf_pm, "data/processed/Pf/dcf_pm.rds")
 Run below in farm
 ```{r, eval=T}
 gogogo()
+## NOTE - Takes long so request an interactive session and run there
+
 # dcifer
 # module load HGI/softpack/groups/team222/Pf_scRNAseq/25
-# bsub -Is -q normal -n 25 -M 150000 -R "span[hosts=1] select[mem>150000] rusage[mem=150000]" R
+# bsub -Is -q normal -n 10 -M 15000 -R "span[hosts=1] select[mem>15000] rusage[mem=15000]" R
+
+
+## bsub -Is -q normal -n 25 -M 150000 -R "span[hosts=1] select[mem>150000] rusage[mem=150000]" R
 
 
 ```
 
 ```{r, eval=F}
 
-# library(dplyr) 
+# library(dplyr)
 # library(dcifer)
-
-# setwd("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/")
+# 
+# # setwd("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/")
 # dcf_pm <- readRDS("data/processed/Pf/dcf_pm.rds")
-#   
+# #
 # dsmp_pm <- formatDat(dcf_pm, svar = "sampleID", lvar = "locus", avar = "allele")
 # saveRDS(dsmp_pm, "data/processed/Pf/dsmp_pm.rds")
-# 
+# #
 # coi_pm  <- rep(1, dim(dcf_pm)[1]) %>% set_names(paste0(dcf_pm$sampleID,".", dcf_pm$locus))
 # saveRDS(coi_pm, "data/processed/Pf/coi_pm.rds")
-# 
+# #
 # afreq_pm <- calcAfreq(dsmp_pm, coi_pm, tol = 1e-5)
 # str(afreq_pm, list.len = 2)
 # saveRDS(afreq_pm, "data/processed/Pf/afreq_pm.rds")
-# 
+# #
 # dres0_pm <- ibdDat(dsmp_pm, coi_pm, afreq_pm, pval = TRUE, confint = TRUE, rnull = 0,
 #                 alpha = 0.05, nr = 1e3)
 # saveRDS(dres0_pm, "data/processed/Pf/dres0_pm.rds")
@@ -1035,6 +1045,8 @@ saveRDS(dcf_pm_ag, "data/processed/Pf/dcf_pm_ag.rds")
 Run below in farm
 ```{r, eval=T}
 gogogo()
+## NOTE - Takes long so request an interactive session and run there
+
 # dcifer
 # module load HGI/softpack/groups/team222/Pf_scRNAseq/25
 # bsub -Is -q normal -n 25 -M 150000 -R "span[hosts=1] select[mem>150000] rusage[mem=150000]" R
