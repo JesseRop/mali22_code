@@ -109,7 +109,8 @@ cond_gns_de_asx <- readRDS('data/processed/Pf/cond_gns_de_asx.RDS')
 ```{r, results='asis', warning=F, message=F}
 solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
 solo_don2 <- c("MSC49",  "MSC66")
-
+solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
+solo_don2 <- c("MSC49",  "MSC66")
 
 # all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
 all_sig_asx_gns <- map(cond_gns_de_asx[solo_don2], ~{
