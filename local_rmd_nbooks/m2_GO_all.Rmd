@@ -76,6 +76,11 @@ knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/u
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
+```{r, results='asis', warning=F, message=F}
+solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
+
+```
+
 Read in tradeseq files from local
 ```{r}
 mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
@@ -85,14 +90,15 @@ mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_.*_ts.RDS$", f
 
 ```
 
-
 Read in tradeseq files from local
 ```{r}
 asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+  .[names(m2_asex_bal_sce)] %>%
   map(readRDS)
 
 ```
+
 
 ```{r}
 ##save condition results for GSEA
@@ -107,13 +113,13 @@ cond_gns_de_asx <- readRDS('data/processed/Pf/cond_gns_de_asx.RDS')
 
 
 ```{r, results='asis', warning=F, message=F}
-solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
-solo_don2 <- c("MSC49",  "MSC66")
-solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
-solo_don2 <- c("MSC49",  "MSC66")
+# solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
+# solo_don2 <- c("MSC49",  "MSC66")
+solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
+solo_don2 <- c("MSC49C",  "MSC66C")
 
 # all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
-all_sig_asx_gns <- map(cond_gns_de_asx[solo_don2], ~{
+all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
   .x %>% 
   select(-c(starts_with("df"))) %>%
   rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
@@ -156,9 +162,11 @@ all_sig_m_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_m
 
 ```{r, results='asis', warning=F, message=F}
 # a_af_separator <- c("[0-9]_f$", "[0-9]_a_f$") %>% set_names(c("f", "a_f"))
-stg_nms <- c("f", "m", "asx")
+stg_nms <- c(#"f", "m", 
+             "asx")
 
-all_sig_gns_df <- map(list(all_sig_f_gns, all_sig_m_gns, all_sig_asx_gns), ~{
+all_sig_gns_df <- map(list(#all_sig_f_gns, all_sig_m_gns, 
+                           all_sig_asx_gns), ~{
   .x %>%
   bind_rows(., .id = "donor") %>%
   group_by(gene_id) %>%
@@ -240,7 +248,9 @@ map(all_sig_gns_df, ~{.x %>%
 ```{r, results='asis', warning=F, message=F}
 # fem_gns_don <- map2(all_sig_gns_df,c(4,4,2), ~{.x %>% 
 # fem_gns_don <- map2(c(all_sig_gns_df, all_sig_gns_df["asx"]), c(3,3,2,1), ~{.x %>% 
-fem_gns_don <- map2(c(all_sig_gns_df[1:2], all_sig_gns_df["asx"]), c(3,3,1), ~{.x %>% 
+# fem_gns_don <- map2(c(all_sig_gns_df[1:2], all_sig_gns_df["asx"]), c(3,3,1), ~{.x %>% 
+fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(1), ~{.x %>% 
+
   filter(freq_btwn_don >= .y) %>%
   distinct(gene_id, .keep_all = T) 
 })
@@ -320,8 +330,8 @@ DE_unvrs_gns_m <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_m")], ~{
 ## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
 ## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
 
-# DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don], ~{
-DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don2], ~{
+DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don], ~{
+# DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don2], ~{
   
   CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
   rownames()
@@ -341,9 +351,11 @@ DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don2], ~{
 ```
 
 ```{r}
-stg_nms2 <- c("f", "m", "asx2")
+# stg_nms2 <- c("f", "m", "asx2")
+stg_nms2 <- c("asx2")
 ## Get the field and lab DE genes
-DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
+# DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
+DE_unvrs <- list(DE_unvrs_gns_asx) %>% set_names(stg_nms2)
 
 ```
 
@@ -354,6 +366,13 @@ DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx) %>% set_names
 Pf3D7_68_gaf_F <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_F.rds")
 Pf3D7_68_gaf_P <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_P.rds")
 Pf3D7_68_gaf_C <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_68_gaf_C.rds")
+
+##!!!!NOTE - PF68 GO FILES ARE BROKEN AND I'M NOT ABLE TO REMAKE THEM. Using the old 63 instead
+Pf3D7_68_gaf_F <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_63_gaf_F.rds")
+Pf3D7_68_gaf_P <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_63_gaf_P.rds")
+Pf3D7_68_gaf_C <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_63_gaf_C.rds")
+Pf3D7_68_gaf <- readRDS("../../Pf3D7_genomes_gtfs_indexs/Pf3D7_63_gaf.rds")
+
 
 # Pf3D7_63_gaf_txt <- read_delim("../../Pf3D7_genomes_gtfs_indexs/PlasmoDB-66_Pfalciparum3D7_GO.gaf", skip = 1, delim = '\t', col_types = paste(rep('c', 17), collapse = ''), col_names = paste0('X', (1:17)))
 # 
@@ -458,7 +477,8 @@ gt_grob <- function(gt_object, wth = NULL, hgt = NULL, ...){
 
 ```{r, fig.height= 8, fig.width=7}
 ##Function to create binned windows across genome and compare pairwise strains and generate the plotting details for chromosome painting
-fem_gns_pos <- fem_gns_don[["f"]] %>% 
+# fem_gns_pos <- fem_gns_don[["f"]] %>% 
+fem_gns_pos <- fem_gns_don[["asx"]] %>% 
   left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Genomic Location (Gene)")]) %>%
   mutate("chr" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7_|_v3.*"),
          "start_pos" = str_remove_all(`Genomic Location (Gene)`, "Pf3.*v3:|\\..*|,"), 
@@ -490,7 +510,7 @@ fem_gns_pos%>%
 
 ```{r}
 library(GenomicRanges)
-pf_chr_size <- read_table("../../Pf3D7_genomes_gtfs_indexs/Pdb66_Genome.size", col_names = F) 
+pf_chr_size <- read_table("/lustre/scratch126/tol/teams/lawniczak/users/jr35/Pf3D7_genomes_gtfs_indexs/Pf_Pdb68_Genome.size", col_names = F) 
 # Define genome bins (e.g., 100 kb bins)
 
 # chroms_nmd <- pf_chr_size$X2 %>% set_names(paste0("chr_", str_remove_all(pf_chr_size$X1, "Pf3D7|_0|_v3|_")))
@@ -635,7 +655,7 @@ ggplot(bin_data, aes(x = start, y = enrichment, color = adj_p_value < 0.05)) +
 ```
 
 ```{r}
-
+go()
 ```
 
 ```{r}
