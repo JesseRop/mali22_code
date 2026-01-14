@@ -53,6 +53,7 @@ suppressPackageStartupMessages({
   conflicts_prefer(dplyr::filter)
   conflicts_prefer(dplyr::rename)
   conflicts_prefer(dplyr::count)
+  conflicts_prefer(dplyr::select)
   # library(knitr)
 })
 ```
@@ -74,6 +75,8 @@ knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/u
 # source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
 # source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/strain_DE/strain_DE_common_fns.R")
+
 ```
 
 ```{r, results='asis', warning=F, message=F}
@@ -82,7 +85,7 @@ solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
 ```
 
 Read in tradeseq files from local
-```{r}
+```{r, eval=FALSE}
 mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
 # mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_a_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq/m2_mf_bal|_t.*'))) %>%
@@ -94,13 +97,13 @@ Read in tradeseq files from local
 ```{r}
 asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
-  .[names(m2_asex_bal_sce)] %>%
+  .[solo_don] %>%
   map(readRDS)
 
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 ##save condition results for GSEA
 cond_gns_de_gam <- readRDS('data/processed/Pf/cond_gns_de_gam.RDS')
 ```
@@ -112,27 +115,47 @@ cond_gns_de_asx <- readRDS('data/processed/Pf/cond_gns_de_asx.RDS')
 ```
 
 
+```{r}
+##save condition results for GSEA
+mast_tde_corr_tbls <- readRDS('data/processed/Pf/m2_all/strain_DE/mast_tde_corr_tbls.RDS')
+```
+
+
 ```{r, results='asis', warning=F, message=F}
 # solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
 # solo_don2 <- c("MSC49",  "MSC66")
 solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
 solo_don2 <- c("MSC49C",  "MSC66C")
 
-# all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
-all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
-  .x %>% 
-  select(-c(starts_with("df"))) %>%
-  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
-  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
-                     # names_pattern = "(.*)_(SC._vs.*)",
-                     names_pattern = "(waldStat|pvalue)_(.*)",
-                     names_to = c( ".value", "ts_pw_comp")) %>%
-    filter(waldStat > 20 & pvalue < 0.001)
-}) 
+# # all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
+# all_sig_asx_gns <- map(mast_tde_corr_tbls[solo_don], ~{
+#   .x %>% 
+#   select(-c(starts_with("df"))) %>%
+#   rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
+#   pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
+#                      # names_pattern = "(.*)_(SC._vs.*)",
+#                      names_pattern = "(waldStat|pvalue)_(.*)",
+#                      names_to = c( ".value", "pw_comparison")) %>%
+#     filter(waldStat > 20 & pvalue < 0.001)
+# }) 
 
 ```
 
 ```{r, results='asis', warning=F, message=F}
+mast_tde_corr_tbls_sig <- map(mast_tde_corr_tbls, ~.x %>%
+    # filter(waldStat > 20 & pvalue < 0.01 & p_val_adj < 0.01) %>%
+    filter(waldStat > 20 & pvalue < 0.05 & p_val_adj < 0.05) %>%
+      left_join(., Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene), by = 'gene_id'))
+
+mast_tde_corr_tbls_sig
+```
+
+
+```{r, results='asis', warning=F, message=F}
+all_sig_asx_gns <- mast_tde_corr_tbls_sig
+```
+
+```{r, results='asis', warning=F, message=F, eval=FALSE}
 all_sig_f_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_f")], ~{
   .x %>% 
   select(-c(starts_with("df"))) %>%
@@ -140,13 +163,13 @@ all_sig_f_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_f
   pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
                      # names_pattern = "(.*)_(SC._vs.*)",
                      names_pattern = "(waldStat|pvalue)_(.*)",
-                     names_to = c( ".value", "ts_pw_comp")) %>%
+                     names_to = c( ".value", "pw_comparison")) %>%
     filter(waldStat > 20 & pvalue < 0.001)
 }) 
 
 ```
 
-```{r, results='asis', warning=F, message=F}
+```{r, results='asis', warning=F, message=F, eval=FALSE}
 all_sig_m_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_m")], ~{
   .x %>% 
   select(-c(starts_with("df"))) %>%
@@ -154,7 +177,7 @@ all_sig_m_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_m
   pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
                      # names_pattern = "(.*)_(SC._vs.*)",
                      names_pattern = "(waldStat|pvalue)_(.*)",
-                     names_to = c( ".value", "ts_pw_comp")) %>%
+                     names_to = c( ".value", "pw_comparison")) %>%
     filter(waldStat > 20 & pvalue < 0.001)
 }) 
 
@@ -172,7 +195,7 @@ all_sig_gns_df <- map(list(#all_sig_f_gns, all_sig_m_gns,
   group_by(gene_id) %>%
   mutate("freq_btwn_don" = n_distinct(donor)) %>%
   group_by(donor, gene_id) %>%
-  mutate("freq_wthn_don" = n_distinct(ts_pw_comp)) %>%
+  mutate("freq_wthn_don" = n_distinct(pw_comparison)) %>%
   ungroup()
       }) %>% set_names(stg_nms)
 
@@ -180,15 +203,26 @@ all_sig_gns_df <- map(list(#all_sig_f_gns, all_sig_m_gns,
 
 
 ```{r, results='asis', warning=F, message=F}
-map(all_sig_gns_df, ~{.x %>% 
+DE_genes_freq <- map(all_sig_gns_df, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don)}
 )
+DE_genes_freq
+```
+
+
+```{r, results='asis', warning=F, message=F}
+saveRDS(all_sig_gns_df, "data/processed/Pf/m2_all/strain_DE/all_sig_gns_df.RDS")
 ```
 
 ```{r, results='asis', warning=F, message=F}
+saveRDS(DE_genes_freq, "data/processed/Pf/m2_all/strain_DE/DE_genes_freq.RDS")
+```
+
+
+```{r, results='asis', warning=F, message=F}
 map(all_sig_gns_df, ~{.x %>%
-    count(donor, ts_pw_comp) %>% 
+    count(donor, pw_comparison) %>% 
   arrange(desc(n))  }
 )
 ```
@@ -210,7 +244,6 @@ map(all_sig_gns_df, ~{.x %>%
 
 41+2
 ```
-
 ```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
 map(all_sig_gns_df, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
@@ -245,11 +278,12 @@ map(all_sig_gns_df, ~{.x %>%
 })
 ```
 
+
 ```{r, results='asis', warning=F, message=F}
 # fem_gns_don <- map2(all_sig_gns_df,c(4,4,2), ~{.x %>% 
 # fem_gns_don <- map2(c(all_sig_gns_df, all_sig_gns_df["asx"]), c(3,3,2,1), ~{.x %>% 
 # fem_gns_don <- map2(c(all_sig_gns_df[1:2], all_sig_gns_df["asx"]), c(3,3,1), ~{.x %>% 
-fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(1), ~{.x %>% 
+fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(2), ~{.x %>% 
 
   filter(freq_btwn_don >= .y) %>%
   distinct(gene_id, .keep_all = T) 
@@ -259,7 +293,7 @@ fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(1), ~{.x %>%
   
 ```
 
-```{r, results='asis', warning=F, message=F}
+```{r, results='asis', warning=F, message=F, eval=FALSE}
 fem_gns_don[["f"]] %>% 
   pull(gene_id) %>%
   str_replace(., "-", "_") %>%
@@ -268,12 +302,12 @@ fem_gns_don[["f"]] %>%
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
 ```
 
@@ -294,7 +328,7 @@ de_gns <- map(fem_gns_don, ~{.x %>% pull(gene_id) %>% unique()})
 
 
 
-```{r}
+```{r, eval=FALSE}
 ## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
 ## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
 
@@ -310,7 +344,7 @@ DE_unvrs_gns_f <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_f")], ~{
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 ## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
 ## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
 
@@ -441,6 +475,31 @@ strn_DE_go_gt_lst
 ```
 
 
+```{r}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+# DE_go_gt_lst <- map(DE_go_std_pdb[c(1,2)],
+strn_DE_go_gt_lst_slim2 <- map(strn_DE_go_std_pdb_p,
+                 ~.x %>% 
+                   group_by(Ontology) %>% 
+                   distinct(GeneRatio, .keep_all = T) %>%
+                   arrange(`p.adjust`) %>% 
+                   slice_head(., n=3) %>% 
+                   ungroup()  %>% 
+                   dplyr::select(c('Ontology', 'Description', 'GeneRatio', 'P')) %>% rename(c('Gene\nRatio'= GeneRatio)) %>%  
+                   mutate(Description = str_wrap(Description, width = 40)) %>%  
+                   gt() %>% 
+                   data_color(method = 'factor', columns = 'Ontology', target_columns = c('Description', 'Gene\nRatio', 'P'), palette = 'Pastel2') %>%
+                   cols_hide('Ontology') %>% 
+                   tab_options(table.width = pct(40), column_labels.font.weight = 'bold')
+                 )
+
+```
+
+
+```{r, fig.width=5.5, fig.height=4}
+##Print the DE GO tables using and arrange in the order msc14 female and then msc3 male
+strn_DE_go_gt_lst_slim2 
+```
 
 ```{r, results='asis', fig.height=16.5, fig.width=12}
 ##get gt tables as grob for merging using cowplot from gt github https://github.com/rstudio/gt/issues/961
@@ -492,7 +551,7 @@ fem_gns_pos%>%
     mutate(pos_range = cut(start_pos, breaks = c(-Inf,seq(0, max(start_pos), by = 100000),Inf))) %>% 
     # pivot_longer(., cols = starts_with(strn_regex), names_to = 'comps', values_to = 'sim') %>% 
   ggplot(aes(x=start_pos)) +
-  geom_histogram(binwidth = 50000) +
+  geom_histogram(binwidth = 100000) +
   facet_grid(chr ~ .) +
   theme_classic()
 ```
