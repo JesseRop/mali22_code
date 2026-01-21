@@ -115,11 +115,19 @@ source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>%
 
 ## Write BPCells Matrices (Filtered)
 
+
+```{r, message=F, warning=F, eval=T}
+## Get filtered matrices file list
+all_msc_bp_filt_seu_list_files <- Sys.glob("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/*/outs/filtered_feature_bc_matrix.h5")
+
+all_msc_bp_filt_seu_list_files
+```
+
 ```{r, message=F, warning=F, eval=T}
 # Write BPCells matrices for filtered feature matrices
-list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", 
-           pattern = "filtered_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|/outs.*'))) %>% 
+all_msc_bp_filt_counts <- map(all_msc_bp_filt_seu_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'/lustre.*_all_genes/|/outs.*h5')))) %>% 
+  unlist(., recursive = F) %>%  
   .[source_irods] %>%
   set_names(names(source_irods)) %>%
   map(~open_matrix_10x_hdf5(path = .)) %>% 
@@ -148,10 +156,17 @@ list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/
 ## Write BPCells Matrices (Raw)
 
 ```{r, message=F, warning=F, eval=T}
-# Write BPCells matrices for raw feature matrices
-list.files("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/", 
-           pattern = "raw_feature_bc_matrix.h5$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes//|/outs.*'))) %>% 
+## Get raw matrices file list
+all_msc_bp_raw_seu_list_files <- Sys.glob("/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data/cellranger_runs/Pf_all_genes/*/outs/raw_feature_bc_matrix.h5")
+
+all_msc_bp_raw_seu_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+# Write BPCells matrices for filtered feature matrices
+all_msc_bp_filt_counts <- map(all_msc_bp_raw_seu_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'/lustre.*_all_genes/|/outs.*h5')))) %>% 
+  unlist(., recursive = F) %>%  
   .[source_irods] %>%
   set_names(names(source_irods)) %>%
   map(~open_matrix_10x_hdf5(path = .)) %>% 
@@ -209,13 +224,17 @@ pf_hs_gene_sum_fn <- function(seurat_obj){
 ```{r}
 ## Count the pf and human genes and add to metadata for filtered set and also remove human genes
 all_msc_bp_filt_noHsGns <- map(all_msc_bp_filt, ~pf_hs_gene_sum_fn(seurat_obj = .x))
-saveRDS(all_msc_bp_filt_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS")
+# saveRDS(all_msc_bp_filt_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS")
+imap(all_msc_bp_filt_noHsGns, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_bp_filt_noHsGns.RDS")))
+
 ```
 
 ```{r}
 # Count the pf and human genes and add to metadata for raw set and also remove human genes
 all_msc_bp_raw_noHsGns <- map(all_msc_bp_raw, ~pf_hs_gene_sum_fn(seurat_obj = .x))
-saveRDS(all_msc_bp_raw_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+# saveRDS(all_msc_bp_raw_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS")
+imap(all_msc_bp_raw_noHsGns, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_bp_raw_noHsGns.RDS")))
+
 ```
 
 ## Save Metadata
@@ -223,11 +242,15 @@ saveRDS(all_msc_bp_raw_noHsGns, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns
 ```{r}
 # Save metadata for filtered set
 all_msc_bp_filt_noHsGns_mdata <- map(all_msc_bp_filt_noHsGns, ~.x@meta.data) %>% .[sample_name]
-saveRDS(all_msc_bp_filt_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns_mdata.RDS")
+# saveRDS(all_msc_bp_filt_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns_mdata.RDS")
+imap(all_msc_bp_filt_noHsGns_mdata, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_bp_filt_noHsGns_mdata.RDS")))
+
 ```
 
 ```{r}
 # Save metadata for raw set
 all_msc_bp_raw_noHsGns_mdata <- map(all_msc_bp_raw_noHsGns, ~.x@meta.data) %>% .[sample_name]
-saveRDS(all_msc_bp_raw_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS")
+# saveRDS(all_msc_bp_raw_noHsGns_mdata, "data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns_mdata.RDS")
+imap(all_msc_bp_raw_noHsGns_mdata, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_bp_raw_noHsGns_mdata.RDS")))
+
 ```
