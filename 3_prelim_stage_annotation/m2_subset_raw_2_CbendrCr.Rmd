@@ -1,0 +1,300 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+})
+```
+
+
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+
+```
+
+###################START- RAW READING#############
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+sample_name
+```
+
+
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+# cr_cbender_pf100_mdata_slct_uni_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_pf100_mdata_slct_uni.RDS")
+cr_cbender_pf100_mdata_slct_uni_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_pf100_mdata_slct_uni3.RDS")
+cr_cbender_pf100_mdata_slct_uni_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+cr_cbender_pf100_mdata_slct_uni <- map(cr_cbender_pf100_mdata_slct_uni_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
+
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+all_msc_bp_raw_noHsGns_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/all_msc_bp_raw_noHsGns.RDS")
+all_msc_bp_raw_noHsGns_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+all_msc_bp_raw_noHsGns <- map(all_msc_bp_raw_noHsGns_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
+
+```
+
+```{r}
+## Read raw seurat objects with human genes removed
+# all_msc_bp_raw_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_raw_noHsGns.RDS") %>% .[sample_name]
+```
+
+```{r}
+## Read filt seurat objects with human genes removed
+# all_msc_bp_filt_noHsGns <- readRDS("data/processed/Pf/m2_all/all_msc_bp_filt_noHsGns.RDS") %>% .[sample_name]
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+all_msc_bp_filt_noHsGns_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/all_msc_bp_filt_noHsGns.RDS")
+all_msc_bp_filt_noHsGns_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+all_msc_bp_filt_noHsGns <- map(all_msc_bp_filt_noHsGns_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
+
+```
+
+```{r, message=FALSE}
+# Add cellbender metadata
+all_bp_raw_w_cbendr_mdata <- list(all_msc_bp_raw_noHsGns, cr_cbender_pf100_mdata_slct_uni[names(all_msc_bp_raw_noHsGns)]) %>%
+  pmap(~ {
+    ..2 %>%
+      select(starts_with("cell_"), contains("background_fraction"), contains("cell_probability"), contains("droplet_efficiency"), mthds_union, mthds_union_slim, fnl_call, fnl_call2, fnl_call3, barcode) %>%
+      column_to_rownames("barcode") %>%
+      AddMetaData(..1, .)
+       })
+
+```
+
+
+
+```{r}
+# all_bp_CbendrCr <- map(all_bp_raw_w_cbendr_mdata, ~subset(.x, subset = fnl_call == "Cell"))
+# all_bp_CbendrCr <- map(all_bp_raw_w_cbendr_mdata, ~subset(.x, subset = fnl_call2 == "Cell"))
+all_bp_CbendrCr <- map(all_bp_raw_w_cbendr_mdata, ~subset(.x, subset = fnl_call3 == "Cell"))
+
+
+```
+
+
+```{r}
+all_bp_CbendrCr 
+```
+
+```{r}
+map(all_bp_CbendrCr, ~{table(.x@meta.data$nCount_RNA >= 100)})
+```
+
+
+```{r, eval=T}
+cell_counts <- pmap(list(all_msc_bp_raw_noHsGns, all_msc_bp_filt_noHsGns, all_bp_CbendrCr), ~{
+  data.frame("raw" = dim(..1)[2], "cr_filt" = dim(..2)[2], "cbendr" = dim(..3)[2])
+  
+}) %>%
+  bind_rows(., .id = "donor")
+
+```
+
+
+```{r, eval=T}
+cell_counts
+```
+
+```{r, eval=T}
+gogo()
+```
+
+
+```{r, eval=T}
+##write out for normalization processing in farm
+
+for (i in 1:length(sample_name)) {
+## Create new directories
+  system(paste0('mkdir -p data/processed/Pf/', sample_name[i], '/seu_obj'))
+  # system(paste0('rm data/processed/Pf/', sample_name[i], '/seu_obj/*'))
+}
+
+
+```
+
+
+Remove cells with less than 100 pf reads
+```{r, eval=T}
+##write out for normalization processing in farm
+# all_msc_bp_filt_pf100
+# all_msc_bp_filt_pf100 <- map(all_msc_bp_filt_noHsGns, ~subset(.x, subset = pf_umi_count >= 100))
+
+```
+
+
+```{r, message=FALSE}
+# Add cellbender metadata
+# all_bp_filt_pf100_mdata <- list(all_msc_bp_filt_pf100, cr_cbender_pf100_mdata_slct_uni[names(all_msc_bp_filt_pf100)]) %>%
+#   pmap(~ {
+#     ..2 %>%
+#       select(starts_with("cell_"), contains("background_fraction"), contains("cell_probability"), contains("droplet_efficiency"), mthds_union, fnl_call, barcode) %>%
+#       column_to_rownames("barcode") %>%
+#       AddMetaData(..1, .)
+#        })
+
+```
+
+
+FARM CODE
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+### filt
+# imap(all_msc_bp_filt_pf100, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu_cr.RDS")))
+
+### cellbender
+# imap(all_bp_CbendrCr, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bp_CbendrCr.RDS")))
+# all_bp_CbendrCr
+imap(all_bp_CbendrCr, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bp_CbendrCr3.RDS")))
+all_bp_CbendrCr
+
+# sample_name_ed <- paste0(names(all_msc_bp_edrops50), "_edrops", man_thresh[names(all_msc_bp_edrops50)])
+# map2(all_msc_bp_edrops50, sample_name_ed, ~saveRDS(.x, paste0("data/processed/Pf/", str_remove(.y, "_ed.*"), "/seu_obj/bpc_seu_", str_extract(.y, "ed.*"),".RDS")))
+
+```
+
+
