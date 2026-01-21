@@ -241,7 +241,7 @@ cell_counts
 ```
 
 ```{r, eval=T}
-gogo()
+# gogo()
 ```
 
 
@@ -258,61 +258,13 @@ for (i in 1:length(sample_name)) {
 ```
 
 
-
-
-```{r, message=FALSE}
-# Add cellbender metadata
-# all_bp_filt_pf100_mdata <- list(all_msc_bp_filt_pf100, cr_cbender_pf100_mdata_slct_uni[names(all_msc_bp_filt_pf100)]) %>%
-#   pmap(~ {
-#     ..2 %>%
-#       select(starts_with("cell_"), contains("background_fraction"), contains("cell_probability"), contains("droplet_efficiency"), mthds_union, fnl_call, barcode) %>%
-#       column_to_rownames("barcode") %>%
-#       AddMetaData(..1, .)
-#        })
-
-```
-
-
-FARM CODE
-
 ```{r, eval=T}
 ## write out seurat bpcells object files for normalization processing in farm
-### filt
-# imap(all_msc_bp_filt_pf100, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bpc_seu_cr.RDS")))
-
 ### cellbender
 # imap(all_bp_CbendrCr, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bp_CbendrCr.RDS")))
 # all_bp_CbendrCr
 imap(all_bp_CbendrCr, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bp_CbendrCr3.RDS")))
 all_bp_CbendrCr
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
-## Get mdata file list
-all_cbender3_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/bp_CbendrCr3.RDS")
-all_cbender3_list_files
-```
-
-```{r, message=F, warning=F, eval=T}
-## read filtered barcodes
-all_cbender3 <- map(all_cbender3_list_files, ~.x %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
-  unlist(., recursive = F) %>% 
-  .[sample_name] %>%
-  .[!is.na(.)] %>%
-  map(readRDS) 
-
-```
-
-```{r, eval=T}
-## convert to dense
-all_bp_CbendrCr_dense <- all_cbender3
-
-for (nm in names(all_cbender3_dense)) {
-  all_cbender3_dense[[nm]][["RNA"]]$counts <- as(all_cbender3_dense[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
-}
 
 ```
 
@@ -330,7 +282,7 @@ for (nm in names(all_bp_CbendrCr_dense)) {
 
 ```{r, eval=T}
 ## save
-imap(all_bp_CbendrCr_dense, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/CbendrCr3_dense.RDS")))
+imap(all_bp_CbendrCr_dense, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/dense_CbendrCr3.RDS")))
 
 ```
 
