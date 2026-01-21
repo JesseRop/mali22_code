@@ -126,7 +126,7 @@ pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_
 sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
 smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
 source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
-sample_name
+sample_name 
 ```
 
 
@@ -220,6 +220,7 @@ all_bp_CbendrCr <- map(all_bp_raw_w_cbendr_mdata, ~subset(.x, subset = fnl_call3
 all_bp_CbendrCr 
 ```
 
+Remove cells with less than 100 pf reads
 ```{r}
 map(all_bp_CbendrCr, ~{table(.x@meta.data$nCount_RNA >= 100)})
 ```
@@ -257,13 +258,6 @@ for (i in 1:length(sample_name)) {
 ```
 
 
-Remove cells with less than 100 pf reads
-```{r, eval=T}
-##write out for normalization processing in farm
-# all_msc_bp_filt_pf100
-# all_msc_bp_filt_pf100 <- map(all_msc_bp_filt_noHsGns, ~subset(.x, subset = pf_umi_count >= 100))
-
-```
 
 
 ```{r, message=FALSE}
@@ -292,9 +286,51 @@ FARM CODE
 imap(all_bp_CbendrCr, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/bp_CbendrCr3.RDS")))
 all_bp_CbendrCr
 
-# sample_name_ed <- paste0(names(all_msc_bp_edrops50), "_edrops", man_thresh[names(all_msc_bp_edrops50)])
-# map2(all_msc_bp_edrops50, sample_name_ed, ~saveRDS(.x, paste0("data/processed/Pf/", str_remove(.y, "_ed.*"), "/seu_obj/bpc_seu_", str_extract(.y, "ed.*"),".RDS")))
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+all_cbender3_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/bp_CbendrCr3.RDS")
+all_cbender3_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+all_cbender3 <- map(all_cbender3_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
 
 ```
 
+```{r, eval=T}
+## convert to dense
+all_bp_CbendrCr_dense <- all_cbender3
+
+for (nm in names(all_cbender3_dense)) {
+  all_cbender3_dense[[nm]][["RNA"]]$counts <- as(all_cbender3_dense[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
+}
+
+```
+
+
+## write out seurat dense matrix since this may be faster and more transparent. bpcells is opaque and may be prone to some weird errors
+```{r, eval=T}
+## convert to dense
+all_bp_CbendrCr_dense <- all_bp_CbendrCr
+
+for (nm in names(all_bp_CbendrCr_dense)) {
+  all_bp_CbendrCr_dense[[nm]][["RNA"]]$counts <- as(all_bp_CbendrCr_dense[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
+}
+
+```
+
+```{r, eval=T}
+## save
+imap(all_bp_CbendrCr_dense, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/CbendrCr3_dense.RDS")))
+
+```
 
