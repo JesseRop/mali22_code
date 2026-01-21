@@ -685,7 +685,8 @@ imap(all_pref_pred_df_fnl_snky, ~snk_pt_fn(., strns_2_plt = c("cbendr", "edrops"
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 # all_seu <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops|cbcr).RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bp|_norm|.RDS'))) %>% 
 # all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
