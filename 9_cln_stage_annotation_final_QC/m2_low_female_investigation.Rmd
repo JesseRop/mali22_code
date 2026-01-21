@@ -1,0 +1,402 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  # library(patchwork)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(knitr)
+  # library(readxl)
+  # library(SCpubr)
+  # library(ggh4x)
+  # library(htmlwidgets)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+#  integration of all MSC
+
+
+```{r setup}
+sample_set = "Mali2"
+
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+
+```{r}
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =6, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
+
+optimum_k_qcd_21 <- c("MSC1" =5, "MSC3" =2, "MSC13" =2, "MSC14" =8, "MSC12" =2)
+
+optimum_k_qcd <- c(optimum_k_qcd_21, optimum_k_qcd)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+```
+
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39", "MSC12")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+```
+
+```{r, message=F, warning=F, eval=T}
+## Remove combined and JC and leave as was originally
+samples_all_orig <- sample_name[!str_detect(sample_name, "C$")]
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get samples for which JC was also run
+samples_jcode <- unique(str_remove(sample_name[str_detect(sample_name, "C$")], "noJC|JC|C$"))
+samples_1run <- sample_name[!str_detect(sample_name, paste0(samples_jcode, collapse = "|"))]
+
+## Select only those with combined data
+samples_all_c <- c(samples_1run, paste0(samples_jcode, "C"))
+```
+
+```{r}
+samples_all_c
+```
+
+## read files
+
+
+## Samples to be included in the paper
+```{r, message=F, warning=F, eval=T}
+key_samples <- c("MSC3", "MSC13", "MSC14", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
+
+don_order <- str_remove(key_samples, "C$")
+
+```
+
+
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_msc_qcd_anot.*'))) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "cln_anotd3_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "cln_anotd3_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|cln_anotd3_.*'))) %>% 
+  # .[sample_name_all] %>%
+  .[key_samples] %>%
+  map(readRDS)
+```
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_msc_qcd_anot.*'))) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "cln_anotd3_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "cln_anotd3_norm.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|cln_anotd3_.*'))) %>% 
+  # .[sample_name_all] %>%
+  .[key_samples] %>%
+  map(readRDS)
+```
+
+```{r}
+map(all_msc_qcd_anotd, ~dim(.x)[2]) %>% unlist()
+```
+
+```{r}
+imap(all_msc_qcd_anotd, ~DimPlot(.x, group.by = c("stage_final2", "seurat_clusters")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r}
+imap(all_msc_qcd_anotd, ~DimPlot(.x, group.by = c("seurat_clusters","stage_final2")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r}
+imap(all_msc_qcd_anotd, possibly(~DimPlot(.x, cells.highlight = colnames(.x[,.x$scrub_doublet == "Doublet"])) + labs(title = .y)))
+```
+
+
+```{r}
+imap(all_msc_qcd_anotd, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y) )
+```
+
+
+```{r}
+imap(all_msc_qcd_anotd, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "stage_final2", pt.size = 0)+ scale_fill_manual(values = sp_col_new) + labs(title = .y) )
+```
+
+
+
+```{r}
+imap(all_msc_qcd_anotd, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "stage_final2", pt.size = 0)+ scale_fill_manual(values = sp_col_new) + labs(title = .y) )
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+#ap2g
+all_msc_qcd_anotd_umap_mdata <- map(all_msc_qcd_anotd, ~{
+  .x@meta.data %>% 
+    rownames_to_column("bcode") %>%
+      left_join(., .x@reductions$umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode")
+})
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3.5}
+
+imap(all_msc_qcd_anotd_umap_mdata, ~.x %>% 
+  ggplot(aes(x = stage_final2, y = nFeature_RNA, colour = seurat_clusters)) + 
+    # scale_colour_manual(values = sp_col_new) +
+  geom_sina()+ 
+    labs(title = .y) 
+)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3.5}
+
+# map(all_msc_qcd_anotd_umap_mdata, ~.x %>% 
+#   ggplot(aes(x = stage_final2, y = nFeature_RNA, colour = seurat_clusters)) + 
+#     # scale_colour_manual(values = sp_col_new) +
+#   geom_box()
+# )
+```
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(all_msc_qcd_anotd)) {
+  # all_msc_qcd_anotd[[nm]][["RNA"]]$counts <- as(all_msc_qcd_anotd[[nm]][["RNA"]]$counts, Class = "dgCMatrix")
+  all_msc_qcd_anotd[[nm]][["RNA"]]$data <- as(all_msc_qcd_anotd[[nm]][["RNA"]]$data, Class = "dgCMatrix")
+
+}
+```
+
+```{r, warning=FALSE, message=FALSE, eval=T}
+## change default assay to RNA for getting cells with ap2g reads
+for (i in 1:length(all_msc_qcd_anotd)) {
+  Idents(all_msc_qcd_anotd[[i]]) <- "seurat_clusters"
+  
+}
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_stg_de <- map(all_msc_qcd_anotd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_stg_de_anot <- map(all_stg_de, ~.x %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+```
+
+```{r}
+imap(all_msc_qcd_anotd, ~DimPlot(.x, group.by = c("seurat_clusters","stage_final2")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g
+imap(all_stg_de_anot, ~.x %>% 
+      filter(p_val_adj == 0 & avg_log2FC > 0) %>% 
+      arrange(desc(avg_log2FC)) %>% 
+      group_by(cluster) %>% 
+      slice_min(order_by = p_val_adj, n = 10) %>% 
+      slice_max(avg_log2FC, n =2) %>%
+       mutate(don = .y))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+fem_msc_qcd_anotd <- map(all_msc_qcd_anotd, ~.x[,str_detect(.x$stage_final2, "Fem|fem")])
+```
+
+```{r, warning=FALSE, message=FALSE}
+fem_msc_qcd_anotd <- map(fem_msc_qcd_anotd, ~FindClusters(.x, resolution = 0.1, cluster.name = "fem_clusters"))
+imap(fem_msc_qcd_anotd, ~DimPlot(.x, group.by = c("fem_clusters","stage_final2"), label = T) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+
+```
+
+```{r}
+imap(fem_msc_qcd_anotd, ~DimPlot(.x, group.by = c("fem_clusters","stage_final2"), label = T) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_fem_de <- map(fem_msc_qcd_anotd, ~SetIdent(.x, "fem_clusters"))
+all_fem_de <- map(fem_msc_qcd_anotd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_fem_de_anot <- map(all_fem_de, ~.x %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+map(all_msc_qcd_anotd_umap_mdata, ~.x %>% 
+      filter(str_detect(stage_final2, "Fem|fem")) %>%
+  ggplot(aes(x = UMAP_1, y = UMAP_2, colour = log(hs_umi_count))) + 
+  scale_color_viridis_c() +
+  geom_point(size = 0.5) +
+    theme_classic()
+)
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+imap(all_msc_qcd_anotd_umap_mdata, ~.x %>% 
+      filter(str_detect(stage_final2, "Fem|fem")) %>%
+  ggplot(aes(x = UMAP_1, y = UMAP_2, colour = log(hs_gn_count))) + 
+  scale_color_viridis_c() +
+  geom_point(size = 0.5) +
+    labs(title = .y) +
+    theme_classic()
+)
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+imap(all_msc_qcd_anotd_umap_mdata, ~.x %>% 
+      filter(str_detect(stage_final2, "Fem|fem")) %>%
+  ggplot(aes(color = seurat_clusters, x = stage_final2, y = log(hs_gn_count))) + 
+  geom_sina() +
+    labs(title = .y) +
+    theme_classic()
+)
+```
+
+```{r}
+imap(fem_msc_qcd_anotd, ~FeaturePlot(.x, features = "hs_umi_count") + labs(title = .y) ) + scale_x_l
+```
+
+```{r}
+imap(fem_msc_qcd_anotd, ~FeaturePlot(.x, features = "percent.mt") + labs(title = .y) )
+```
+
+```{r}
+imap(fem_msc_qcd_anotd, ~FeaturePlot(.x, features = "nFeature_RNA") + labs(title = .y) )
+```
+
+```{r}
+imap(fem_msc_qcd_anotd, ~DimPlot(.x, group.by = c("seurat_clusters","stage_final2"), label = T) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g
+top_fem_clustr_markers <- imap(all_fem_de_anot, ~.x %>% 
+      # filter(p_val_adj == 0 & avg_log2FC > 0) %>% 
+       filter(avg_log2FC > 0) %>% 
+      arrange(desc(avg_log2FC)) %>% 
+      group_by(cluster) %>% 
+      slice_min(order_by = p_val_adj, n = 10) %>% 
+      slice_max(avg_log2FC, n =10) %>%
+       mutate(don = .y))
+
+top_fem_clustr_markers
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_stg_de <- map(fem_msc_qcd_anotd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# ap2-g
+imap(top_fem_clustr_markers, ~.x %>% 
+      filter(Gene %in% c("KAHRP", "GARP", "HSP70x", "ETRAMP10", "SBP1", "REX1", "REX2")))
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=3}
+map(all_msc_qcd_anotd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_coarse", split.by = "donor"))
+```
+

@@ -1,0 +1,561 @@
+---
+title: "MSC QC cbender_comparisons"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  library(ggsankey)
+  library(scales)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(purrr::reduce)
+})
+```
+
+
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+# source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/cell_calling/plotting_fns_n_variables.R")
+
+
+```
+
+###################START- RAW READING#############
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Genotype clustering for MSC
+
+initialize variable for the sample names
+
+
+
+```{r}
+
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+# slct_sample_names <-c("MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
+
+
+# ## poor quality samples
+# sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39", "MSC50_SLO", "MSC33")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# 
+## slct_sample_names[-c(sample_rm)]
+# slct_sample_names <- slct_sample_names[!slct_sample_names %in% c(sample_rm, sample_mxd)]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+## get relevant sample names
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+
+##Sample IDs
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
+
+```
+
+## Samples to be included in the paper
+```{r, message=F, warning=F, eval=T}
+key_samples <- c("MSC3", "MSC13", "MSC14", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
+
+don_order <- str_remove(key_samples, "C$")
+don_order_m <- str_remove_all(key_samples, "SC|C$")
+```
+
+```{r, eval = T}
+## Read in datasets generated in 'm2_lasse_integration_gn_explrtn.Rmd'
+m2_lasse_asex_harmony_pc_noM55_jnd <- readRDS("data/processed/Pf/m2_all/plot_tables_data/m2_lasse_integration_figs/m2_lasse_asex_harmony_pc_noM55_jnd.RDS")
+
+lp_mca_markers_anot <- readRDS("data/processed/Pf/m2_all/plot_tables_data/m2_lasse_integration_figs/lp_mca_markers_anot.RDS")
+
+```
+
+
+```{r}
+##Read lasse et al harmony integration of atlas and natural infections
+lasse_donor_seu_harmony_jnd <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/collaborators/portugal_lab/lasse_donor_seu_harmony_jnd.RDS")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+lp_mca_seu_cols <- c( "0" = "#4E79A7", "1" = "#59A14F", "2" = "#9C755F", "3" = "#F28E2B", "4" = "#B07AA1", "5" = "#76B7B2", "6" = "#ca9f88", "7" = "#E15759", "8" = "#BAB0AC", "9" = "#8CD17D" )
+
+lp_cols <- c( "0" = "#6B8EC1", "1" = "#7FB685",  "2" = "#C1A36A", "3" = "#A17C6B", "4" = "#9D7FB0", "5" = "#5FA3A2", "6" = "#D98C8C", "7" = "#EDC948")
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+DimPlot(lasse_donor_seu_harmony_jnd, label = T, reduction = "umap.harmony", group.by = "seurat_clusters", label.size = 6, label.box = F, dims = c(1,3)) +
+  scale_color_manual(values = lp_cols) +
+  scale_fill_manual(values = lp_cols) +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank()) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=4.7, fig.height=4.4}
+DimPlot(lasse_donor_seu_harmony_jnd, reduction = "umap.harmony", group.by = "pseudotime.stages", dims = c(1,3)) + 
+  scale_color_manual(values = sp_fld_colors2) +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 19),
+        axis.title = element_text(size = 15),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        # axis.title = element_blank(),
+        axis.ticks = element_blank()
+        ) +
+  guides(color = guide_legend(nrow = 4, override.aes = list(size = 4)))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=2.5, fig.height=4}
+## ap2g, surf1.2
+map(c("PF3D7-1222600", "PF3D7-0113600"), ~FeaturePlot(lasse_donor_seu_harmony_jnd, features = .x, reduction = "umap.harmony", order = T, ncol = 1, dims = c(1,3), pt.size = 0.5)+
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 22),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank()) 
+)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=2.5, fig.height=4}
+## surf1.2
+FeaturePlot(lasse_donor_seu_harmony_jnd, features = c("PF3D7-0113600"), reduction = "umap.harmony", order = T, ncol = 1, dims = c(1,3))+
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 22),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank()) 
+
+```
+
+```{r, fig.width=12, fig.height=3.5}
+## Get ring clusters
+DimPlot(lasse_donor_seu_harmony_jnd, reduction = "umap.harmony", group.by = "seurat_clusters", dims = c(1,3), split.by = 'orig.ident', cols = lp_cols)+
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 18),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        # axis.title = element_blank(),
+        axis.ticks = element_blank()
+        ) +
+  guides(color = guide_legend(nrow = 1, override.aes = list(size = 4)))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Get ring clusters
+lasse_donor_seu_harmony_jnd_ring <- subset(lasse_donor_seu_harmony_jnd, subset = seurat_clusters %in% c(0,1,2,4,7))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+DimPlot(lasse_donor_seu_harmony_jnd_ring, label = T, reduction = "umap.harmony", group.by = "seurat_clusters", label.size = 6, label.box = F, dims = c(1,3)) +
+  scale_color_manual(values = lp_cols) +
+  scale_fill_manual(values = lp_cols) +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank()) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+##Generate in 'lasse_stages_marker_genes_explrtn.Rmd'
+lasse_clst_mrkrs_rings_anot <- readRDS("data/processed/Pf/m2_all/plot_tables_data/m2_lasse_integration_figs/lasse_clst_mrkrs_rings_anot.RDS")
+```
+
+```{r, fig.height=6, fig.width=6}
+
+
+lasse_rings_vlcano <- map(c(7), ~{
+  
+  EnhancedVolcano(lasse_clst_mrkrs_rings_anot %>% filter(cluster == .x),
+                lab = lasse_clst_mrkrs_rings_anot %>% filter(cluster == .x) %>% pull(Gene),
+                # selectLab = .y,
+                x = 'avg_log2FC',
+                y = 'p_val_adj',
+                pCutoff = 0.05,
+                FCcutoff = 2,
+                pointSize = 1.5,
+                labSize = 5.0,
+                title = '',
+                subtitle = "",
+                titleLabSize = 0,
+                subtitleLabSize = 0,
+                axisLabSize = 22,
+                drawConnectors = TRUE,
+                # boxedLabels = TRUE,
+                # legendLabels =c( "p_val_adj"),
+                gridlines.minor = FALSE,
+                # ylim = c(0, -log10(10e-100)),
+                ) +
+    theme(legend.position = "none")
+
+}) 
+lasse_rings_vlcano
+
+##Save the above image for plot grid in functional_GO_n_lit_comparison.RMD for manuscript
+# saveRDS(fh_fl_vlcano, "plots/figS26/fh_fl_vlcano.RDS")
+```
+
+
+```{r, fig.height=6, fig.width=5.5}
+lasse_rings_vlcano[[1]] +
+  theme(axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 16, angle = 90, hjust = 0.5),
+        axis.title = element_text(size = 16))
+```
+
+```{r, warning=FALSE, message=FALSE}
+##Generated in 'm2_integration_asx_clustr_gn_explrtn.Rmd'
+commited_de_anot <- readRDS("data/processed/Pf/m2_all/commited_de_anot3.RDS")  %>% .[["noM55_jcC"]]
+```
+
+```{r, warning=FALSE, message=FALSE}
+mca_lp_comt_genes_all <- commited_de_anot %>%
+  filter(cluster == 1) %>%
+  full_join(., lasse_clst_mrkrs_rings_anot %>% filter(cluster == 7), by = "gene", suffix = c("_mca", "_lp")) %>%
+  filter(p_val_adj_mca < 0.0001 | p_val_adj_lp < 0.0001)
+
+mca_lp_comt_genes_all
+```
+
+```{r, warning=FALSE, message=FALSE}
+mca_lp_comt_genes <- mca_lp_comt_genes_all %>%
+  filter(p_val_adj_mca < 0.0001 & p_val_adj_lp < 0.0001)
+
+mca_lp_comt_genes
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+top_labl_genes <- mca_lp_comt_genes |>
+  filter(avg_log2FC_mca > 2 | avg_log2FC_lp < -1) #|>
+  #arrange(desc(abs(lfc_mean))) #|>
+  # slice_head(n = 10)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+mca_lp_comt_genes %>%
+  ggplot(aes(x = avg_log2FC_mca, y = avg_log2FC_lp)) +
+  geom_point() +
+  geom_point(data = top_labl_genes, size = 1) +
+  ggpubr::stat_cor(method = "pearson", label.x =4, label.y = 0)+ 
+  geom_text_repel(
+    data = top_labl_genes %>% filter(avg_log2FC_lp > 0 & avg_log2FC_mca > 0),
+    aes(label = Gene_mca),
+    size = 5,
+    segment.size = 0.3, segment.color = "black", nudge_x = -2, nudge_y = 0, force = 10
+  ) +
+  geom_text_repel(
+    data = top_labl_genes %>% filter(avg_log2FC_lp < 0 & avg_log2FC_mca < 0),
+    aes(label = Gene_mca),
+    size = 5,
+    segment.size = 0.3, segment.color = "black", nudge_x = 2, nudge_y = 0, force = 10
+  ) +
+  geom_abline() +
+  theme_bw() +
+  theme(text = element_text(size = 18)) 
+  
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=7.5, fig.height=4}
+mca_lp_comt_genes %>%
+  ggplot(aes(x = avg_log2FC_mca, y = avg_log2FC_lp)) +
+  geom_point() +
+  geom_point(data = top_labl_genes, size = 1) +
+  ggpubr::stat_cor(method = "pearson", label.x =3, label.y = 0, size = 5)+ 
+  geom_text_repel(
+    data = top_labl_genes,
+    aes(label = Gene_mca),
+    size = 5,
+    segment.size = 0.3,  force = 100
+  ) +
+  geom_abline() +
+  labs(x = "avg Log2FC MCA", y = "avg Log2FC Lasse") +
+  theme_bw() +
+  theme(text = element_text(size = 18)) 
+  
+```
+
+```{r, warning=FALSE, message=FALSE}
+top_discrepant_genes <- mca_lp_comt_genes |>
+  filter((avg_log2FC_mca > 0 & avg_log2FC_lp < 0) | (avg_log2FC_mca < 0 & avg_log2FC_lp > 0))
+
+mca_lp_comt_genes %>%
+  ggplot(aes(x = avg_log2FC_mca, y = avg_log2FC_lp)) +
+  geom_point() +
+  geom_point(data = top_discrepant_genes, size = 1) +
+  geom_text_repel(
+    data = top_discrepant_genes,
+    aes(label = Gene_mca),
+    size = 3, segment.size = 0.3, segment.color = "black", nudge_x = 4, nudge_y = 0, force = 25
+  ) +
+  theme_bw()
+  
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+mca_lp_cmtd_gn_sets <- list(
+"MCA_up" = mca_lp_comt_genes_all %>% filter(p_val_adj_mca < 0.0001 & avg_log2FC_mca > 0) %>% pull(gene),
+"LP_up" = mca_lp_comt_genes_all %>% filter(p_val_adj_lp < 0.0001 & avg_log2FC_lp > 0) %>% pull(gene),
+"MCA_down" = mca_lp_comt_genes_all %>% filter(p_val_adj_mca < 0.0001 & avg_log2FC_mca < 0) %>% pull(gene),
+"LP_down" = mca_lp_comt_genes_all %>% filter(p_val_adj_lp < 0.0001 & avg_log2FC_lp < 0) %>% pull(gene)
+)
+
+```
+
+```{r, fig.height=3.8, fig.width=3.8}
+
+ggvenn(mca_lp_cmtd_gn_sets,
+       show_percentage = F,
+       text_size = 6)
+
+```
+
+
+## Lasse portugal integrated dataset figures
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+DimPlot(m2_lasse_asex_harmony_pc_noM55_jnd, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_PC_man_clusters", label.size = 7, label.box = F) +
+  scale_color_manual(values = lp_mca_seu_cols) +
+  scale_fill_manual(values = lp_mca_seu_cols) +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank()) 
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+sympto_lvls <- c("asympto_mca", "sympto_mca", "dry_lp", "sympto_lp")
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+m2_lasse_asex_harmony_pc_noM55_jnd <- m2_lasse_asex_harmony_pc_noM55_jnd@meta.data %>%
+    mutate(across(donor, ~factor(str_remove_all(., "SC|C$"), levels = don_order_m)),
+           # across(donor, ~factor(str_remove(., "C$"), levels = don_order)),
+           stage_fld = str_replace_all(stage_fld, c("Mid trophozoite" = "Early trophozoite", ".*schizont" = "Schizont", "Gametocyte \\(developing\\)" = "Early ring")),
+           stage_lp_mca = coalesce(str_to_sentence(str_replace_all(pseudotime.stages, c("Late" = "Late ", "Early" = "Early ", "DevelopingGametocyte" = "Gametocyte \\(developing\\)", "Mid" = "Mid ", "FemaleGametocyte" = "Female"))), stage_fld), 
+           across(c(stage_fld, stage_lp_mca), ~factor(., levels = stg_refnd_lvls)), 
+           across(c(lp_mca_sympto), ~factor(., levels = sympto_lvls))) %>%
+  select(donor, stage_fld, stage_lp_mca, lp_mca_sympto) %>%
+  AddMetaData(m2_lasse_asex_harmony_pc_noM55_jnd, .)
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=4.9, fig.height=4.7}
+DimPlot(m2_lasse_asex_harmony_pc_noM55_jnd, reduction = "umap.harmony_PC_man", group.by = "stage_lp_mca", dims = c(1,2)) + 
+  scale_color_manual(values = sp_fld_colors2) +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 19),
+        axis.title = element_text(size = 15),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        # axis.title = element_blank(),
+        axis.ticks = element_blank()
+        ) +
+  guides(color = guide_legend(nrow = 4, override.aes = list(size = 4)))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+DimPlot(m2_lasse_asex_harmony_pc_noM55_jnd, reduction = "umap.harmony_PC_man", group.by = "stage_lp_mca", dims = c(1,2)) + 
+  scale_color_manual(values = sp_fld_colors2) +
+  theme_classic() +
+  theme_classic() +
+  labs(title = "", x = "UMAP 1", y= "UMAP 2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        # axis.title = element_blank()
+        ) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 8, fig.height=3.5}
+# split by condition
+DimPlot(m2_lasse_asex_harmony_pc_noM55_jnd, reduction = "umap.harmony_PC_man",  group.by = "harmony_PC_man_clusters",  split.by = "lp_mca_sympto", label = T, cols = lp_mca_seu_cols, label.size = 6)+
+  theme_classic() +
+  labs(title = "", x = "UMAP 1", y= "UMAP 2") +
+  theme(text = element_text(size = 16),
+        strip.text =element_text(size=18,face="bold", colour = 'black'),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        # axis.title = element_blank(),
+        axis.ticks = element_blank()
+        ) +
+  guides(color = guide_legend(nrow = 1, override.aes = list(size = 4)))
+
+  
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+gn_exp_plots <- FeaturePlot(m2_lasse_asex_harmony_pc_noM55_jnd, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500", "PF3D7-0406200"), reduction = "umap.harmony_PC_man", ncol = 3, order = T, combine = F)
+# gn_exp_plots <- FeaturePlot(m2_lasse_asex_harmony_pc_noM55_jnd, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", ncol = 3, order = T, combine = F)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+map(gn_exp_plots, ~.x +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+) %>%
+  cowplot::plot_grid(plotlist = ., nrow = 1)
+  
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+FeaturePlot(m2_lasse_asex_harmony_pc_noM55_jnd, features = c( "PF3D7-0406200"), reduction = "umap.harmony_PC_man", ncol = 3, order = T, combine = T, split.by = "lp_mca_sympto")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+gn_exp_plots <- FeaturePlot(m2_lasse_asex_harmony_pc_noM55_jnd, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", ncol = 3, order = T, combine = F)
+# gn_exp_plots <- FeaturePlot(m2_lasse_asex_harmony_pc_noM55_jnd, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", ncol = 3, order = T, combine = F)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=8, fig.height=3}
+map(gn_exp_plots, ~.x +
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP2") +
+  theme(text = element_text(size = 15),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+) %>%
+  cowplot::plot_grid(plotlist = ., nrow = 1)
+  
+```
+
+
+
+
+
