@@ -1,0 +1,279 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+})
+```
+
+
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Variable declarations
+
+```{r}
+##colors
+sp_col_new <- c(`Late ring` = "#78C679", `Early trophozoite` = "#FEEEAA", `Female (LE)` = "#a97f2f", 
+Female = "#551A8B", `Male (LE)` = "#7e5522", Male = "mediumpurple", 
+`Gametocyte (male)` = "#1a6c8b", `Gametocyte (female)` = "#d1b252", 
+Lab = "#D3D3D3", Unassigned = "#DCDCDC", `Failed QC` = "grey", 
+`Not assigned` = "grey", Atlas = "grey", `Early ring` = "#D1EC9F", 
+`Late trophozoite` = "#FEB24C", `Early schizont` = "#C9E8F1", 
+`Late schizont` = "#85B1D3", `Gametocyte (developing)` = "thistle", 
+`early female` = "#749E89", `late female` = "#4E6D58", Asexual = "#FF6961", 
+`NULL` = "lightgrey", `Field unlabelled` = "#D2C1DC", "weak_score" = "#c9c9c9", "unclear" = "#dddddd")
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+
+```
+
+## Genotype clustering for MSC
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+```
+
+
+
+Read in seurat objects processed in farm
+```{r, message=F, warning=F}
+# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
+# slct_sample_names <-c("MSC24", "MSC68", "MSC14", "MSC55") %>% str_sort(., numeric = T)
+# sample_name <- slct_sample_names
+sample_name_cr <- c(paste0(sample_name, "_cbendr"))
+sample_name_cr
+```
+
+## read in files
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+all_msc_cb_filt_dbt <- list.files("data/processed/Pf", pattern = "all_msc_cb_no_dbt3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_seu_filtOlMtCb_sct <- list.files("data/processed/Pf", pattern = "all_seu_filtOlMtCb_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_msc_cb_no_dbt.*.RDS'))) %>% 
+  # .[sample_name_all] %>%
+  .[sample_name] %>%
+  map(readRDS)
+```
+
+
+```{r}
+imap(all_msc_cb_filt_dbt, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "stage_fld") + labs(title = .y)) 
+```
+
+
+```{r, fig.height=6, fig.width=24, eval=T}
+## Generated in 'strain_pbulk_gtyping_supp_data_n_figs.Rmd' 
+soupo_kselect_list_pp_k_verified <- readRDS("data/processed/Pf/m2_all/strain_calling/soupo_kselect_list_pp_k_verified.RDS")
+
+```
+
+```{r}
+soupo_kselect_list_pp_k_verified[[1]]
+```
+
+
+```{r, eval=T}
+all_msc_cb_filt_dbt_w_strn_K_verfd <- map2(all_msc_cb_filt_dbt, soupo_kselect_list_pp_k_verified[paste0(names(all_msc_cb_filt_dbt), "_minmap")], ~{
+  AddMetaData(.x, .y %>% 
+                column_to_rownames("bcode") %>% 
+                select(Strain_K_verified, Strain_K_verified_QC, Strain_K_verified_n, Strain_K_verified_afm, Strain_K_verified_QC_afm, Strain_K_verified_afm_n) %>%
+                mutate(Strain_DN = Strain_K_verified))
+  })
+```
+
+```{r, fig.height=6, fig.width=24, eval=T}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd,~.x@meta.data %>% count(Strain_K_verified, Strain_K_verified_QC, Strain_K_verified_n)  %>% rename(!!paste0("n_", .y) := n))
+```
+
+
+```{r, fig.height=6, fig.width=24, eval=T}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd,~.x@meta.data %>% count(Strain_K_verified_afm, Strain_K_verified_QC_afm, Strain_K_verified_afm_n)  %>% rename(!!paste0("n_", .y) := n))
+```
+
+```{r, fig.height=6, fig.width=24, eval=T}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd,~.x@meta.data %>% count(Strain_DN, stage_afm) %>% rename(!!paste0("n_", .y) := n))
+```
+
+```{r}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd, ~DimPlot(.x, group.by = "stage_final2") + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+
+
+```{r}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd, ~DimPlot(.x, cells.highlight = rownames(.x@meta.data %>% filter(Strain_DN == "Doublet"))) + labs(title = .y))
+```
+
+
+```{r}
+## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt <- map(all_msc_cb_filt_dbt_w_strn_K_verfd, ~subset(.x,  subset = Strain_DN != "Doublet"))
+
+strKverf_dbt_after_rm <- map(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, dim)%>% as.data.frame() %>% .[2,] 
+strKverf_dbt_after_rm
+```
+
+
+```{r, fig.height=6, fig.width=24, eval=T}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt,~.x@meta.data %>% count(Strain_K_verified, Strain_K_verified_QC, Strain_K_verified_afm, Strain_K_verified_QC_afm) %>% filter(str_detect(Strain_K_verified_QC, "dbt"))  %>% rename(!!paste0("n_", .y) := n))
+```
+
+```{r}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, ~DimPlot(.x, cells.highlight = rownames(.x@meta.data %>% filter(Strain_K_verified_QC == "dbt_like"  & Strain_K_verified_QC_afm == "dbt_like" & Strain_K_verified != "Negative"))) + labs(title = .y))
+```
+
+
+```{r}
+## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt <- map(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, ~subset(.x,  subset = (Strain_K_verified_QC == "dbt_like" & Strain_K_verified_QC_afm == "dbt_like" & Strain_K_verified != "Negative"), invert = T))
+
+strKverf_dbtlike_after_rm <- map(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, dim)%>% as.data.frame() %>% .[2,] 
+strKverf_dbtlike_after_rm
+```
+
+```{r}
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, ~length(rownames(.x@meta.data %>% filter(Strain_K_verified_QC == "dbt_like"  & Strain_K_verified_QC_afm == "dbt_like" & Strain_K_verified != "Negative")))) %>% unlist()
+```
+
+
+```{r, eval=T}
+## write out seurat bpcells object files for normalization processing in farm
+### Cbender filt
+# imap(all_msc_cb_no_dbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_no_dbt.RDS")))
+imap(all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt3.RDS")))
+
+```
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt3.RDS" \
+
+```
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/prelim_stage_annotation/submsn_scmap_multi_ref_bsub.sh
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/all_msc_cb_filt_dbt_w_strn_K_verfd_noStrnDbt3.RDS" \
+# --o_sufx "_anotd" \
+```
+
