@@ -46,7 +46,7 @@ params.fdr_l= "0.01"
 
 // - compute resources for first process
 ncores="5"
-mem="20 GB"
+mem="30 GB"
 
 
 input_raw_ch = Channel
@@ -80,12 +80,12 @@ combined_input_ch.view()
 
 
 // - Combined process for all analyses
-process ALL_ANALYSES {
+process EDROPS_BCRANK_QC {
     memory "${mem}"
     cpus "${ncores}"
-    queue "small"
+    time '2.h'
 
-    errorStrategy 'ignore' 
+    // errorStrategy 'ignore' 
 
     tag "analyses on ${sample_nm} reads"
 
@@ -124,7 +124,7 @@ process ALL_ANALYSES {
 
 workflow {
     
-    all_out_ch = ALL_ANALYSES(combined_input_ch)
+    all_out_ch = EDROPS_BCRANK_QC(combined_input_ch)
     // all_out_ch.view()
 
 }
