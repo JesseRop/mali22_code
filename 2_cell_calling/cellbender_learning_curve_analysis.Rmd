@@ -1,0 +1,1041 @@
+---
+title: "CellBender Learning Curve Assessment Analysis"
+author: "jr35"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    theme: flatly
+    fig_width: 12
+    fig_height: 8
+params:
+  filter_samples: NULL
+---
+
+```{r load-libraries}
+# library(tidyverse)
+library(gt)
+library(plotly)
+library(DT)
+library(scales)
+library(patchwork)
+library(viridis)
+library(conflicted)
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+conflicts_prefer(plotly::layout)
+conflicts_prefer(dplyr::filter)
+
+# Set theme
+theme_set(theme_minimal(base_size = 12))
+
+# Define color palette for assessment categories
+ASSESSMENT_COLORS <- c(
+  "Normal" = "#4CAF50",                # Green
+  "Maybe Needs Lower LR" = "#FF9800",  # Orange
+  "Needs Lower LR" = "#F44336",        # Red
+  "Not Found" = "#FFC107",             # Yellow
+  "Other" = "#9E9E9E"                  # Grey
+)
+
+# Define reusable theme elements
+THEME_TITLE_CENTERED <- theme(
+  plot.title = element_text(hjust = 0.5, face = "bold"),
+  plot.subtitle = element_text(hjust = 0.5)
+)
+
+THEME_FACET_STRIP <- theme(
+  strip.text = element_text(face = "bold", size = 12),
+  strip.background = element_rect(fill = "#e0e0e0", color = NA)
+)
+
+THEME_LEGEND_TOP <- theme(legend.position = "top")
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = 'center'
+)
+
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+
+```{r, eval=T}
+pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_solo_mixed_mdata_decode$sample_nm
+```
+
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+```
+
+```{r}
+
+# ==============================================================================
+# CONFIGURATION: Filter by specific samples
+# ==============================================================================
+# Set to NULL to include all samples, or provide a vector of sample names
+# 
+# Examples:
+#   FILTER_SAMPLES <- NULL                              # All samples (default)
+#   FILTER_SAMPLES <- c("MSC3", "MSC40")               # Only MSC3 and MSC40
+#   FILTER_SAMPLES <- c("MSC36C", "MSC48C", "MSC49C")  # Multiple samples
+#   FILTER_SAMPLES <- c("MSC50_SLOnoJC")               # Single sample
+#
+# You can also use grep patterns to select samples:
+#   all_samples <- c("MSC36C", "MSC40noJC", "MSC48C", "MSC49C", "MSC50_SLOnoJC", ...)
+#   FILTER_SAMPLES <- all_samples[grep("noJC", all_samples)]  # All samples with "noJC"
+
+FILTER_SAMPLES <- sample_name  # Change this to filter specific samples
+# ==============================================================================
+```
+
+```{r, eval=T}
+# Run like 
+# module load HGI/softpack/groups/team152/vietnam_vacxin/5
+
+# Rscript extract_cellbender_learning_curve_assessment.R "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/cbender_custom2_wHsPf/cb_LR*/cb_report.html" "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/cbender_curve_assesment/wHsPf"
+
+# Rscript extract_cellbender_learning_curve_assessment.R "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/cbender_custom2_rmHs/cb_LR*/cb_report.html" "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/cbender_curve_assesment/rmHs"
+```
+
+# Overview
+
+This document analyzes CellBender learning curve assessments across different samples and conditions.
+
+```{r overview-note, results='asis', echo=FALSE}
+if (!is.null(FILTER_SAMPLES)) {
+  cat("\n> **Note:** This report is filtered to show only the following samples: **", 
+      paste(FILTER_SAMPLES, collapse = ", "), "**\n\n")
+}
+```
+
+# Load Data
+
+```{r load-data}
+# Function to load CSV files
+load_assessment_data <- function(file_path) {
+  if (file.exists(file_path)) {
+    read_csv(file_path, show_col_types = FALSE) %>%
+      mutate(
+        Learning_Rate = as.numeric(Learning_Rate),
+        Epochs = as.numeric(Epochs)
+      )
+  } else {
+    message(paste("File not found:", file_path))
+    return(NULL)
+  }
+}
+
+# Try to load both conditions
+rmHs_file <- "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/cbender_curve_assesment/rmHs/cellbender_learning_curve_assessments_rmHs.csv"
+wHsPf_file <- "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/cbender_curve_assesment/wHsPf/cellbender_learning_curve_assessments_wHsPf.csv"
+
+# Load available files
+data_list <- list()
+
+if (file.exists(rmHs_file)) {
+  data_list$rmHs <- load_assessment_data(rmHs_file) %>%
+    mutate(Condition = "rmHs")
+}
+
+if (file.exists(wHsPf_file)) {
+  data_list$wHsPf <- load_assessment_data(wHsPf_file) %>%
+    mutate(Condition = "wHsPf")
+}
+
+# Combine data if multiple conditions exist
+if (length(data_list) > 0) {
+  combined_data <- bind_rows(data_list)
+  message(paste("Loaded", nrow(combined_data), "assessments from", length(data_list), "condition(s)"))
+  
+  # Apply sample filter if specified
+  if (!is.null(FILTER_SAMPLES)) {
+    original_count <- nrow(combined_data)
+    original_samples <- length(unique(combined_data$Sample))
+    
+    combined_data <- combined_data %>%
+      filter(Sample %in% FILTER_SAMPLES)
+    
+    filtered_count <- nrow(combined_data)
+    filtered_samples <- length(unique(combined_data$Sample))
+    
+    if (filtered_count == 0) {
+      stop(paste("No data found for specified samples:", paste(FILTER_SAMPLES, collapse = ", ")))
+    }
+    
+    message(paste("\n*** SAMPLE FILTER APPLIED ***"))
+    message(paste("Requested samples:", paste(FILTER_SAMPLES, collapse = ", ")))
+    message(paste("Found samples:", paste(unique(combined_data$Sample), collapse = ", ")))
+    message(paste("Filtered from", original_count, "to", filtered_count, "assessments"))
+    message(paste("Filtered from", original_samples, "to", filtered_samples, "samples"))
+  }
+} else {
+  stop("No data files found. Please run the extraction script first.")
+}
+
+# Display loaded data info
+cat("\n**Data Summary:**\n")
+if (!is.null(FILTER_SAMPLES)) {
+  cat("- **FILTERED SAMPLES:**", paste(FILTER_SAMPLES, collapse = ", "), "\n")
+}
+cat("- Total assessments:", nrow(combined_data), "\n")
+cat("- Conditions:", paste(unique(combined_data$Condition), collapse = ", "), "\n")
+cat("- Samples:", length(unique(combined_data$Sample)), "\n")
+cat("- Learning rates:", paste(unique(combined_data$Learning_Rate), collapse = ", "), "\n")
+cat("- Epochs:", paste(unique(combined_data$Epochs), collapse = ", "), "\n")
+```
+
+# Data Table
+
+
+```{r data-table}
+# Remove PNG hyperlink column, just show the main assessment table
+table_data <- combined_data %>%
+  select(Sample, Condition, Learning_Rate, Epochs, Assessment_Category, Full_Assessment)
+
+datatable(
+  table_data,
+  filter = 'top',
+  options = list(
+    pageLength = 20,
+    scrollX = TRUE,
+    autoWidth = TRUE
+  ),
+  rownames = FALSE,
+  escape = TRUE,
+  caption = "Interactive table of all CellBender learning curve assessments"
+)
+```
+
+## Learning Curve Images by Sample (Grid)
+```{r learning-curve-image-grid, results='asis', fig.width=10, fig.height=10}
+
+# Show a grid of learning curve images for each sample, up to four per sample (for different parameter combos)
+library(gridExtra)
+img_df <- combined_data %>%
+  filter(!is.na(Learning_Curve_Image)) %>%
+  mutate(Exists = file.exists(Learning_Curve_Image))
+
+if (nrow(img_df) == 0) {
+  cat("No learning curve images found in the loaded data.\n")
+} else {
+  samples <- unique(img_df$Sample)
+  for (s in samples) {
+    sample_imgs <- img_df %>% filter(Sample == s & Exists)
+    if (nrow(sample_imgs) == 0) next
+    # Order by Condition, Learning_Rate, Epochs for consistency
+    sample_imgs <- sample_imgs %>% arrange(Condition, Learning_Rate, Epochs)
+    # Titles for each image with assessment category
+    img_titles <- paste0(sample_imgs$Condition, ", LR=", sample_imgs$Learning_Rate, ", E=", sample_imgs$Epochs, 
+                         "\n[", sample_imgs$Assessment_Category, "]")
+    # List of grobs for images
+    grob_list <- lapply(seq_len(nrow(sample_imgs)), function(i) {
+      grid::rasterGrob(png::readPNG(sample_imgs$Learning_Curve_Image[i]), interpolate=TRUE)
+    })
+    # Arrange in up to 2x2 grid
+    n_imgs <- length(grob_list)
+    ncol <- ifelse(n_imgs > 2, 2, n_imgs)
+    nrow <- ceiling(n_imgs / ncol)
+    # Add titles above each image with assessment category
+    grid_plots <- mapply(function(g, t) gridExtra::arrangeGrob(g, top = t), grob_list, img_titles, SIMPLIFY = FALSE)
+    # Title for the sample
+    cat(paste0("\n\n### ", s, "\n"))
+    # grid::grid.newpage()
+    gridExtra::grid.arrange(grobs = grid_plots, ncol = ncol, top = grid::textGrob(s, gp = grid::gpar(fontsize = 16, fontface = "bold")))
+  }
+}
+```
+
+## Learning Curve Images
+
+```{r learning-curve-images, results='asis', eval=F}
+# Display extracted learning curve PNGs, if present
+img_df <- combined_data %>%
+  filter(!is.na(Learning_Curve_Image)) %>%
+  mutate(Exists = file.exists(Learning_Curve_Image)) %>%
+  arrange(Condition, Sample, Learning_Rate, Epochs)
+
+if (nrow(img_df) == 0) {
+  cat("No learning curve images found in the loaded data.\n")
+} else {
+  for (i in seq_len(nrow(img_df))) {
+    row <- img_df[i, ]
+    cat(paste0("\n### ", row$Sample, " | ", row$Condition, " | LR=", row$Learning_Rate, " | E=", row$Epochs, "\n\n"))
+    if (isTRUE(row$Exists)) {
+      print(knitr::include_graphics(row$Learning_Curve_Image))
+    } else {
+      cat("Image file not found: ", row$Learning_Curve_Image, "\n\n")
+    }
+  }
+}
+```
+
+# Summary Statistics
+
+```{r summary-stats}
+# Overall summary
+overall_summary <- combined_data %>%
+  count(Assessment_Category) %>%
+  mutate(
+    Percentage = n / sum(n) * 100,
+    Percentage_Label = sprintf("%.1f%%", Percentage)
+  )
+
+# Create summary table
+overall_summary %>%
+  gt() %>%
+  tab_header(
+    title = "Overall Assessment Categories",
+    subtitle = "Across all samples and conditions"
+  ) %>%
+  cols_label(
+    Assessment_Category = "Assessment",
+    n = "Count",
+    Percentage = "Percentage",
+    Percentage_Label = "Percentage"
+  ) %>%
+  fmt_number(
+    columns = c(Percentage),
+    decimals = 1
+  ) %>%
+  cols_hide(columns = c(Percentage_Label)) %>%
+  tab_style(
+    style = cell_fill(color = "#f0f0f0"),
+    locations = cells_body(columns = everything(), rows = Assessment_Category == "Normal")
+  ) %>%
+  tab_style(
+    style = cell_fill(color = "#fff3e0"),
+    locations = cells_body(columns = everything(), rows = Assessment_Category == "Maybe Needs Lower LR")
+  ) %>%
+  tab_style(
+    style = cell_fill(color = "#ffe6e6"),
+    locations = cells_body(columns = everything(), rows = Assessment_Category == "Needs Lower LR")
+  )
+```
+
+```{r condition-summary}
+# Summary by condition
+if (length(unique(combined_data$Condition)) > 1) {
+  combined_data %>%
+    count(Condition, Assessment_Category) %>%
+    group_by(Condition) %>%
+    mutate(
+      Total = sum(n),
+      Percentage = n / Total * 100
+    ) %>%
+    ungroup() %>%
+    gt() %>%
+    tab_header(
+      title = "Assessment Categories by Condition",
+      subtitle = "Comparison across processing conditions"
+    ) %>%
+    cols_label(
+      Condition = "Condition",
+      Assessment_Category = "Assessment",
+      n = "Count",
+      Total = "Total",
+      Percentage = "Percentage"
+    ) %>%
+    fmt_number(
+      columns = c(Percentage),
+      decimals = 1
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#f0f0f0"),
+      locations = cells_body(columns = everything(), rows = Assessment_Category == "Normal")
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#fff3e0"),
+      locations = cells_body(columns = everything(), rows = Assessment_Category == "Maybe Needs Lower LR")
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#ffe6e6"),
+      locations = cells_body(columns = everything(), rows = Assessment_Category == "Needs Lower LR")
+    )
+}
+```
+
+# Visualizations
+
+## Assessment Category Distribution
+
+```{r assessment-distribution, fig.height=6}
+# Pie chart of overall distribution
+p1 <- overall_summary %>%
+  ggplot(aes(x = "", y = n, fill = Assessment_Category)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  geom_text(aes(label = paste0(Assessment_Category, "\n", n, " (", Percentage_Label, ")")),
+            position = position_stack(vjust = 0.5),
+            size = 4) +
+  scale_fill_manual(values = ASSESSMENT_COLORS) +
+  labs(
+    title = "Overall Assessment Distribution",
+    fill = "Assessment"
+  ) +
+  theme_void() +
+  THEME_TITLE_CENTERED +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    legend.position = "right"
+  )
+
+# Bar chart
+p2 <- combined_data %>%
+  count(Assessment_Category) %>%
+  ggplot(aes(x = reorder(Assessment_Category, -n), y = n, fill = Assessment_Category)) +
+  geom_col(color = "white") +
+  geom_text(aes(label = n), vjust = -0.5, size = 4) +
+  scale_fill_manual(values = ASSESSMENT_COLORS) +
+  labs(
+    title = "Assessment Category Counts",
+    x = "Assessment Category",
+    y = "Count"
+  ) +
+  THEME_TITLE_CENTERED +
+  theme(legend.position = "none")
+
+p1 + p2
+```
+
+## Assessment by Condition
+
+```{r assessment-by-condition, fig.height=6}
+if (length(unique(combined_data$Condition)) > 1) {
+  combined_data %>%
+    count(Condition, Assessment_Category) %>%
+    ggplot(aes(x = Condition, y = n, fill = Assessment_Category)) +
+    geom_col(position = "dodge", color = "white") +
+    geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.5) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    labs(
+      title = "Assessment Categories by Processing Condition",
+      x = "Condition",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP
+} else {
+  cat("Only one condition present in the data.\n")
+}
+```
+
+## Assessment by Learning Rate
+
+```{r assessment-by-lr, fig.height=6}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Plot with condition split
+  combined_data %>%
+    count(Condition, Learning_Rate, Assessment_Category) %>%
+    ggplot(aes(x = factor(Learning_Rate), y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white") +
+    geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    facet_wrap(~Condition, ncol = 2) +
+    labs(
+      title = "Assessment Categories by Learning Rate and Condition",
+      x = "Learning Rate",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP +
+    THEME_FACET_STRIP
+} else {
+  # Single condition plot
+  combined_data %>%
+    count(Learning_Rate, Assessment_Category) %>%
+    ggplot(aes(x = factor(Learning_Rate), y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white") +
+    geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3.5) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    labs(
+      title = "Assessment Categories by Learning Rate",
+      x = "Learning Rate",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP
+}
+```
+
+## Assessment by Epochs
+
+```{r assessment-by-epochs, fig.height=6}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Plot with condition split
+  combined_data %>%
+    count(Condition, Epochs, Assessment_Category) %>%
+    ggplot(aes(x = factor(Epochs), y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white") +
+    geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    facet_wrap(~Condition, ncol = 2) +
+    labs(
+      title = "Assessment Categories by Number of Epochs and Condition",
+      x = "Epochs",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP +
+    THEME_FACET_STRIP
+} else {
+  # Single condition plot
+  combined_data %>%
+    count(Epochs, Assessment_Category) %>%
+    ggplot(aes(x = factor(Epochs), y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white") +
+    geom_text(aes(label = n), position = position_stack(vjust = 0.5), size = 3.5) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    labs(
+      title = "Assessment Categories by Number of Epochs",
+      x = "Epochs",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP
+}
+```
+
+## Heatmap: Learning Rate vs Epochs
+
+```{r heatmap-lr-epochs, fig.height=8}
+# Create a heatmap showing assessment categories
+heatmap_data <- combined_data %>%
+  count(Condition, Learning_Rate, Epochs, Assessment_Category) %>%
+  group_by(Condition, Learning_Rate, Epochs) %>%
+  mutate(
+    Total = sum(n),
+    Category_Pct = n / Total * 100
+  ) %>%
+  ungroup()
+
+if (length(unique(combined_data$Condition)) > 1) {
+  # Plot for "Normal" assessments - split by condition
+  heatmap_data %>%
+    filter(Assessment_Category == "Normal") %>%
+    ggplot(aes(x = factor(Learning_Rate), y = factor(Epochs), fill = Category_Pct)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = sprintf("%.0f%%\n(%d/%d)", Category_Pct, n, Total)), size = 3) +
+    scale_fill_gradient(low = "#fff5f0", high = "#4CAF50", name = "% Normal") +
+    facet_wrap(~Condition, ncol = 2) +
+    labs(
+      title = "Percentage of 'Normal' Learning Curve Assessments",
+      subtitle = "By Learning Rate, Epochs, and Condition",
+      x = "Learning Rate",
+      y = "Epochs"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_FACET_STRIP
+} else {
+  # Single condition heatmap
+  heatmap_data %>%
+    filter(Assessment_Category == "Normal") %>%
+    ggplot(aes(x = factor(Learning_Rate), y = factor(Epochs), fill = Category_Pct)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = sprintf("%.0f%%\n(%d/%d)", Category_Pct, n, Total)), size = 3) +
+    scale_fill_gradient(low = "#fff5f0", high = "#4CAF50", name = "% Normal") +
+    labs(
+      title = "Percentage of 'Normal' Learning Curve Assessments",
+      subtitle = "By Learning Rate and Epochs",
+      x = "Learning Rate",
+      y = "Epochs"
+    ) +
+    THEME_TITLE_CENTERED
+}
+```
+
+
+```{r, fig.height= 4, fig.width= 4, eval=T}
+# Copy to 'cell_calling_figs.Rmd' for figure generation
+combined_data_cbender_assesment <- combined_data
+saveRDS(combined_data_cbender_assesment, "data/processed/Pf/m2_all/cell_calling_plotting/combined_data_cbender_assesment.RDS")
+
+```
+
+## Sample-Level Assessment
+
+```{r sample-assessment, fig.height=12, fig.width=14}
+# Summary by sample with parameter details
+sample_summary <- combined_data %>%
+  count(Sample, Condition, Learning_Rate, Epochs, Assessment_Category) %>%
+  mutate(
+    Param_Combo = paste0("LR: ", Learning_Rate, "\nE: ", Epochs)
+  )
+
+if (length(unique(combined_data$Condition)) > 1) {
+  # Plot with condition and parameter combinations
+  sample_summary %>%
+    ggplot(aes(x = Sample, y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white", width = 0.7) +
+    geom_text(aes(label = ifelse(n > 0, n, "")), 
+              position = position_stack(vjust = 0.5), size = 2) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    facet_grid(Condition ~ Param_Combo, scales = "free_y", space = "free") +
+    labs(
+      title = "Assessment Categories by Sample, Condition, and Parameters",
+      subtitle = "Each panel shows a different learning rate and epoch combination",
+      x = "Sample",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    coord_flip() +
+    theme_minimal(base_size = 10) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP +
+    theme(
+      strip.text = element_text(face = "bold", size = 9),
+      strip.background = element_rect(fill = "#e0e0e0", color = NA),
+      axis.text.x = element_text(size = 8),
+      axis.text.y = element_text(size = 7),
+      panel.spacing = unit(0.5, "lines")
+    )
+} else {
+  # Single condition plot with parameter facets
+  sample_summary %>%
+    ggplot(aes(x = Sample, y = n, fill = Assessment_Category)) +
+    geom_col(position = "stack", color = "white", width = 0.7) +
+    geom_text(aes(label = ifelse(n > 0, n, "")), 
+              position = position_stack(vjust = 0.5), size = 2.5) +
+    scale_fill_manual(values = ASSESSMENT_COLORS) +
+    facet_wrap(~ Param_Combo, ncol = 2, scales = "free_y") +
+    labs(
+      title = "Assessment Categories by Sample and Parameters",
+      subtitle = "Each panel shows a different learning rate and epoch combination",
+      x = "Sample",
+      y = "Count",
+      fill = "Assessment"
+    ) +
+    coord_flip() +
+    theme_minimal(base_size = 10) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      strip.background = element_rect(fill = "#e0e0e0", color = NA)
+    )
+}
+```
+
+## Interactive Sample Exploration
+
+```{r interactive-sample}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Interactive plot with condition faceting
+  plot_ly(
+    data = sample_summary,
+    x = ~Sample,
+    y = ~n,
+    color = ~Assessment_Category,
+    colors = ASSESSMENT_COLORS,
+    type = "bar",
+    text = ~paste(
+      "Sample:", Sample,
+      "<br>Condition:", Condition,
+      "<br>Learning Rate:", Learning_Rate,
+      "<br>Epochs:", Epochs,
+      "<br>Assessment:", Assessment_Category,
+      "<br>Count:", n
+    ),
+    hoverinfo = "text",
+    transforms = list(
+      list(
+        type = 'groupby',
+        groups = ~Condition
+      )
+    )
+  ) %>%
+    layout(
+      title = "Interactive Sample-Level Assessment by Condition",
+      barmode = "stack",
+      xaxis = list(title = "Sample"),
+      yaxis = list(title = "Count"),
+      legend = list(title = list(text = "Assessment")),
+      updatemenus = list(
+        list(
+          type = "buttons",
+          direction = "down",
+          xanchor = "left",
+          yanchor = "top",
+          x = 0,
+          y = 1.15,
+          buttons = list(
+            list(method = "restyle",
+                 args = list("transforms[0].value", unique(sample_summary$Condition)[1]),
+                 label = unique(sample_summary$Condition)[1]),
+            list(method = "restyle",
+                 args = list("transforms[0].value", unique(sample_summary$Condition)[2]),
+                 label = unique(sample_summary$Condition)[2])
+          )
+        )
+      )
+    )
+} else {
+  # Single condition interactive plot
+  plot_ly(
+    data = sample_summary,
+    x = ~Sample,
+    y = ~n,
+    color = ~Assessment_Category,
+    colors = ASSESSMENT_COLORS,
+    type = "bar",
+    text = ~paste(
+      "Sample:", Sample,
+      "<br>Learning Rate:", Learning_Rate,
+      "<br>Epochs:", Epochs,
+      "<br>Assessment:", Assessment_Category,
+      "<br>Count:", n
+    ),
+    hoverinfo = "text"
+  ) %>%
+    layout(
+      title = "Interactive Sample-Level Assessment",
+      barmode = "stack",
+      xaxis = list(title = "Sample"),
+      yaxis = list(title = "Count"),
+      legend = list(title = list(text = "Assessment"))
+    )
+}
+```
+
+# Detailed Analysis
+
+## Parameter Combinations
+
+```{r parameter-combinations}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Show parameter combinations by condition
+  param_combos <- combined_data %>%
+    count(Condition, Learning_Rate, Epochs, Assessment_Category) %>%
+    pivot_wider(
+      names_from = Assessment_Category,
+      values_from = n,
+      values_fill = 0
+    ) %>%
+    mutate(
+      Total = rowSums(across(where(is.numeric) & !matches("Condition"))),
+      Normal_Pct = if_else(Total > 0, Normal / Total * 100, 0)
+    ) %>%
+    arrange(Condition, desc(Normal_Pct))
+  
+  param_combos %>%
+    gt() %>%
+    tab_header(
+      title = "Parameter Combinations Performance by Condition",
+      subtitle = "Sorted by percentage of Normal assessments within each condition"
+    ) %>%
+    cols_label(
+      Condition = "Condition",
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      Normal_Pct = "% Normal"
+    ) %>%
+    fmt_number(
+      columns = c(Normal_Pct),
+      decimals = 1
+    ) %>%
+    data_color(
+      columns = c(Normal_Pct),
+      colors = scales::col_numeric(
+        palette = c("#F44336", "#FFC107", "#4CAF50"),
+        domain = c(0, 100)
+      )
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#f5f5f5"),
+      locations = cells_body(columns = everything(), rows = Condition == "rmHs")
+    )
+} else {
+  # Single condition
+  param_combos <- combined_data %>%
+    count(Learning_Rate, Epochs, Assessment_Category) %>%
+    pivot_wider(
+      names_from = Assessment_Category,
+      values_from = n,
+      values_fill = 0
+    ) %>%
+    mutate(
+      Total = rowSums(across(where(is.numeric))),
+      Normal_Pct = if_else(Total > 0, Normal / Total * 100, 0)
+    ) %>%
+    arrange(desc(Normal_Pct))
+  
+  param_combos %>%
+    gt() %>%
+    tab_header(
+      title = "Parameter Combinations Performance",
+      subtitle = "Sorted by percentage of Normal assessments"
+    ) %>%
+    cols_label(
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      Normal_Pct = "% Normal"
+    ) %>%
+    fmt_number(
+      columns = c(Normal_Pct),
+      decimals = 1
+    ) %>%
+    data_color(
+      columns = c(Normal_Pct),
+      colors = scales::col_numeric(
+        palette = c("#F44336", "#FFC107", "#4CAF50"),
+        domain = c(0, 100)
+      )
+    )
+}
+```
+
+## Samples Needing Attention
+
+```{r samples-attention}
+# Identify samples with "Needs Lower LR" or "Maybe Needs Lower LR" assessments
+samples_needs_lr <- combined_data %>%
+  filter(Assessment_Category == "Needs Lower LR") %>%
+  select(Sample, Condition, Learning_Rate, Epochs, Full_Assessment) %>%
+  arrange(Sample, Learning_Rate, Epochs)
+
+samples_maybe_needs_lr <- combined_data %>%
+  filter(Assessment_Category == "Maybe Needs Lower LR") %>%
+  select(Sample, Condition, Learning_Rate, Epochs, Full_Assessment) %>%
+  arrange(Sample, Learning_Rate, Epochs)
+
+if (nrow(samples_needs_lr) > 0) {
+  cat("\n**Samples with 'Needs Lower LR' assessments (definite):**\n\n")
+  
+  samples_needs_lr %>%
+    gt() %>%
+    tab_header(
+      title = "Samples Definitely Requiring Lower Learning Rate",
+      subtitle = "These runs showed unusual behavior - re-run recommended"
+    ) %>%
+    cols_label(
+      Sample = "Sample",
+      Condition = "Condition",
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      Full_Assessment = "Assessment"
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#ffe6e6"),
+      locations = cells_body()
+    )
+} else {
+  cat("\n**No samples definitely require lower learning rates!**\n")
+}
+
+if (nrow(samples_maybe_needs_lr) > 0) {
+  cat("\n\n**Samples with 'Maybe Needs Lower LR' assessments (slightly unusual):**\n\n")
+  
+  samples_maybe_needs_lr %>%
+    gt() %>%
+    tab_header(
+      title = "Samples That Might Benefit from Lower Learning Rate",
+      subtitle = "These runs showed slightly unusual behavior - consider re-running"
+    ) %>%
+    cols_label(
+      Sample = "Sample",
+      Condition = "Condition",
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      Full_Assessment = "Assessment"
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#fff3e0"),
+      locations = cells_body()
+    )
+} else {
+  cat("\n\n**No samples show slightly unusual behavior!**\n")
+}
+
+if (nrow(samples_needs_lr) == 0 && nrow(samples_maybe_needs_lr) == 0) {
+  cat("\n**All learning curves look normal! No action required.**\n")
+}
+```
+
+## Recommended Parameters
+
+```{r recommended-parameters}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Find best performing parameter combinations per condition
+  recommended <- combined_data %>%
+    filter(Assessment_Category == "Normal") %>%
+    count(Condition, Learning_Rate, Epochs) %>%
+    group_by(Condition) %>%
+    arrange(Condition, desc(n)) %>%
+    slice_head(n = 3) %>%
+    ungroup()
+  
+  cat("\n**Top 3 Parameter Combinations per Condition (by number of Normal assessments):**\n\n")
+  
+  recommended %>%
+    gt() %>%
+    tab_header(
+      title = "Recommended Parameter Combinations by Condition",
+      subtitle = "Based on frequency of Normal assessments"
+    ) %>%
+    cols_label(
+      Condition = "Condition",
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      n = "Normal Count"
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#e8f5e9"),
+      locations = cells_body()
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#f5f5f5"),
+      locations = cells_body(columns = everything(), rows = Condition == "rmHs")
+    )
+} else {
+  # Single condition
+  recommended <- combined_data %>%
+    filter(Assessment_Category == "Normal") %>%
+    count(Learning_Rate, Epochs) %>%
+    arrange(desc(n)) %>%
+    head(5)
+  
+  cat("\n**Top 5 Parameter Combinations (by number of Normal assessments):**\n\n")
+  
+  recommended %>%
+    gt() %>%
+    tab_header(
+      title = "Recommended Parameter Combinations",
+      subtitle = "Based on frequency of Normal assessments"
+    ) %>%
+    cols_label(
+      Learning_Rate = "Learning Rate",
+      Epochs = "Epochs",
+      n = "Normal Count"
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "#e8f5e9"),
+      locations = cells_body()
+    )
+}
+```
+
+# Condition Comparison
+
+```{r condition-comparison}
+if (length(unique(combined_data$Condition)) > 1) {
+  # Compare conditions side by side
+  condition_comparison <- combined_data %>%
+    count(Condition, Learning_Rate, Epochs, Assessment_Category) %>%
+    pivot_wider(
+      names_from = Assessment_Category,
+      values_from = n,
+      values_fill = 0
+    ) %>%
+    mutate(
+      Total = rowSums(across(where(is.numeric))),
+      Normal_Pct = if_else(Total > 0, Normal / Total * 100, 0)
+    )
+  
+  # Plot comparison
+  condition_comparison %>%
+    ggplot(aes(x = interaction(Learning_Rate, Epochs), y = Normal_Pct, fill = Condition)) +
+    geom_col(position = "dodge") +
+    geom_text(aes(label = sprintf("%.0f%%", Normal_Pct)), 
+              position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+    scale_fill_brewer(palette = "Set2") +
+    labs(
+      title = "Comparison of Normal Assessment Rates by Condition",
+      subtitle = "Across different parameter combinations",
+      x = "Learning Rate × Epochs",
+      y = "% Normal Assessments",
+      fill = "Condition"
+    ) +
+    THEME_TITLE_CENTERED +
+    THEME_LEGEND_TOP +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+```
+
+# Summary
+
+```{r final-summary}
+cat("\n## Key Findings\n\n")
+
+# Calculate key metrics
+total_assessments <- nrow(combined_data)
+normal_count <- sum(combined_data$Assessment_Category == "Normal")
+needs_lr_count <- sum(combined_data$Assessment_Category == "Needs Lower LR")
+maybe_needs_lr_count <- sum(combined_data$Assessment_Category == "Maybe Needs Lower LR")
+normal_pct <- normal_count / total_assessments * 100
+
+cat("- **Total assessments analyzed:**", total_assessments, "\n")
+cat("- **Normal learning curves:**", normal_count, sprintf("(%.1f%%)", normal_pct), "\n")
+cat("- **Definitely needs lower learning rate:**", needs_lr_count, sprintf("(%.1f%%)", needs_lr_count / total_assessments * 100), "\n")
+cat("- **Maybe needs lower learning rate:**", maybe_needs_lr_count, sprintf("(%.1f%%)", maybe_needs_lr_count / total_assessments * 100), "\n")
+
+if (needs_lr_count > 0) {
+  cat("\n**High Priority Action Items:**\n")
+  cat("- Re-run", needs_lr_count, "assessments with half the current learning rate\n")
+  cat("- Focus on samples:", paste(unique(samples_needs_lr$Sample), collapse = ", "), "\n")
+}
+
+if (maybe_needs_lr_count > 0) {
+  cat("\n**Consider Action Items:**\n")
+  cat("- Consider re-running", maybe_needs_lr_count, "assessments with half the current learning rate\n")
+  cat("- Samples to consider:", paste(unique(samples_maybe_needs_lr$Sample), collapse = ", "), "\n")
+}
+
+if (needs_lr_count == 0 && maybe_needs_lr_count == 0) {
+  cat("\n**All learning curves look normal! No action required.**\n")
+}
+
+if (length(unique(combined_data$Condition)) > 1) {
+  cat("\n**Best performing parameters by condition:**\n")
+  for (cond in unique(recommended$Condition)) {
+    cat("\n", cond, ":\n", sep = "")
+    best_params <- recommended %>% filter(Condition == cond) %>% slice(1)
+    cat("  - Learning Rate:", best_params$Learning_Rate, "\n")
+    cat("  - Epochs:", best_params$Epochs, "\n")
+    cat("  - Normal count:", best_params$n, "\n")
+  }
+} else {
+  cat("\n**Best performing parameters:**\n")
+  best_params <- recommended %>% slice(1)
+  cat("- Learning Rate:", best_params$Learning_Rate, "\n")
+  cat("- Epochs:", best_params$Epochs, "\n")
+}
+```
+
+---
+
+**Report generated:** `r Sys.time()`
+
+**Data files analyzed:** `r paste(names(data_list), collapse = ", ")`
