@@ -22,14 +22,14 @@ DATA_DIR="${BASE_DIR}/data"
 RAW_DIR="/lustre/scratch126/tol/teams/lawniczak/projects/malaria_single_cell/mali_field_runs/2022/data"
 
 # Set parameters
-L_RATES="0.0001,0.000005"
-EPOCHS="150,250"
+L_RATES="0.0001"
+EPOCHS="150"
 SPECIES_CRANGER="cellranger_runs_rmHsapiens cellranger_runs"
 SPECIES_CBENDER="_rmHs _wHsPf"
 
 # Run the Nextflow pipeline
 nextflow run \
-  ${BASE_DIR}/mali22_code_lnk/cell_calling/main.nf \
+  ${BASE_DIR}/mali22_code_lnk/cell_calling/cbender_main.nf \
   -w ${WORK_DIR}/work_pipeline \
   -profile sanger \
   -c ${WORK_DIR}/profiles.config \
@@ -37,14 +37,14 @@ nextflow run \
   -resume \
   -with-dag pipeline.png \
   --outdir "${DATA_DIR}" \
-  --input_tenx "${RAW_DIR}/{cellranger_runs,cellranger_runs_rmHsapiens}/Pf_all_genes/5736STDY*/outs/raw_feature_bc_matrix" \
+  --input_tenx "${RAW_DIR}/{cellranger_runs,cellranger_runs_rmHsapiens}/Pf_all_genes/5736STDY11771535/outs/raw_feature_bc_matrix" \
   --decode_csv "${DATA_DIR}/raw/pf_solo_mixed_mdata_decode_cln.csv" \
   --l_rates "${L_RATES}" \
   --epochs "${EPOCHS}" \
   \
   --script_umi "${BASE_DIR}/mali22_code_lnk/cell_calling/get_estimates_from_umi_counts.py" \
   --cellbender_script "${BASE_DIR}/../multipurpose_scripts_lnk/cbender_cellNo_edropsNo.sh" \
-  --metadata_script "${BASE_DIR}/mali22_code_lnk/python_nbooks/cbender_mdata_csv.py" \
+  --metadata_script "${BASE_DIR}/mali22_code_lnk/cell_calling/cbender_mdata_csv.py" \
   --yascp_utils "/software/team222/jr35/yascp_utils" \
   --cellbender_env "/software/team222/jr35/cellbender_gpu/cellbender_gpu_env" \
   \
@@ -59,7 +59,7 @@ nextflow run \
   --estimate_params_umis.min_droplets "0" \
   \
   --ncores "3" \
-  --mem "30000" \
+  --mem "20000" \
   --species_cranger ${SPECIES_CRANGER} \
   --species_cbender ${SPECIES_CBENDER} \
   \
