@@ -121,24 +121,6 @@ Read in clusters.tsv files with assignment of cells to strains and PCA plots met
 
 Transfer clusters.tsv files with assignment of cells to strains and PCA plots metrics for the best K from farm to my local Mac
 
-```{r}
-
-# slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
-# ## get relevant sample names
-# pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
-# 
-# ##Sample ID
-# sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
-# smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
-
-```
-
-
-```{r}
-# Remove poor quality samples
-# poorQC_samples <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39") 
-# sample_name <- sample_name[!(sample_name %in% poorQC_samples)] %>% str_sort(., numeric = T)
-```
 
 ```{r}
 
@@ -207,7 +189,7 @@ sample_name_ed_cr <- c(paste0(sample_name, "_cr"), paste0(sample_name, "_edrops"
 
 ```{r, message=F, warning=F}
 # Retain only the old cellbender and the new cellbendr_cellranger combination
-sample_name_ed_cr_slct <- sample_name_ed_cr[str_detect(sample_name_ed_cr, "CbendrCr|cbendr")]
+sample_name_ed_cr_slct <- sample_name_ed_cr[str_detect(sample_name_ed_cr, "CbendrCr")]
 ```
 
 Read in cell annotation singleR processed in farm
@@ -217,7 +199,7 @@ Read in cell annotation singleR processed in farm
 #   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|_seu.*|bpc'))) %>% 
 
 
-all_pref_pred <- list.files("data/processed/Pf", pattern = "bp.*_(cbendr|CbendrCr)_pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+all_pref_pred <- list.files("data/processed/Pf", pattern = "bp.*_(CbendrCr)_pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
 # all_pref_pred <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops|cbcr)_pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
 # all_pref_pred <- list.files("data/processed/Pf", pattern = "bpc_seu_cbendr_pred_sR.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|bp|_pred.*'))) %>%
@@ -264,50 +246,6 @@ map(all_pref_pred, ~{
 ```{r, eval=FALSE}
 map(all_pref_pred[1], ~plotDeltaDistribution(.x))
 
-```
-
-
-
-
-```{r}
-# config <- configureMarkerHeatmap(all_pref_pred[[1]], all_ed_pref_sce[[3]], "epsilon")
-# mat <- assay(all_ed_pref_sce[[3]], "logcounts")[head(config$rows, 20), config$columns]
-# aggregated <- scuttle::summarizeAssayByGroup(mat, config$predictions)
-# pheatmap::pheatmap(assay(aggregated), cluster_col=FALSE)
-```
-
-
-```{r}
-# map(all_pref_pred, all_ed_pref_sce[3], ~plotMarkerHeatmap(.x, .y, "Male"))
-
-```
-
-```{r}
-# collected <- list()
-# for (lab in unique(all_pref_pred[[1]]$labels)) {
-#   print(lab)
-#   collected[[lab]] <- SingleR::plotMarkerHeatmap(results = predictions, test = all_ed_pref_sce[[3]], label = lab)[[4]]
-# }
-
-```
-
-
-```{r}
-# config <- configureMarkerHeatmap(predictions, m13_qcd_anotd_sce, "epsilon")
-# mat <- assay(m13_qcd_anotd_sce, "logcounts")[head(config$rows, 20), config$columns]
-# aggregated <- scuttle::summarizeAssayByGroup(mat, config$predictions)
-# pheatmap::pheatmap(assay(aggregated), cluster_col=FALSE)
-```
-
-
-```{r}
-# tab <- table(cluster=m13_qcd_anotd_sce$seurat_clusters, label=predictions$labels) 
-# pheatmap::pheatmap(log10(tab+10)) # using a larger pseudo-count for smoothing. 
-```
-
-
-```{r}
-# scater::plotUMAP(m13_qcd_anotd_sce, colour_by = "seurat_clusters")
 ```
 
 ################## evaluate singleR MAnually
@@ -399,53 +337,9 @@ sp_col_new_abrv
 
 
 
-```{r, fig.width=4, fig.height=4}
-
-snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), labls = paste0("K=", opt_clusters_nms[[3]][1:2]), bp_face = c("bold", "plain"), ttl = "plot", strain_colours = strain_cols_n) {
-  decod_tbl %>% 
-        mutate(across(contains("train"), ~str_replace_all(., c("Doublet" = "Dbt", "Negative" = "Neg")))) %>%
-        make_long(all_of(strns_2_plt)) %>% 
-        add_count(x,node, "n") %>%
-        ggplot(., aes(x = x, next_x = next_x,node = node,next_node = next_node,fill = factor(node),label = paste0(node,": ",n))) +
-            geom_sankey() +
-        theme_void()+
-        scale_fill_manual(values = strain_colours) +
-        scale_x_discrete(labels=labls)+
-        geom_sankey_label(size = 3.6, color = 1, fill = "white") +
-        labs(title = ttl) +
-        theme_sankey(base_size = 9) +
-        theme(legend.position = "none",
-              axis.title.x = element_blank(),
-              axis.text.x = element_text(size = 15, face = bp_face))
-      
-}
-
-
-```
-
-```{r, message=FALSE, warning=FALSE}
-
-# imap(all_pref_pred_df_fnl_snky, ~snk_pt_fn(., strns_2_plt = c("cbendr", "edrops", "cr"), labls = c("cbendr", "edrops", "cr"), bp_face = c("bold", "bold", "bold"), ttl = .y, strain_colours = sp_col_new_abrv))
-imap(all_pref_pred_df_fnl_snky, ~snk_pt_fn(., strns_2_plt = c("cbendr", "CbendrCr"), labls = c("cbendr", "CbendrCr"), bp_face = c("bold", "bold"), ttl = .y, strain_colours = sp_col_new_abrv))
-```
-
-
-```{r, message=FALSE, warning=FALSE, eval=FALSE}
-
-all_pref_pred_df_fnl_snky_cb_cr <- map(all_pref_pred_df_fnl_snky, ~.x %>% filter(if_any(c(cr, cbendr), ~!is.na(.x))))
-all_pref_pred_df_fnl_snky_cb_cr[["MSC3"]] %>% count(cr, cbendr)
-
-```
-
-```{r, message=FALSE, warning=FALSE, eval=FALSE}
-
-imap(all_pref_pred_df_fnl_snky_cb_cr, ~snk_pt_fn(., strns_2_plt = c("cbendr", "cr"), labls = c("cbendr", "cr"), bp_face = c("bold", "bold"), ttl = .y, strain_colours = sp_col_new_abrv))
-  
-```
-
 
 ```{r, eval=T}
-gogo()
+# gogo()
 ```
 ################## END evaluate singleR MAnually
 
@@ -465,19 +359,7 @@ system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
 # saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/m2_all/all_seu_prelim_stg_norm_cb_mdata.RDS"))
 saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata3.RDS"))
 saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/m2_all/all_seu_prelim_stg_norm_cb_mdata3.RDS"))
-
-```
-
-
-```{r, eval = F}
-# # !!!!NOTE - MOVE A NOTEBOOK UP
-# all_seu_prelim_stg_norm_cb_mdata <- map(all_seu_prelim_stg_norm, ~.x@meta.data)
-# # saveRDS(all_seu_prelim_stg_norm_cb_mdata, "data/processed/Pf/all_seu_prelim_stg_norm_cb_mdata.csv")
-# species <- "Pf"
-# sv_dir <- "pbulk_gtypes_preQC_resc"
-# system(paste0("mkdir -p data/processed/", species, "/" , sv_dir))
-# 
-# saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/" , sv_dir, "/all_seu_prelim_stg_norm_cb_mdata.csv"))
+saveRDS(all_seu_prelim_stg_norm_cb_mdata, paste0("data/processed/", species, "/m2_all/all_seu_prelim_stg_norm_cb_mdata.RDS"))
 
 ```
 
@@ -632,6 +514,32 @@ singleR_scmap_df_snky <- map2(all_pref_pred_df_fnl_cbender, multi_ref_stg_tbl2_s
 ```
 
 
+```{r, fig.width=4, fig.height=4}
+
+snk_pt_fn <- function(decod_tbl, strns_2_plt = c('Strain_2nd', 'n_strains'), labls = paste0("K=", opt_clusters_nms[[3]][1:2]), bp_face = c("bold", "plain"), ttl = "plot", strain_colours = strain_cols_n) {
+  decod_tbl %>% 
+        mutate(across(contains("train"), ~str_replace_all(., c("Doublet" = "Dbt", "Negative" = "Neg")))) %>%
+        make_long(all_of(strns_2_plt)) %>% 
+        add_count(x,node, "n") %>%
+        ggplot(., aes(x = x, next_x = next_x,node = node,next_node = next_node,fill = factor(node),label = paste0(node,": ",n))) +
+            geom_sankey() +
+        theme_void()+
+        scale_fill_manual(values = strain_colours) +
+        scale_x_discrete(labels=labls)+
+        geom_sankey_label(size = 3.6, color = 1, fill = "white") +
+        labs(title = ttl) +
+        theme_sankey(base_size = 9) +
+        theme(legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 15, face = bp_face))
+      
+}
+
+
+```
+
+
+
 ```{r, message=FALSE, warning=FALSE}
 
 imap(singleR_scmap_df_snky, ~snk_pt_fn(., strns_2_plt = c("sR_fine_stg", "stage_fld"), labls = c("SingleR", "scmap"), bp_face = c("bold", "bold"), ttl = .y, strain_colours = sp_col_new_abrv))
@@ -682,15 +590,22 @@ imap(all_pref_pred_df_fnl_snky, ~snk_pt_fn(., strns_2_plt = c("cbendr", "edrops"
 
 ####### Add annotations to seurat object
 
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list
+# all_seu_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/bp_CbendrCr3.RDS")
+all_seu_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/dense_CbendrCr3.RDS")
+all_seu_list_files
+```
 
-```{r, message=F, warning=F}
-##Read BPcells matrices
-# all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-# all_seu <- list.files("data/processed/Pf", pattern = "bpc_seu_(cr|cbendr|edrops|cbcr).RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bp|_norm|.RDS'))) %>% 
-# all_seu_norm <- list.files("data/processed/Pf", pattern = "bpc_seu.*_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|bpc_seu|_sct.*'))) %>% 
+```{r, message=F, warning=F, eval=T}
+# sample_name_ed_cr_slct3 = paste0(sample_name_ed_cr_slct, "3")
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+all_seu <- map(all_seu_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/dense|3.RDS')))) %>% 
+  unlist(., recursive = F) %>% 
   .[sample_name_ed_cr_slct] %>%
   .[!is.na(.)] %>%
   map(readRDS)
@@ -698,17 +613,6 @@ all_seu <- list.files("data/processed/Pf", pattern = "bp_CbendrCr3.RDS$", full.n
 
 ```
 
-```{r, message=FALSE}
-##Doublet removal
-# all_seu_prelim_stg_norm <- list(all_ed_pref_norm, all_pref_pred_df_com_scores_fnl, all_pref_dblt_clst_df, str_remove(names(all_ed_pref), "_.*")) %>%
-# all_seu_prelim_stg <- list(all_seu, all_pref_pred_df_fnl) %>%
-#   pmap(~ {
-#     ..2 %>%
-#       column_to_rownames("bcode") %>%
-#       AddMetaData(..1, .)
-#        })
-
-```
 
 ```{r, eval=T}
 # gogo()
@@ -775,6 +679,9 @@ imap(all_seu_prelim_stg, ~saveRDS(.x, paste0("data/processed/Pf/",str_remove(.y,
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_bsub.sh
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh
 
-# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bp_CbendrCr_prelim_stg.RDS" \
+
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/bp_CbendrCr_prelim_stg3.RDS" \
+# : "${HVG:=500}"
+# : "${CLUSTER_RESOLN:=0.5}"
 
 ```
