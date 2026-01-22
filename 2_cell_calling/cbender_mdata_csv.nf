@@ -6,7 +6,8 @@ params.input_h5 = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/d
 // params.input_h5 = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC3/cbender_custom_wHsPf/cb_LR0.0001_E150/cb.h5' // change as needed
 
 // params.python = '/usr/bin/python3' // path to python; change if using env/module
-params.scrpt = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/python_nbooks/cbender_mdata_csv.py'
+// params.scrpt = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/python_nbooks/cbender_mdata_csv.py'
+params.scrpt = "${projectDir}/cbender_mdata_csv.py"
 params.obs_fname = 'cb_mdata.csv'
 params.var_fname = 'cb_gene_mdata.csv'
 // params.workers = 1
