@@ -1,0 +1,595 @@
+---
+title: "MSC QC cbender_comparisons"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(scran)
+  library(SingleR)
+  library(scDblFinder)
+  library(ggsankey)
+  library(scales)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(dplyr::desc)
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(purrr::reduce)
+})
+```
+
+
+
+# MSC Preprocessing
+
+## setup, read input files and exploratory visualizations and general functions
+
+```{r, setup}
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+# source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/cell_calling/plotting_fns_n_variables.R")
+
+
+```
+
+###################START- RAW READING#############
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Genotype clustering for MSC
+
+initialize variable for the sample names
+
+
+```{r}
+
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+# slct_sample_names <-c("MSC68", "MSC14", "MSC49", "MSC55") %>% str_sort(., numeric = T)
+
+
+# ## poor quality samples
+# sample_rm <- c("MSC1", "MSC24", "MSC37", "MSC38", "MSC39", "MSC50_SLO", "MSC33")
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# 
+## slct_sample_names[-c(sample_rm)]
+# slct_sample_names <- slct_sample_names[!slct_sample_names %in% c(sample_rm, sample_mxd)]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+
+## get relevant sample names
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+##Sample ID
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <-str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+
+##Sample IDs
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>%.[sample_name]
+
+```
+
+## Samples to be included in the paper
+```{r, message=F, warning=F, eval=T}
+key_samples <- c("MSC3", "MSC13", "MSC14", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
+
+don_order <- str_remove(key_samples, "C$")
+
+```
+
+
+
+## Barcode ranks plots showing dropletutils calculated cut-offs
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Generated in 'm22_EDrops_ambient_cutoff_est.Rmd'
+all_bcrank_mrg <- readRDS("data/processed/Pf/m2_all/cell_calling_plotting/all_bcrank_mrg.RDS")
+
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height=16, fig.width=12}
+##Read edrops results matrices
+
+key_samples_species <- paste0(rep(key_samples, each = 2), c("_rmHs", "_wHsPf"))
+
+bcranks_ncells_ndrops_plot_fn(dset = all_bcrank_mrg %>% 
+                                # filter(str_detect(sample, paste0(paste(key_samples, collapse = "_|"),"_"))) %>% 
+                                filter(sample %in% key_samples_species) %>% 
+                                mutate(across(donor, ~factor(., levels = don_order))) %>%
+                                select(-c(jumpcode)) %>%
+                                mutate(across(species, ~str_replace_all(., c("rmHs" = "Pf", "wHsPf" = "PfHs")))), 
+                              ncols =6,
+                              vline_cells_lab = "",
+                              vline_droplets_lab = "",
+                              lab_size = 6, 
+                              c_pos=2, 
+                              d_pos = 1500) +
+  labs(y= "Total UMI (log 10)", x = "Rank (log 10)") + 
+  theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        strip.text.x.top = element_text(size = 17, face= "bold"),
+        axis.title = element_text(size = 17)) 
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height=15, fig.width=10}
+##Read edrops results matrices
+map(c("knee", "inflection"), ~{
+
+    bcranks_cutoff_plot_fn(dset = all_bcrank_mrg %>% filter(str_detect(sample, paste0(paste(key_samples, collapse = "_|"),"_"))),# %>% 
+                             # filter(donor %in% key_samples), 
+                           hline_droplets = "umi_counts_cutoff_total_droplets_", 
+                           hline_droplets_lab = "droplets:", 
+                           hline_cells = "umi_counts_cutoff_cell_estimate_",
+                           hline_cells_lab = "cells:", 
+                           line_part = .x, ncols = 6)
+  
+})
+
+```
+
+
+## Barcode ranks plots of human and pf umi counts separately
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Generated in 'm22_bcranks_called_cells.Rmd'
+all_msc_bp_raw_noHsGns_mdata_mrg <- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/cell_calling_plotting/all_msc_bp_raw_noHsGns_mdata_mrg.RDS")
+
+```
+
+
+```{r, fig.height= 10, fig.width= 10, eval=T}
+all_mrg_plot_tbl <- all_msc_bp_raw_noHsGns_mdata_mrg %>% 
+  filter(donor %in% key_samples) %>%
+  mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))) %>%
+  filter(!(duplicated(pf_rank) & duplicated(hs_rank) & (duplicated(rank))), .by = "donor") %>%
+  rename("all_rank" = rank) %>%
+  rename("all_umi_count" = nCount_RNA) %>%
+  pivot_longer(cols = c(pf_rank, hs_rank, all_rank, pf_umi_count, hs_umi_count, all_umi_count), names_to = c("species", ".value"), names_pattern = "(pf|hs|all)_(rank|umi_count)") 
+
+```
+
+
+```{r, fig.height= 9, fig.width= 10, eval=T}
+all_mrg_plot_tbl %>%
+  kneeplt_facet_fn(ncount_tbl = . , donor_group = "donor", numbr_of_cols = 6, rank_var = "rank", cell_var = "umi_count", cell_call_methd = "species", mthd_col = c("pf" = "#007BFF", "all" = "#FFC107", "hs" = "#b2d8d8"), cut_offs = c(10,50)) +
+  theme(axis.text.x = element_text(size = 9),
+        strip.text.x.top = element_text(size = 15)) +
+  guides(color = guide_legend(title = 'Species', override.aes = list(size = 4), nrow = 1))
+
+
+```
+
+
+## Comparison of cellbender iterations - altering epochs and learning rate
+```{r, message=FALSE, warning=FALSE, eval=F}
+# Generated in 'm_cbendr_comparisons.Rmd'
+cr_cbender_mdata_hmnz_syst_snky_pfumi <- readRDS("data/processed/Pf/m2_all/cell_calling_plotting/cr_cbender_mdata_hmnz_syst_snky_pfumi.RDS")
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+sample_sufx_cb <- c("_hsLRloEhi", "_hsLRloElo", "_hsLRhiEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRloElo", "_pfLRhiEhi", "_pfLRhiElo")
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+# Parallelize plot generation
+plan(multisession, workers = 7)
+
+cb_snky_plts_pf100 <- future_imap(cr_cbender_mdata_hmnz_syst_snky_pfumi, ~snk_pt_fn(.x %>% filter(pf_umi_count >= 100 & !is.na(pf_umi_count)), strns_2_plt = c("cr", paste0("cb", sample_sufx_cb)), labls = c("cr", paste0("cb", sample_sufx_cb)), ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')), .options = furrr_options(seed = TRUE))
+
+plan(sequential)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+runs2plot <- c("cr", paste0("cb", c("_hsLRloEhi", "_hsLRhiElo", "_pfLRloEhi", "_pfLRhiElo")))
+```
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+# Parallelize plot generation
+# plan(multisession, workers = 7)
+
+cb_snky_plts_pf100_set <- future_imap(cr_cbender_mdata_hmnz_syst_snky_pfumi, ~snk_pt_fn(.x %>% filter(pf_umi_count >= 100 & !is.na(pf_umi_count)), strns_2_plt = runs2plot, labls = runs2plot, ttl = .y, strain_colours = c('Cell' ='#911eb4', 'nonCell' ='#008080', 'NA' = 'lightgrey')), .options = furrr_options(seed = TRUE))
+
+# plan(sequential)
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+cb_snky_plts_pf100_set[1]
+
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get mdata file list - Generated in 'm_cbendr_comparisons.Rmd'
+# cr_cbender_pf100_mdata_slct_uni_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_pf100_mdata_slct_uni.RDS")
+cr_cbender_mdata_slct_uni_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/cr_cbender_mdata_slct_uni.RDS")
+cr_cbender_mdata_slct_uni_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+cr_cbender_mdata_slct_uni <- map(cr_cbender_mdata_slct_uni_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
+  unlist(., recursive = F) %>% 
+  .[sample_name] %>%
+  .[!is.na(.)] %>%
+  map(readRDS) 
+
+```
+
+
+```{r}
+## Convert mthds_union to factor
+## Get all possible combinations of factors factoring in the order in which the variables were introduced
+# c_mthds <- c("Cr", "Cbhs", "Cbpf", "Cbycr")
+# c_mthds <- c("Cr", "CbyHs", "CbyPf", "CbPf")
+c_mthds <- c("Cr", "CbyHs", "CbyPf", "CbPf", "CbmPf", "CbmHs")
+c_mthds <- str_replace_all(c_mthds, "Cb", "")
+
+c_combos <- map(1:length(c_mthds), ~ combn(c_mthds, .x, paste0, collapse = "_")) %>% unlist() %>% dput()
+c_combos <- c(rev(c_combos), "nonCell")
+
+set.seed(12)
+# c_combos_cols <- sample(c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#fabebe', '#008080', '#e6beff', '#9a6324',  '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075'), length(c_combos)) %>% set_names(c_combos)
+c_combos_cols <- sample(c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#fabebe', '#008080', '#e6beff', '#9a6324',  '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075','#000000','#FFFFFF','#FF0000','#00FF00','#0000FF','#FFFF00','#00FFFF','#FF00FF',
+  '#800080','#808080','#C0C0C0','#FFA500','#A52A2A','#008000','#ADD8E6','#00008B',
+  '#B22222','#FF1493','#2E8B57','#DAA520','#4B0082','#7FFF00','#D2691E','#F4A460',
+  '#20B2AA','#87CEEB','#6A5ACD','#DB7093','#F0E68C','#9ACD32','#00CED1','#4682B4',
+  '#5F9EA0','#FF69B4','#CD5C5C','#191970','#FFE4B5','#8B4513','#2F4F4F','#556B2F',
+  '#FFB6C1','#E9967A','#8A2BE2','#00BFFF','#7CFC00','#F5DEB3','#9AED92'), length(c_combos)) %>% set_names(c_combos)
+
+c_combos_cols <- ifelse(names(c_combos_cols) == "nonCell", "lightgrey", c_combos_cols)  %>% set_names(c_combos)
+
+```
+
+
+```{r, fig.width=12, fig.height=14, eval=FALSE}
+
+call_methods_overlap_barplot_fn(cr_cbender_mdata_slct_uni, "mthds_union", pf_umi_filt = 100, min_grp_size = 10)
+```
+
+```{r, fig.width=12, fig.height=14}
+call_methods_overlap_barplot_fn(cr_cbender_mdata_slct_uni, "mthds_union_slim2", pf_umi_filt = 100) 
+```
+```{r, fig.width=12, fig.height=14}
+## Function to plot how different cell calling methods including different iterations of cellbender overlap
+call_methods_overlap_barplot_PUB_fn <- function(tbl = cr_cbender_mdata_slct_uni, mthd = "mthds_union", pf_umi_filt = 0, min_grp_size =0, ncols = 5, in_lab_size = 3.5) {
+  map(tbl, ~.x %>% 
+        filter(pf_umi_count >= pf_umi_filt) %>%
+        count(!!rlang::sym(mthd)) %>%
+        filter(n > min_grp_size)
+  ) %>%
+    bind_rows(., .id = "donor") %>%
+    mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))) %>%
+    # filter(n > 100) %>%
+    ggplot(aes(y = n/1000, x = !!rlang::sym(mthd), fill = !!rlang::sym(mthd))) +
+    geom_col() +
+    # geom_text(aes(label=n), hjust=0.5, vjust= -0.3, position = position_dodge(width = .9), size = 5, show.legend = F)+
+    geom_text(aes(label=n), angle=90, hjust=-0.1, vjust= 0.5, position = position_dodge(width = .9), size = in_lab_size, show.legend = F)+
+    scale_y_continuous(expand = expansion(mult = c(0.01, 0.8))) +
+    scale_fill_manual(values = c_combos_cols) +
+    facet_wrap(. ~ donor, ncol = ncols, scales = "free_y") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          text = element_text(size = 11),
+          legend.position = "bottom")
+  
+}
+
+```
+
+
+
+```{r, fig.width=12, fig.height=7.7}
+call_methods_overlap_barplot_PUB_fn(cr_cbender_mdata_slct_uni[key_samples], "mthds_union_slim3", pf_umi_filt = 100, ncols = 6, in_lab_size = 5.5) + 
+  labs(x = "Cell call methods", y = "Cell count (X1000)") +
+  theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15, angle = 50),
+        strip.text.x.top = element_text(size = 17, face= "bold"),
+        axis.title = element_text(size = 17),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 17, face = "bold")) +
+      guides(fill = guide_legend(title = 'Cell call methods', nrow = 1))
+
+
+```
+
+
+```{r, fig.width=12, fig.height=7.7}
+call_methods_overlap_barplot_PUB_fn(cr_cbender_mdata_slct_uni[key_samples], "mthds_union_slim2", pf_umi_filt = 100, ncols = 6, in_lab_size = 5.5) + 
+  labs(x = "Cell call methods", y = "Cell count (X1000)") +
+  theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15, angle = 50),
+        strip.text.x.top = element_text(size = 17, face= "bold"),
+        axis.title = element_text(size = 17),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 17, face = "bold")) +
+      guides(fill = guide_legend(title = 'Cell call methods', nrow = 1))
+
+
+```
+
+```{r, fig.width=12, fig.height=14}
+call_methods_overlap_barplot_fn(cr_cbender_mdata_slct_uni, "mthds_union_slim3", pf_umi_filt = 100) 
+```
+
+```{r, message=F, warning=F, eval=T, fig.height=14, fig.width=12}
+cr_cbender_uni_pf100_mrg <- bind_rows(map(cr_cbender_mdata_slct_uni, ~filter(., pf_umi_count > 100)), .id = "donor")
+```
+
+
+```{r, message=F, warning=F, eval=T, fig.height=14, fig.width=12}
+call_methods_overlap_scatter_fn <- function(tbl = cr_cbender_uni_pf100_mrg, gn_or_umi = "umi",  mthd = "mthds_union", ncols = 5) {
+
+  ggplot(tbl, aes(x = log10(!!rlang::sym(paste0('pf_',gn_or_umi,'_count'))), y = log10(!!rlang::sym(paste0('hs_',gn_or_umi,'_count'))), colour = !!rlang::sym(mthd))) +
+    geom_point(size = 0.01) +
+    # geom_density_2d()  +
+    scale_colour_manual(values = c_combos_cols) +
+    facet_wrap(donor ~ .,  ncol = ncols) +
+    geom_hline(yintercept = log10(100)) +
+    geom_vline(xintercept = log10(100)) +
+    guides(color = guide_legend(title = 'Cell call', override.aes = list(size = 4), ncol = 1))
+}
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.width=12, fig.height=5.5}
+map2(c("gn", "umi"), c("Gene", "UMI"), ~call_methods_overlap_scatter_fn(
+  tbl = cr_cbender_uni_pf100_mrg %>%  
+    filter(donor %in% key_samples) %>%
+    mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))), 
+  gn_or_umi = .x,
+  mthd = "mthds_union_slim3",
+  ncols = 6
+  ) +
+    theme_classic() +
+    theme(text = element_text(size = 11),
+          legend.position = "bottom",
+          axis.text.y = element_text(size = 16),
+          axis.text.x = element_text(size = 16, hjust = 1),
+          strip.text.x.top = element_text(size = 17, face= "bold"),
+          axis.title = element_text(size = 17),
+          legend.text = element_text(size = 16),
+          legend.title = element_text(size = 17, face = "bold")) +
+    labs(x = paste0("Pf ", .y, " count (log10)"), y = paste0("Hs ", .y, " count (log10)")) +
+    guides(color = guide_legend(title = 'Cell call methods', override.aes = list(size = 4), nrow = 1))
+  )
+
+```
+
+```{r, message=F, warning=F, eval=T, fig.height=14, fig.width=12}
+map(c("gn", "umi"), ~call_methods_overlap_scatter_fn(gn_or_umi = .x))
+
+```
+
+## Barcode ranks of cleaned cells
+
+```{r, fig.height= 4, fig.width= 4, eval=T}
+# Generated in 'm_cbendr_bcranks.Rmd'
+all_rank_ncount_cb_hspf_mrg <- readRDS("data/processed/Pf/m2_all/cell_calling_plotting/all_rank_ncount_cb_hspf_mrg.RDS")
+```
+
+
+```{r, fig.height= 8, fig.width= 10, eval=T}
+all_rank_ncount_cb_hspf_mrg %>%
+  filter(!(duplicated(pf_rank) & is_cell_cb_hs %in% c("empty_bc", "nonCell") & is_cell_cb_pf %in% c("empty_bc", "nonCell")), .by = "donor") %>%
+  filter(donor %in% key_samples) %>%
+  mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))) %>%
+  kneeplt_facet_fn(ncount_tbl = ., cell_call_methd = "fnl_call3",  mthd_col = cell_call_mthd_col, donor_group = "donor", numbr_of_cols = 6, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(100), thresh_ln_size = 0, thresh = "umi_counts_knee_rmHs") +
+  theme(axis.text.x = element_text(size = 9),
+        strip.text.x.top = element_text(size = 15)) +
+  guides(color = guide_legend(title = 'Species', override.aes = list(size = 4), nrow = 1))
+
+```
+
+```{r, fig.height= 8, fig.width= 10, eval=T}
+all_rank_ncount_cb_hspf_mrg %>%
+  filter(!(duplicated(pf_rank) & is_cell_cb_hs %in% c("empty_bc", "nonCell") & is_cell_cb_pf %in% c("empty_bc", "nonCell")), .by = "donor") %>%
+  filter(donor %in% key_samples) %>%
+  mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))) %>%
+  kneeplt_facet_fn(ncount_tbl = ., cell_call_methd = "fnl_call3", mthd_col = cell_call_mthd_col, donor_group = "donor", numbr_of_cols = 6, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(100), thresh_ln_size = 0, thresh = "umi_counts_knee_rmHs") +
+  theme(axis.text.x = element_text(size = 9),
+        strip.text.x.top = element_text(size = 15)) +
+  guides(color = guide_legend(title = 'Species', override.aes = list(size = 4), nrow = 1))
+
+```
+
+```{r, fig.height= 15, fig.width= 10, eval=T}
+all_rank_ncount_cb_hspf_mrg %>%
+  filter(!(duplicated(pf_rank) & is_cell_cb_hs %in% c("empty_bc", "nonCell") & is_cell_cb_pf %in% c("empty_bc", "nonCell")), .by = "donor") %>%
+  kneeplt_facet_fn(ncount_tbl = ., cell_call_methd = "fnl_call3", mthd_col = cell_call_mthd_col, donor_group = "donor", numbr_of_cols = 5, rank_var = "pf_rank", cell_var = "pf_umi_count", cut_offs = c(50, 100), thresh = "umi_counts_knee_rmHs")
+
+```
+
+
+## Assesment of how different combinations of cellbender epochs and learning rates performed
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Generated in 'm22_EDrops_ambient_cutoff_est.Rmd'
+combined_data_cbender_assesment <- readRDS("data/processed/Pf/m2_all/cell_calling_plotting/combined_data_cbender_assesment.RDS")
+
+```
+
+```{r sample-assessment, fig.height=12, fig.width=14}
+# Summary by sample with parameter details
+sample_summary <- combined_data_cbender_assesment %>%
+  rename("donor" = Sample) %>%
+  filter(donor %in% key_samples) %>%
+  mutate(across(donor, ~factor(str_remove(., "C$"), levels = don_order))) %>%
+  mutate(across(donor, ~factor(., levels = don_order))) %>%
+  mutate(across(Condition, ~str_replace_all(., c("rmHs" = "Pf", "wHsPf" = "PfHs")))) %>%
+  count(donor, Condition, Learning_Rate, Epochs, Assessment_Category) %>%
+  mutate(
+    Param_Combo = paste0("LR: ", sub("\\.?0+$", "", format(Learning_Rate, scientific = FALSE)), "\nE: ", Epochs)
+  )
+
+
+```
+
+
+```{r sample-assessment, fig.height=5.5, fig.width=11}
+
+agg <- sample_summary %>%
+  group_by(Condition, Param_Combo, donor, Assessment_Category) %>%
+  summarise(n = sum(n, na.rm = TRUE), .groups = "drop")
+
+if (is.factor(sample_summary$donor)) {
+  agg <- agg %>% mutate(donor = factor(donor, levels = levels(sample_summary$donor)))
+}
+
+ggplot(agg, aes(x = n, y = donor, fill = Assessment_Category)) +
+  geom_col(position = position_stack(), color = "white", width = 0.7) +
+  scale_fill_manual(values = ASSESSMENT_COLORS) +
+  facet_nested(cols = vars(Condition, Param_Combo)) +   # <-- no switch
+  labs(x = "", y = "donor") +
+  theme_classic() +
+  theme(
+    strip.position = "top",             # <-- put facet strips at the top
+    strip.placement = "outside",
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold"), 
+    panel.spacing = unit(0.4, "lines"),
+    text = element_text(size = 16),
+    axis.text.y = element_text(size = 16, hjust = 1),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "bottom"
+  ) +
+  guides(fill = guide_legend(title = 'Cellbender assesment', nrow = 1))
+  
+
+```
+
+
+
+
+```{r}
+library(grid)
+library(knitr)
+library(magick)
+
+img_df <- combined_data %>%
+filter(!is.na(Learning_Curve_Image)) %>%
+mutate(Exists = file.exists(Learning_Curve_Image)) %>%
+arrange(Condition, Sample, Learning_Rate, Epochs)
+
+
+if (nrow(img_df) == 0) {
+  cat("No learning curve images found in the loaded data.\n")
+} else {
+  for (i in seq_len(nrow(img_df))) {
+    row <- img_df[i, ]
+    img_title <- paste0(row$Sample, " | ", row$Condition, 
+                        " | LR=", row$Learning_Rate, " | E=", row$Epochs)
+    
+    if (isTRUE(row$Exists)) {
+      # Print the image
+      img <- image_read(row$Learning_Curve_Image)
+      grid.newpage()
+      grid.raster(as.raster(img))
+      grid.text(paste0(row$Sample, " | ", row$Condition, " | LR=", 
+                 row$Learning_Rate, " | E=", row$Epochs),
+          y = unit(1, "npc") - unit(2, "mm"),
+          gp = gpar(fontsize = 14, fontface = "bold"))
+    } else {
+      cat(paste0("Image file not found: ", row$Learning_Curve_Image, "\n\n"))
+    }
+  }
+}
+
+```
+
+
+```{r}
+combined_data_cbender_assesment %>% filter(Sample == "MSC49C" & Condition == "rmHs" & (Epochs == 150 & Learning_Rate == 0.000005)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+combined_data_cbender_assesment %>% filter(Sample == "MSC49C" & Condition == "rmHs" & (Epochs == 250 & Learning_Rate == 0.000005)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+combined_data_cbender_assesment %>% filter(Sample == "MSC49C" & Condition == "rmHs" & (Epochs == 150 & Learning_Rate == 0.0001)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+
+```
+
+
+```{r}
+combined_data_cbender_assesment %>% filter(Sample == "MSC66C" & Condition == "rmHs" & (Epochs == 150 & Learning_Rate == 0.000005)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+combined_data_cbender_assesment %>% filter(Sample == "MSC66C" & Condition == "rmHs" & (Epochs == 250 & Learning_Rate == 0.000005)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+combined_data_cbender_assesment %>% filter(Sample == "MSC66C" & Condition == "rmHs" & (Epochs == 150 & Learning_Rate == 0.0001)) %>% pull(Learning_Curve_Image) %>% knitr::include_graphics(.)
+
+```
