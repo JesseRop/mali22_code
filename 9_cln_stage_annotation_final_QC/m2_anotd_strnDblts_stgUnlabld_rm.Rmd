@@ -163,20 +163,6 @@ all_msc_qcd_anotd_slim <- list.files("data/processed/Pf", pattern = "all_msc_qcd
 ```
 
 
-```{r, warning=FALSE, message=FALSE}
-map(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, cells.highlight = colnames(.x[,.x@meta.data$Strain_DN == "Doublet"])) + labs(title = .y) ))
-```
-
-```{r}
-# ## Adding stage annotations to query cells
-# all_msc_qcd_anotd_slim <- list(all_msc_qcd_anotd_slim) %>%
-#   pmap(~ ..1@meta.data %>%
-#          mutate(Strain_DN = Strain_K_verified) %>% 
-#          AddMetaData(..1, .) 
-#   )
-
-```
-
 ```{r}
 imap(all_msc_qcd_anotd_slim, ~DimPlot(.x, group.by = "stage_fld") + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
 ```
@@ -221,47 +207,6 @@ imap(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, cells.highlight = 
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-map(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, group.by = "Strain_DN") + labs(title = .y) ))
-```
-
-```{r, eval=T}
-map(all_msc_qcd_anotd_slim, ~.x@meta.data %>% count(Strain_DN) )
-```
-
-```{r}
-## Barcodes removed
-strn_k_dbt_rm_bcodes <- map(all_msc_qcd_anotd_slim, possibly(~colnames(subset(.x, Strain_DN != "Doublet", invert = T))))
-```
-
-```{r}
-## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
-all_anotd_no_dbt <- map(all_msc_qcd_anotd_slim, ~subset(.x, Strain_DN != "Doublet"))
-
-strn_k_dbt_rm <- map(all_anotd_no_dbt, dim)%>% as.data.frame() %>% .[2,] 
-strn_k_dbt_rm
-```
-
-##### NOTE !!! uncomment the next three chunks to remove likely strain doublets here - keeping them for now and will remove them later to ensure the results for committed rings stay intact
-```{r}
-# ## Barcodes removed
-# strn_k_likelyDbt_rm_bcodes <- map(all_anotd_no_dbt, possibly(~colnames(subset(.x, Strain_K_verified_QC != "dbt_like", invert = T))))
-```
-
-```{r}
-# ## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
-# all_anotd_no_all_dbt <- map(all_anotd_no_dbt, ~subset(.x, Strain_K_verified_QC != "dbt_like"))
-# 
-# strn_k_likelyDbt_rm <- map(all_anotd_no_all_dbt, dim)%>% as.data.frame() %>% .[2,] 
-# strn_k_likelyDbt_rm
-```
-
-```{r}
-# ## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
-# all_anotd_no_dbt <- all_anotd_no_all_dbt
-
-```
-
 
 ```{r, warning=FALSE, message=FALSE}
 map(all_anotd_no_dbt, possibly(~DimPlot(.x, label = T, cells.highlight = colnames(.x[,.x@meta.data$stage_fld == "Unassigned"]))))
@@ -281,7 +226,6 @@ stg_unassignd_rm_bcodes <- map(all_anotd_no_dbt, possibly(~colnames(subset(.x, s
 
 
 ```{r}
-## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
 cln_anotd <- map(all_anotd_no_dbt, ~subset(.x, stage_fld != "Unassigned"))
 
 stg_unassignd_rm <- map(cln_anotd, dim)%>% as.data.frame() %>% .[2,] 
