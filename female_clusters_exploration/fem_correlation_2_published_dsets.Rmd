@@ -1,0 +1,1446 @@
+---
+title: "correlation2bulk_dsets"
+output: html_document
+date: "2024-07-18"
+---
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  # library(dreamlet)
+  # library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(BiocParallel)
+  library(ComplexHeatmap)
+  library(readxl)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::intersect)
+  conflicts_prefer(base::setdiff)
+  conflicts_prefer(base::union)
+  
+})
+```
+
+
+```{r}
+sample_set = "Mali2"
+
+```
+
+#  integration of all MSC
+
+
+```{r setup}
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk//plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r}
+## subset where field parasites are for slingshot
+# v3_m2_asex_harmony_fld_sset_ptime1 <- readRDS("data/processed/Pf/v3_m2_asex_harmony_fld_sset_ptime1.RDS")
+# 
+# ## Remove lab
+# v3_m2_asex_harmony_fld_sset_ptime1_fld <- v3_m2_asex_harmony_fld_sset_ptime1[, v3_m2_asex_harmony_fld_sset_ptime1$dset == "Field"]
+```
+
+```{r}
+## Read in new asexual object with cellranger filtered and emptydrops rescued asexuals
+# all_asex_merged_int_no_actv_harmony_pt <- readRDS("data/processed/Pf/all_asex_merged_int_no_actv_harmony_pt.RDS")
+m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony_pt.RDS")
+
+```
+
+```{r}
+
+v3_m2_asex_harmony_fld_sset_ptime1_fld <- m2_scvi_asex_noM12_harmony_pt
+
+```
+
+```{r}
+DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, reduction = "umap.harmony", group.by = "harmony_clusters_ss", pt.size = 0.5, dims = c(1,2), label = T)
+# DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, reduction = "harmony", group.by = "harmony_clusters_ss", pt.size = 0.5, dims = c(1,2), label = T)
+
+```
+
+```{r, fig.width=30, fig.height=6}
+FeaturePlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, features = "PF3D7-0925700", reduction = "umap.harmony", split.by = "donor", pt.size = 1, ncol = 7, order = T)
+```
+
+Mapping to bulk using scripts borrowed from Elias below
+For the correlation to bulk datasets we load two datasets with a focus on asexual - and two datasets with a focus and sexual development.
+```{r, fig.width=30, fig.height=6}
+# Read data
+# bartfai = read.delim2("~/Documents/Data/bulk/GSE75795_counts-PlasmoDB9.1.tsv", sep = "\t", row.names = 1)
+# lopez = read.delim2("~/Documents/Data/bulk/lopez.csv", sep = ",", row.names = 1)
+# painter_row = read.delim2("~/Documents/Data/bulk/PAINTER.csv", sep = ",")
+# painter = read.xlsx("~/Documents/Data/bulk/Table_S1_new.xlsx", sheet = 5)
+# vanbiljon = read.delim2("~/Documents/Data/bulk/VanBiljon_transcriptome.csv", sep = ",", row.names = 1)
+```
+
+```{r}
+painter_raw = readxl::read_xlsx("../published_dsets/painter_29985403_48hr_dynamics/Expression_Peak_Timing_48h_IDC.xlsx", sheet = "Estimated Total Abundance", .name_repair = "universal") %>% mutate(across(Gene.ID, ~str_replace(., "_", "-"))) %>% rename_all(., ~str_remove(., "\\.\\."))
+```
+
+```{r}
+painter_raw
+```
+
+```{r}
+painter_raw %>% filter(Gene.ID %in% c("PF3D7-1201000", "PF3D7-0701600", "PF3D7-1468400")) %>% 
+  pivot_longer(cols = ends_with("hpi"), names_to = "time", values_to = "expresion") %>% 
+  mutate(across(time, ~as.numeric(str_extract(., "[0-9]+")))) %>% 
+  ggplot(aes(x = time, y = expresion, color = Gene.ID)) + 
+  geom_point()
+```
+
+Before we can correlate the data to our single cell dataset we have to unify gene names, cut all datasets to the same set of genes and order them alphabetically.
+
+```{r, fig.width=30, fig.height=6}
+# Create array that can be subset without changing the original object
+cor_assay = GetAssayData(object = v3_m2_asex_harmony_fld_sset_ptime1_fld, assay = "RNA", slot = "data")
+
+# Cut out genes that are not present in the Painter data
+cor_assay = cor_assay[rownames(cor_assay) %in% painter_raw$Gene.ID, ]
+
+# Create clean matrices that only contain the genes present in all datasets (5052) and is ordered alphabetically
+
+# Painter data
+# rownames(painter) = painter$Gene.ID
+# painter_cut = painter[rownames(painter) %in% rownames(cor_assay),]
+# painter_clean = apply(painter_cut[,3:(ncol(painter_cut)-2)], 2, as.numeric)
+# rownames(painter_clean) = rownames(painter_cut)
+
+```
+
+```{r, fig.width=30, fig.height=6}
+v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[, "pseudotime"] <- v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[, "slingPseudotime_1"] 
+```
+
+To correlate the single cell data to the bulk data, based on pseudotime we produce XX pseudobulks of the asexual cycle containing approximately XX cells. 
+
+```{r}
+##Generate pseudotime chunks categories with range of highest and lowest pseudotime values and breaks numbers to ensure balanced representation of cells and drop the cells without strain information
+
+chunk_num <- 16
+
+v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[,c('ptime_cat', 'ptime_bal_cat')] <- v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[,c( "pseudotime"), drop=F] %>%
+        data.frame() %>% 
+        mutate(ptime_cat = cut(!!rlang::sym("pseudotime"),  
+                               breaks = c(-Inf, seq(min(!!rlang::sym("pseudotime")),  max(!!rlang::sym("pseudotime")), round((max(!!rlang::sym("pseudotime")) - min(!!rlang::sym("pseudotime")))/chunk_num, 2)), Inf)),
+               pt_rank = dense_rank(!!rlang::sym("pseudotime")),
+               ptime_bal_cat = cut(pt_rank,  
+                               breaks = c(-Inf, seq(min(pt_rank),  max(pt_rank), round((max(pt_rank) - min(pt_rank))/chunk_num, 2)), Inf))
+               ) %>%
+  mutate(ptime_grp_rnk = dense_rank(factor(ptime_cat)),
+         ptime_bal_grp_rnk = dense_rank(factor(ptime_bal_cat)),
+         ptime_cat = factor(paste0("ptime_", ptime_grp_rnk), levels = paste0("ptime_", 1:max(ptime_grp_rnk)) ),
+         ptime_bal_cat = factor(paste0("ptime_", ptime_bal_grp_rnk), levels = paste0("ptime_", 1:max(ptime_bal_grp_rnk)) )
+         ) %>%
+        dplyr::select(ptime_cat, ptime_bal_cat)
+
+```
+
+
+```{r}
+table(v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[,c('ptime_bal_cat')], useNA = "ifany")
+table(v3_m2_asex_harmony_fld_sset_ptime1_fld@meta.data[,c('ptime_cat')], useNA = "ifany")
+
+```
+
+
+
+```{r, fig.width=7, fig.height=5}
+DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, group.by = "ptime_bal_cat", reduction = "umap.harmony", pt.size = 1, order = T)
+DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, group.by  = "ptime_cat", reduction = "umap.harmony", pt.size = 1, order = T)
+
+```
+
+```{r}
+DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, reduction = "umap.harmony", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T)
+DimPlot(v3_m2_asex_harmony_fld_sset_ptime1_fld, reduction = "umap.harmony", group.by = "ptime_bal_cat", pt.size = 0.5, dims = c(1,2), label = T)
+
+```
+
+
+
+```{r, fig.width=30, fig.height=6}
+# pseudobulk cells only by cell type
+v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk <- AggregateExpression(v3_m2_asex_harmony_fld_sset_ptime1_fld, group.by = "ptime_bal_cat", return.seurat = TRUE)
+# v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk <- AggregateExpression(v3_m2_asex_harmony_fld_sset_ptime1_fld, group.by = "ptime_cat", return.seurat = TRUE)
+
+Cells(v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk)
+
+```
+
+```{r, fig.width=30, fig.height=6}
+# Create array that can be subset without changing the original object
+cor_assay_bulk = GetAssayData(object = v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk, assay = "RNA", slot = "data")
+
+```
+
+
+```{r, fig.width=30, fig.height=6}
+# Cut out genes that are not present in the Painter data
+cor_assay_bulk_painter = cor_assay_bulk[rownames(cor_assay_bulk) %in% painter_raw$Gene.ID, ]
+painter = painter_raw[painter_raw$Gene.ID %in% rownames(cor_assay_bulk_painter) , ]
+
+# Cut out genes that are not present in the Painter data
+cor_assay_bulk_painter = cor_assay_bulk_painter[painter$Gene.ID, ]
+painter_cut = painter %>% select(Gene.ID, contains(".hpi")) %>% column_to_rownames("Gene.ID") %>% as.matrix() %>% .[rownames(cor_assay_bulk_painter), ]
+
+# Make shure every dataset is ordered and has the same rownames
+print(sum(rownames(cor_assay_bulk_painter) == rownames(painter_cut)))
+
+```
+
+Function
+```{r, fig.width=30, fig.height=6}
+get_maxima = function(correlation_matrix){
+  results = rep("no call", ncol(correlation_matrix))
+  maxima = MatrixGenerics::colMaxs(correlation_matrix)
+  for(i in 1:ncol(correlation_matrix)){
+    results[i] = rownames(correlation_matrix)[correlation_matrix[,i] == maxima[i]]
+  }
+  return(results)
+}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+# Correlate pseudobulks to the 48 timecourse from Painter et. al. 
+cor_matrix = cor(painter_cut[, paste0(0:30, ".hpi")], cor_assay_bulk_painter, method = "pearson")
+
+# Calculate the highest corralating timepoints for every pseudobulk
+high = get_maxima(cor_matrix)
+
+# Define a vector with the maxima as integer value and add to column annotation
+high_hour = as.numeric(str_split(high, pattern = ".hpi", simplify = T)[,1])
+column_ha = HeatmapAnnotation(high = high_hour)
+
+# Plot correlation heatmap and density heatmap with top annotation 
+densityHeatmap(cor_matrix, height = unit(4, "cm"), width = unit(16, "cm"), title = NULL, ylab = NULL, quantile_gp = gpar(fontsize = 10) ) %v%
+    Heatmap(cor_matrix, cluster_rows = F, cluster_columns = F, height = unit(16, "cm"),width = unit(16, "cm"), top_annotation = column_ha, 
+            name = "pearson_cor", col=brewer.pal(9,"YlOrRd"), row_order = order(1:31, decreasing = T), row_names_gp = gpar(fontsize = 10), show_column_names = T, column_names_gp =  gpar(fontsize = 10))
+```
+
+
+## Andrade20 
+circulation time of dry season asymptomatic parasites higher than wet season
+12 RDT+ subclinical individuals at the end of the dry season (May) and 12 clinical malaria episode at the beginning of the ensuing malaria season (MAL)
+
+```{r, fig.width=30, fig.height=6}
+andrade20_CT <- read_table("../published_dsets/andrade20_33106664_drySeason_circulation/normalized_counts.txt") 
+andrade20_CT <- andrade20_CT %>% mutate("locus_tag_cln" = str_remove_all(locus_tag, '\\"|;.*'))
+```
+
+
+```{r, fig.width=10, fig.height=10}
+
+# Correlate pseudobulks to the 48 timecourse from Painter et. al. 
+andrade20_sympto_mdata <- read_csv("../published_dsets/andrade20_33106664_drySeason_circulation/sympto_mdata.csv") %>% mutate(across(season, ~str_replace_all(., c("wet" = "S", "dry" = "NS"))))
+```
+
+```{r, fig.width=30, fig.height=6}
+## NB - This needs to go to the common scripts file
+## read alias file first time round
+pf_pdb68_alias <- read_tsv("../../Pf3D7_genomes_gtfs_indexs/release_68/PlasmoDB-68_Pfalciparum3D7_GeneAliases.txt", col_names = F)
+
+## Warnings present due to column disparity across rows "Warning: One or more parsing issues, call `problems()` on your data frame for details, e.g.:" Use problems to check maximum number of rows
+
+problems(pf_pdb68_alias) %>% count(col)
+
+## Sort by separating the last column based on \t
+pf_pdb68_alias <- pf_pdb68_alias %>% separate_wider_delim(X2, delim = "\t", names_sep = "_", too_few = "align_start") 
+```
+
+
+```{r, fig.width=30, fig.height=6}
+## decode andrade20 names
+andrade_decode <- map(1:8, 
+      ~inner_join(andrade20_CT[,c("gene", "locus_tag_cln")], 
+                  pf_pdb68_alias[, c("X1", paste0("X2_",.x))],
+                  by = c("locus_tag_cln" = paste0("X2_",.x)))
+      ) %>%
+  bind_rows() %>%
+  rename("gene_id" = X1) %>%
+  select(gene, gene_id) %>% 
+  distinct(gene,.keep_all = T)%>% 
+  distinct(gene_id,.keep_all = T)
+
+```
+
+
+
+
+```{r, fig.width=30, fig.height=6}
+## add decoded andrade20 names PF3D7_
+andrade20_CT_decode <- andrade20_CT %>% left_join(andrade_decode, by = "gene") %>% filter(!is.na(gene_id)) %>% mutate(across(gene_id, ~str_replace(., "_", "-")))
+
+```
+
+
+```{r, fig.width=30, fig.height=6}
+## add decoded andrade20 names PF3D7_
+# andrade20_CT_decode_cond <- 
+# andrade20_CT_decode %>% select(-c(gene, locus_tag, transcript_ID,locus_tag_cln, gene_id)) %>% head %>% t() %>% as.data.frame() %>% rownames_to_column("iid") %>% left_join(., andrade20_sympto_mdata, by = "iid") %>% mutate(across(iid, ~paste0(., "_", season))) %>% column_to_rownames("iid") %>% t()
+
+names_cond <- andrade20_CT_decode %>% select(-c(gene, locus_tag, transcript_ID,locus_tag_cln, gene_id)) %>% head %>% t() %>% as.data.frame() %>% rownames_to_column("iid") %>% left_join(., andrade20_sympto_mdata, by = "iid") %>% mutate(donor = paste0(iid, "_", season)) %>% select(iid, donor) %>% deframe()
+```
+
+```{r, fig.width=30, fig.height=6}
+# Retain only the overlapping genes in bulk and scrnaseq and remove those only present in either dataset
+cor_assay_bulk_andrade = cor_assay_bulk[rownames(cor_assay_bulk) %in% andrade20_CT_decode$gene_id, ]
+andrade20_CT_cut = andrade20_CT_decode[andrade20_CT_decode$gene_id %in% rownames(cor_assay_bulk_andrade) , ]
+
+# Convert bulk to matrix and arrange in same order as scrnaseq
+andrade20_CT_cut_sort <- andrade20_CT_cut %>% select(gene_id, starts_with("kali")) %>% column_to_rownames("gene_id") %>% as.matrix() %>% .[rownames(cor_assay_bulk_andrade), ]
+
+# Make shure every dataset is ordered and has the same rownames
+print(sum(rownames(cor_assay_bulk_andrade) == rownames(andrade20_CT_cut_sort)))
+
+```
+
+
+```{r, fig.width=30, fig.height=6}
+# Rename donors with conditions
+
+colnames(andrade20_CT_cut_sort)
+names_cond[colnames(andrade20_CT_cut_sort)]
+```
+
+
+```{r, fig.width=30, fig.height=6}
+# Rename donors with conditions
+
+colnames(andrade20_CT_cut_sort)
+names_cond[colnames(andrade20_CT_cut_sort)]
+
+andrade20_CT_cut_sort_cond <- andrade20_CT_cut_sort
+colnames(andrade20_CT_cut_sort_cond) <- names_cond[colnames(andrade20_CT_cut_sort)]
+```
+
+```{r, fig.width=10, fig.height=10}
+
+# Correlate pseudobulks to the 48 timecourse from Painter et. al. 
+cor_matrix = cor(andrade20_CT_cut_sort_cond, cor_assay_bulk_andrade, method = "pearson")
+
+# Calculate the highest corralating timepoints for every pseudobulk
+high = get_maxima(cor_matrix)
+
+# Define a vector with the maxima as integer value and add to column annotation
+high_hour = as.numeric(str_split(high, pattern = "kali", simplify = T)[,1])
+column_ha = HeatmapAnnotation(high = high_hour)
+
+# Plot correlation heatmap and density heatmap with top annotation 
+densityHeatmap(cor_matrix, height = unit(4, "cm"), width = unit(16, "cm"), title = NULL, ylab = NULL, quantile_gp = gpar(fontsize = 10) ) %v%
+    Heatmap(cor_matrix, cluster_rows = T, cluster_columns = F, height = unit(16, "cm"),width = unit(16, "cm"), top_annotation = column_ha, 
+            name = "pearson_cor", col=brewer.pal(9,"YlOrRd"), row_order = order(1:24, decreasing = T), row_names_gp = gpar(fontsize = 10), show_column_names = T, column_names_gp =  gpar(fontsize = 10))
+```
+
+#################################START - LEMIUEX ################################
+## LEMIUEX 
+circulation time of dry season asymptomatic parasites higher than wet season
+12 RDT+ subclinical individuals at the end of the dry season (May) and 12 clinical malaria episode at the beginning of the ensuing malaria season (MAL)
+```{r}
+## Load reference set
+# We use a cleaned version of the Bozdech et al. (2003) overview data set with
+# NULL genes removed and duplicates averaged, yielding n = 3532 genes.
+# Can also use 3D7 and Dd2 reference sets
+# z <- read.csv("data/raw/Pf/andrade_lemiux_MLE/bozdech_Hb3_clean.csv", as.is = T)
+z <- read.csv("data/raw/Pf/andrade_lemiux_MLE/bozdech_Hb3_clean.csv")
+z
+```
+
+
+```{r}
+z_cln_id <- pf_pdb68_alias %>% pivot_longer(cols = contains("X2_"), names_to = "id_cat", values_to = "old_ids", values_drop_na = T) %>% select(X1, old_ids) %>% rename("gene_id" = X1) %>% inner_join(z, ., by = c("Name" = "old_ids"))
+
+z_cln_id %>% arrange(Name) %>% group_by(Name) %>% add_count() %>% filter(n == 2) %>% select(gene_id, Name) %>% filter(!str_detect(gene_id, "\\.")) 
+```
+
+```{r}
+## separate old names and match to new names
+z_cln_id_uniq <- z_cln_id %>% arrange(Name) %>% group_by(Name) %>% add_count(name = "old_id_n") %>% ungroup() %>% filter(old_id_n == 1 | (old_id_n == 2 & str_detect(gene_id, "\\."))) %>% group_by(gene_id) %>% add_count(name = "new_id_n") %>% ungroup() %>% filter(new_id_n == 1) %>% select(-c(Name, new_id_n, old_id_n)) %>% mutate(across(gene_id, ~str_replace(., "_", "-")))
+
+z_cln_id_uniq
+
+```
+
+```{r}
+z_cln_id_uniq %>% arrange(gene_id) %>% group_by(gene_id) %>% add_count() %>% filter(n == 2)
+z_cln_id_uniq %>% filter(str_detect(gene_id, "\\."))
+
+```
+
+
+
+```{r}
+# ## !!!!NOTE - alternative way to old names and match to new names RETAINS ISOFORMS 
+# Pf3D7_genes_plasmoDB_w_old_ids <- Pf3D7_genes_plasmoDB %>% mutate(across(`Previous ID(s)`, ~str_remove(., "Previous IDs: "))) %>% separate_wider_delim(`Previous ID(s)`, delim = ";", names = c("old_id1", "old_id2", "old_id3", "old_id4", "old_id5", "old_id6", "old_id7", "old_id8"), too_few = "align_start", too_many = "debug")
+# 
+# z_cln_id <- Pf3D7_genes_plasmoDB_w_old_ids %>% pivot_longer(cols = c("old_id1", "old_id2", "old_id3", "old_id4", "old_id5", "old_id6", "old_id7", "old_id8"), names_to = "id_cat", values_to = "old_ids", values_drop_na = T) %>% select(gene_id, old_ids) %>% inner_join(z, ., by = c("Name" = "old_ids"))
+# 
+# z_cln_id %>% arrange(Name) %>% group_by(Name) %>% add_count() %>% filter(n == 2) %>% select(gene_id, Name) %>% filter(!str_detect(gene_id, "\\.")) 
+# 
+# ## separate old names and match to new names
+# z_cln_id_uniq <- z_cln_id %>% arrange(Name) %>% group_by(Name) %>% add_count(name = "old_id_n") %>% ungroup() %>% filter(old_id_n == 1 | (old_id_n == 2 & str_detect(gene_id, "\\."))) %>% group_by(gene_id) %>% add_count(name = "new_id_n") %>% ungroup() %>% filter(new_id_n == 1) %>% select(-c(Name, new_id_n, old_id_n))
+# 
+# z_cln_id_uniq
+
+```
+
+```{r, fig.width=30, fig.height=6}
+# Retain only the overlapping genes in bulk and scrnaseq and remove those only present in either dataset
+cor_assay_bulk_z = cor_assay_bulk[rownames(cor_assay_bulk) %in% z_cln_id_uniq$gene_id, ]
+z_CT_cut = z_cln_id_uniq[z_cln_id_uniq$gene_id %in% rownames(cor_assay_bulk_z) , ]
+
+# Convert bulk to matrix and arrange in same order as scrnaseq
+z_CT_cut_sort <- z_CT_cut %>% select(gene_id, starts_with("TP")) %>% column_to_rownames("gene_id") %>% as.matrix() %>% .[rownames(cor_assay_bulk_z), ]
+
+# Make shure every dataset is ordered and has the same rownames
+print(table(rownames(cor_assay_bulk_z) == rownames(z_CT_cut_sort)))
+print(sum(rownames(cor_assay_bulk_z) == rownames(z_CT_cut_sort)))
+
+```
+
+
+```{r, fig.width=30, fig.height=6}
+# Rename donors with conditions
+
+colnames(z_CT_cut_sort)
+# names_cond[colnames(z_CT_cut_sort)]
+```
+
+
+```{r, fig.width=30, fig.height=6}
+# Rename donors with conditions
+
+colnames(z_CT_cut_sort)
+# names_cond[colnames(z_CT_cut_sort)]
+
+z_CT_cut_sort_cond <- z_CT_cut_sort
+# colnames(z_CT_cut_sort_cond) <- names_cond[colnames(z_CT_cut_sort)]
+```
+
+```{r, fig.width=10, fig.height=10}
+
+# Correlate pseudobulks to the 48 timecourse from Painter et. al. 
+cor_matrix = cor(z_CT_cut_sort_cond, cor_assay_bulk_z, method = "pearson")
+
+cor_matrix
+```
+
+
+
+```{r, fig.width=10, fig.height=10}
+
+# Calculate the highest corralating timepoints for every pseudobulk
+high = get_maxima(cor_matrix)
+
+# Define a vector with the maxima as integer value and add to column annotation
+high_hour = as.numeric(str_split(high, pattern = "TP", simplify = T)[,2])
+column_ha = HeatmapAnnotation(high = high_hour)
+
+# Plot correlation heatmap and density heatmap with top annotation 
+# densityHeatmap(cor_matrix, height = unit(4, "cm"), width = unit(16, "cm"), title = NULL, ylab = NULL, quantile_gp = gpar(fontsize = 10) ) %v%
+    Heatmap(cor_matrix, cluster_rows = F, cluster_columns = F, height = unit(16, "cm"),width = unit(16, "cm"), top_annotation = column_ha, 
+            name = "pearson_cor", col=brewer.pal(9,"YlOrRd"), row_order = order(1:46, decreasing = T), row_names_gp = gpar(fontsize = 10), show_column_names = T, column_names_gp =  gpar(fontsize = 10))
+```
+
+################################END LEMIUEX ################################
+
+################################# START - ZB MLE #######################################
+########################################################################################
+
+```{r}
+##Load the input data file
+source("mali22_code_lnk/local_rmd_nbooks/lemieux_et_al_pipeline_functions.R")
+```
+
+```{r}
+##Load the input data file
+z = z_cln_id_uniq %>% rename("Name" = gene_id)
+```
+
+```{r, fig.width=30, fig.height=6}
+v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk@meta.data
+```
+
+```{r, fig.width=30, fig.height=6}
+# Create array that can be subset without changing the original object
+cor_assay_bulk_counts = GetAssayData(object = v3_m2_asex_harmony_fld_sset_ptime1_fld_bulk, assay = "RNA", slot = "counts")
+
+```
+
+
+```{r}
+## using counts or data does not make a difference
+x = cor_assay_bulk_counts %>% data.frame() %>% rownames_to_column("Name")
+x = cor_assay_bulk %>% data.frame() %>% rownames_to_column("Name")
+
+```
+
+
+
+################################################################################
+###
+### Pre-process
+###
+
+
+```{r}
+head(x$Name)
+head(z$Name)
+```
+
+```{r}
+## Sync data
+# Ensures that data sets contain the same genes and are in the same order
+# Note that first column must be gene description titled "Name"
+data <- sync_data(x, z)
+x <- data[[1]]
+z <- data[[2]]
+```
+
+```{r}
+x 
+z
+```
+
+## Store names
+
+```{r}
+#genenames <- x$?..Name
+
+#genenames <- x$Name
+## Make data ordinal
+# This is necessary for comparisons between one- and two-color arrays
+# Returns a matrix and if `use.name = T', removes first "Name" column
+x <- ordinal(x, use.name = T)
+z <- ordinal(z, use.name = T)
+
+
+## If same arry type, remove first column and make into a matrix
+#x <- as.matrix(x[,-1])
+#z <- as.matrix(z[,-1])
+```
+
+## Impute missing values
+
+```{r}
+# For later interpretability, we impute the missing time points (23 and 29 HPI)
+# for the Hb3 reference set. This method interpolates missing values using
+# smoothing splines, though other approaches are possible.
+z.na <- cbind(z[,1:22], rep(NA, nrow(z)), z[,23:27],
+              rep(NA, nrow(z)), z[,28:46])
+z <- t(apply(z.na, 1, smooth.missing))
+```
+
+
+
+## Load sigma_epsilon
+```{r}
+# Estimate of background noise obtained by comparing Hb3 and 3D7 samples
+sigma.epsilon <- 789.9056
+```
+
+################################################################################
+###
+### Get smooth reference data
+###
+
+
+## Check default log-likelihood parameters, stored in ll.par
+
+```{r}
+## Smooth reference data set
+# This smooths the time course for each gene in the reference set using a
+# smoothing spline. There is also a loess implementation.
+# `spar' is the parameter of smoothing
+z.smooth <- smooth.ref(z, method = "spline", spar = 0.5)
+```
+
+
+```{r}
+## Estimate residual of smoothing
+z.smooth.hourly <- z.smooth[,ll.par$hourly]
+sigma.eta <- mean(sd(z - z.smooth.hourly, na.rm = T), na.rm=T)
+```
+
+```{r}
+## Calculate new sigma based on sigma_eta and sigma_epsilon
+new.sigma <- sqrt(sigma.eta^2 + sigma.epsilon^2)
+```
+
+################################################################################
+###
+### Get Log-Likelihood, MLE, and Confidence Intervals
+###
+
+
+#-----------------------
+# Main function options
+#-----------------------
+# B: number of iterations; 100 is default; 500 is better
+# sample.rate: rate of subsampling; 0.50 is default
+# alpha: for confidence intervals; alpha = 0.05 is default
+
+```{r}
+ll <- compute.ll(x = x, z = z.smooth, sigma = new.sigma,
+                 bootstrap = T,
+                 B = 100,
+                 sample.rate = 0.50)
+
+
+
+# mle(ll) --> extracts MLEs
+# loglik(ll) --> extracts log-likelihoods
+# ci(ll) --> extracts confidence intervals
+```
+
+```{r}
+## To obtain only the log-likelihoods without bootstrapped confidence intervals
+ll <- compute.ll(x = x, z = z.smooth, sigma = new.sigma,
+                 bootstrap = F)
+```
+
+###############################################################################
+###
+### Plot Logliks and MLEs
+###
+```{r}
+## Plot the log-likelihood curves
+plot.ll(ll)
+
+## Plot the maximum likelihood estimates with 95% confidence intervals
+plot.mle(ll)
+```
+
+```{r}
+pt_zb_hpi <- map(ll, ~.x$mle) %>% data.frame() %>% t() %>% data.frame() %>% rownames_to_column("pseudotime") %>% rename_all(., ~str_replace(., "\\.", "ZB_hpi_corr")) %>% mutate(across(pseudotime, ~factor(., levels = paste0("ptime.", 1:25))))
+```
+
+```{r}
+pt_zb_hpi %>% ggplot(aes(y = pseudotime, x=ZB_hpi_corr)) + geom_point() + theme_classic()
+```
+
+################################# END - ZB MLE #######################################
+########################################################################################
+
+```{r, fig.width=10, fig.height=10}
+# library(music)
+```
+
+```{r, fig.width=10, fig.height=10}
+GOGO()
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+```{r, fig.width=10, fig.height=10}
+
+```
+
+Male and female fertility genes https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+```{r}
+sayers_Pb_fertility = readxl::read_xlsx("../published_dsets/sayers_PbFertilityGenes_2024/fertility_genes_screen.xlsx", sheet = "(A) Fertility screen results", .name_repair = "universal", na = c("", "NA")) %>% rename_all(., ~str_remove(., "\\.\\."))
+```
+
+```{r}
+sayers_Pb_fertility_cln <- sayers_Pb_fertility %>% select(Pberghei.ANKA.gene.ID, Pfalciparum.3D7.orthologue..ID, Female.fertilitylog2FC...input.sample.log2.barcode.relative.abundance.is.subtracted.from.output.sample.log2.barcode.relative.abundance.and.then.normalised.to.WT.controls., Female.p.valuelikelihood.that.fertility..log2FC..occurs.by.chance.where.a.p.value..0.05.indicates.statistical.significance., Female.fertility.phenotypemutants.with.a.fertility..log2FC..plus.2xSD.of.less.than..2.are.called.Reduced.and.greater.than..2.are.called.Not.reduced., Male.fertilitylog2FC...input.sample.log2.barcode.relative.abundance.is.subtracted.from.output.sample.log2.barcode.relative.abundance.then.normalised.to.WT.controls., Male.p.valuelikelihood.that.fertility..log2FC..occurs.by.chance.where.a.p.value..0.05.indicates.statistical.significance., Male.fertility.phenotypemutants.with.a.fertility..log2FC..plus.2xSD.of.less.than..2.are.called.Reduced.and.greater.than..2.are.called.Not.reduced., contains("gametocyte.log2FCPMID..36634679"), contains("phenotypePMID..36634679")) %>% rename_all(., ~str_remove_all(., "...input.sample.*|likelihood..*|mutants.*|PMID.*")) %>% mutate(gene_id = str_replace(Pfalciparum.3D7.orthologue..ID, "_", "-"))
+```
+
+```{r}
+all_mrks <- readRDS("data/processed/Pf/m2_all/all_mrks.RDS")
+```
+
+
+```{r}
+all_mrks %>% str()
+```
+
+
+```{r}
+## https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+all_mrks %>% bind_rows(., .id = "donor") %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% dplyr::filter(cluster == "Female LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% filter(avg_log2FC > 0 & p_val_adj < 0.05)
+```
+
+
+```{r}
+## https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+le_gns <- all_mrks %>% bind_rows(., .id = "donor") %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene"="gene_id")) %>% group_by(donor, cluster) %>% arrange(p_val_adj, .by_group = T) %>% dplyr::filter(cluster == "Female LE") %>% group_by(gene)  %>% add_count(gene, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene) %>% filter(avg_log2FC > 0 & p_val_adj < 0.05)
+```
+
+
+```{r}
+msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
+```
+
+```{r}
+msc_w_cln_strns 
+```
+
+
+```{r}
+le_he_mrks <- imap(msc_w_cln_strns[!names(msc_w_cln_strns) %in% c("MSC12")], ~{
+  
+  print(.y)
+  seurobj <- .x
+  le <- c("Female LE", "Male LE")
+  he <- c("Female", "Male")
+  
+  map2(le, he, possibly(~{
+    seurobj[["RNA"]]$data <- as(object = seurobj[["RNA"]]$data, Class = "dgCMatrix")
+    Idents(seurobj) <- "stage"
+    FindMarkers(object = seurobj, ident.1 = .x, ident.2 = .y)
+    # FindMarkers(object = seurobj, cells.1 = colnames(seurobj[,seurobj$StagePrelim == "Female LE"]), cells.2 = colnames(seurobj[,seurobj$StagePrelim == "Female"]))
+  }, NULL))
+  })
+```
+
+
+```{r}
+fle_fhe_mrks <- map(le_he_mrks, ~.x[[1]])
+fle_fhe_mrks <- fle_fhe_mrks[!unlist(map(fle_fhe_mrks, is.null))]
+fle_fhe_mrks <- map(fle_fhe_mrks, ~.x %>% rownames_to_column("gene_id")) %>% bind_rows(., .id = "donor")
+```
+
+```{r}
+
+mle_mhe_mrks <- map(le_he_mrks, ~.x[[2]])
+mle_mhe_mrks <- mle_mhe_mrks[!unlist(map(mle_mhe_mrks, is.null))]
+mle_mhe_mrks <- map(mle_mhe_mrks, ~.x %>% rownames_to_column("gene_id")) %>% bind_rows(., .id = "donor")
+```
+
+
+
+```{r}
+le_he_mrks_sig <- map2(list(fle_fhe_mrks, mle_mhe_mrks), c("f", "m"), ~{.x %>% filter(p_val_adj < 0.05) %>% mutate(dir = ifelse(avg_log2FC > 0, paste0(.y, "le_up"), paste0(.y, "he_up"))) %>% left_join(., Pf3D7_genes_plasmoDB[, c("Gene", "gene_id")], by = c("gene_id"="gene_id")) %>% group_by(donor) %>% arrange(p_val_adj, .by_group = T) %>% group_by(gene_id)  %>% add_count(gene_id, name = "gene_cnt" ) %>% arrange(desc(gene_cnt), gene_id, p_val_adj)}) %>% set_names(c("f", "m")) 
+```
+
+
+```{r}
+fle_fhe_mrks_sig_deets <- map(le_he_mrks_sig, ~.x %>% group_by(gene_id) %>% add_count(dir, name = "dir_support" ) %>% mutate(dir_support_prop = round(dir_support/gene_cnt, digits = 2)) %>% distinct(gene_id,dir, .keep_all = T) %>% group_by(gene_id) %>% mutate("opposing_dir" = n_distinct(dir)) %>% ungroup() %>% arrange(desc(opposing_dir), gene_id, p_val_adj))
+```
+
+
+```{r}
+fle_fhe_mrks_sig_deets[['m']] %>% filter(opposing_dir == 1 & dir_support > 1)
+```
+
+```{r}
+fl_dir_nms <- c("fle_up", "fhe_up", "mle_up", "mhe_up")
+dir_prop_thres <- c(0.7, 0.7, 1, 1)
+dir_count_thres <- c(5, 5, 1, 1)
+
+le_he_sig_gns <- pmap(list(rep(fle_fhe_mrks_sig_deets, each =2), fl_dir_nms, dir_prop_thres, dir_count_thres), ~..1 %>% filter(dir == ..2 & dir_support_prop >= ..3 & dir_support > ..4)) %>% set_names(fl_dir_nms)
+```
+
+```{r}
+map(le_he_sig_gns, ~arrange(.x, dir_support_prop))
+```
+
+
+
+```{r}
+sayers_Pb_fertility_cln_LEup <- pmap(list(le_he_sig_gns, names(le_he_sig_gns), rep(c("Female.fertility.phenotype", "Male.fertility.phenotype"), each = 2)), ~{
+  sayers_Pb_fertility_cln %>% 
+  filter(!!rlang::sym(..3) == "Reduced") %>% 
+  left_join(..1, fle_up_gns, by = "gene_id") %>% 
+  mutate(ovlp = case_when(is.na(`Pfalciparum.3D7.orthologue..ID`) ~ "no ortholog", 
+                          !is.na(`Pfalciparum.3D7.orthologue..ID`) & is.na(donor) ~ paste0("absent in ", ..2), 
+                          !is.na(`Pfalciparum.3D7.orthologue..ID`) & !is.na(donor) ~ "overlap"))
+})
+```
+
+
+```{r}
+map(sayers_Pb_fertility_cln_LEup, ~count(.x, ovlp))
+
+```
+
+
+
+```{r}
+map(sayers_Pb_fertility_cln_LEup, ~.x %>%
+  ggplot(aes(x = Female.fertilitylog2FC, y = avg_log2FC)) +
+  geom_point() +
+  geom_smooth())
+```
+
+
+```{r}
+map(sayers_Pb_fertility_cln_LEup, ~.x %>%
+  ggplot(aes(y = Female.fertilitylog2FC, x = gene_cnt)) +
+  geom_point() )
+```
+
+```{r}
+map(sayers_Pb_fertility_cln_LEup, ~.x %>%
+  ggplot(aes(x = gene_cnt)) +
+  geom_bar() )
+```
+
+
+Male and female fertility genes https://www.cell.com/cell-systems/fulltext/S2405-4712(24)00305-3
+```{r}
+sayers_Pb_male_egress = readxl::read_xlsx("../published_dsets/sayers_PbFertilityGenes_2024/male_fertility_egree_motility.xlsx", sheet = "Male motility and egress screen", .name_repair = "universal", na = c("", "NA")) %>% rename_all(., ~str_remove(., "\\.\\."))
+```
+
+
+
+Male and female fertility genes https://pubmed.ncbi.nlm.nih.gov/28126901/
+```{r}
+miao_f_proteome = readxl::read_xlsx("../published_dsets/miao_PfFemMaleproteomes_2017/all_proteomes_frm_study.xlsx", sheet = "I. Female All", .name_repair = "universal", na = c("", "NA")) %>% rename_all(., ~str_remove(., "\\.\\.")) %>% mutate(gene_id = str_replace(Gene.ID, "_", "-"))
+```
+
+
+
+```{r}
+le_he_sig_gns[["fle_up"]] %>% inner_join(., miao_f_proteome, by = "gene_id")
+
+```
+
+Male and female fertility genes https://pubmed.ncbi.nlm.nih.gov/28126901/
+```{r}
+miao_f_proteome = readxl::read_xlsx("../published_dsets/miao_PfFemMaleproteomes_2017/all_proteomes_frm_study.xlsx", sheet = "I. Female All", .name_repair = "universal", na = c("", "NA")) %>% rename_all(., ~str_remove(., "\\.\\."))
+```
+
+## Hart P.yoelli CCR4 knockouts gene DE
+
+#### P.berghei annotations 
+```{r, message=FALSE}
+##ortholog file to translate to falciparum IDs
+ortho <- read_csv("../../Pf3D7_genomes_gtfs_indexs/ortho4.csv")
+
+```
+
+```{r}
+hart_male_tr_gns <- read_xlsx('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/published_dsets/Hart_deadenylases_male_gam/DE_due_pyccr4_deltn.xlsx', sheet = 'P adjusted Significant') %>% rename('gene_id'=GeneID...1) %>% left_join(., ortho, by=c('gene_id'='yoelii') ) 
+
+hart_gns <- hart_male_tr_gns%>% filter(!is.na(falciparum)) %>% dplyr::pull(falciparum) %>% str_replace(., '_', '-')
+
+# a= mfet_gns_3.13.14_don_colps %>% filter(fh_fl_only == 'y') %>% pull(gene_id) 
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(fh_only == 'y') %>% pull(gene_id) 
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(mh_ml_only == 'y') %>% pull(gene_id) 
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(mh_only == 'y') %>% pull(gene_id) 
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+
+```
+
+
+
+```{r}
+
+# a= mfet_gns_3.13.14_don_colps %>% filter(fh_fl_only == 'y') %>% pull(gene_id)
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(fh_only == 'y') %>% pull(gene_id)
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(mh_ml_only == 'y') %>% pull(gene_id)
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+# 
+# a= mfet_gns_3.13.14_don_colps %>% filter(mh_only == 'y') %>% pull(gene_id)
+# table(a %in% hart_gns)
+# prop.table(table(a %in% hart_gns))
+
+```
+
+
+```{r}
+map(le_he_sig_gns, ~.x %>% filter(gene_id %in% hart_gns) %>%  dim())
+```
+
+
+#### Average expression of 511 Lasonder translationally repressed genes in MSC {.tabset}
+```{r, message=FALSE}
+lasonder_tr <- read_xlsx('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/published_dsets/lasonder/supp_512_TR_genes.xlsx', skip = 4)
+tr_gns <- lasonder_tr %>% dplyr::rename('gene_id' = `Gene ID...1`) %>% pull(gene_id) %>% str_replace(.,'_', '-')
+tr_gns <- tr_gns[str_detect(tr_gns, 'PF3D7-')]
+```
+
+
+```{r}
+map(le_he_sig_gns, ~.x %>% filter(gene_id %in% tr_gns) %>%  dim())
+```
+
+Degraded genes in dogga et al - PF3D7-0530800, PF3D7-0624900, PF3D7-0715400, PF3D7-1338800, PF3D7-1423900, PF3D7-1446100, PF3D7-1466500
+```{r}
+degraded_gns_dogga <- c("PF3D7-0530800", "PF3D7-0624900", "PF3D7-0715400", "PF3D7-1338800", "PF3D7-1423900", "PF3D7-1446100", "PF3D7-1466500")
+table(degraded_gns_dogga %in% tr_gns) 
+```
+
+#### Rios widespread release of TR genes 2024 plos
+
+```{r, message=FALSE}
+rios_tr <- read_xlsx('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/published_dsets/rios_releaseOfTRGeneHostToVector_2024/journal.ppat.1012823.s010.xlsx', sheet = "TR198 List")
+
+rios_tr_gns <- rios_tr %>% left_join(., ortho, by=c('Gene ID'='yoelii') ) %>% filter(!is.na(falciparum)) %>% dplyr::pull(falciparum) %>% str_replace(., '_', '-')
+
+# rios_tr_gns <- rios_tr_gns %>% dplyr::rename('gene_id' = `Gene ID...1`) %>% pull(gene_id) %>% str_replace(.,'_', '-')
+# tr_gns_gns <- tr_gns[str_detect(tr_gns, 'PF3D7-')]
+```
+
+```{r}
+degraded_gns_dogga <- c("PF3D7-0530800", "PF3D7-0624900", "PF3D7-0715400", "PF3D7-1338800", "PF3D7-1423900", "PF3D7-1446100", "PF3D7-1466500")
+table(degraded_gns_dogga %in% rios_tr_gns) 
+```
+
+```{r}
+map(le_he_sig_gns, ~.x %>% filter(gene_id %in% rios_tr_gns) %>%  dim())
+```
+
+
+##### Female LE, HE, Male LE, HE absence/present genes (detected in 25% of the population) overrepresentation test {.tabset}
+
+```{r}
+## Copy the gene lists to make do GO overrepresentation test
+mfet_gns_3.13.14_don_colps<- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali1_thesis/data/processed/DB52e_star/MSC14/mf_le_he/mfet_gns_3.13.14_don_colps.RDS")
+mfet_gns_3.13.14_lst<- readRDS("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali1_thesis/data/processed/DB52e_star/MSC14/mf_le_he/mfet_gns_3.13.14_lst.RDS")
+```
+
+
+```{r}
+## Copy the gene lists to make do GO overrepresentation test
+mfet_gns_3.13.14_don_colps
+```
+
+
+```{r}
+## Copy the gene lists to make do GO overrepresentation test
+mfet_gns_3.13.14_don_colps %>% count(fh_only, fh_fl_only, F_genes, FLE_genes)
+```
+
+```{r}
+## Core genes in FHE that are also core genes in FLE
+fhe_fle_gns <- mfet_gns_3.13.14_don_colps %>% filter(fh_fl_only == 'y') %>% pull(gene_id)
+
+## Core genes in FHE that are only unique to FHE 
+fhe_only_gns <- mfet_gns_3.13.14_don_colps %>% filter(fh_only == 'y') %>% pull(gene_id)
+
+## Core genes in FHE that plus core genes in FLE
+fhe_plus_fle_gns <- mfet_gns_3.13.14_don_colps %>% filter(fh_only == 'y' | fh_fl_only == 'y') %>% pull(gene_id)
+
+```
+
+
+```{r}
+fhe_fle_gns
+```
+
+
+```{r}
+all_genes <- Pf3D7_genes_plasmoDB %>% pull(gene_id)
+```
+
+
+```{r}
+# Load necessary package
+# library(stats)
+
+# Create contingency table
+a <- length(intersect(fhe_fle_gns, tr_gns))  # In gene_list AND pathway
+a
+b <- length(setdiff(fhe_fle_gns, tr_gns))    # In gene_list but NOT pathway
+b
+c <- length(setdiff(tr_gns, fhe_fle_gns))    # In pathway but NOT gene_list
+c
+d <- length(setdiff(all_genes, union(fhe_fle_gns, tr_gns))) # Neither in gene_list nor pathway
+d
+  
+```
+
+```{r}
+# Create 2x2 table
+contingency_table <- matrix(c(a, b, c, d), nrow = 2, byrow = TRUE)
+contingency_table
+```
+
+
+```{r}
+matrix(c(90, 110, 210, 590), nrow = 2)
+```
+
+```{r}
+# Perform Fisher's Exact Test
+test_result <- fisher.test(contingency_table)
+  
+# Return odds ratio and p-value
+test_result$estimate
+test_result$p.value
+
+```
+
+
+```{r}
+# Function for Fisher's Exact Test
+enrichment_test <- function(gene_list, all_genes, pathway_genes) {
+  # Create contingency table
+  a <- length(intersect(gene_list, pathway_genes))  # In gene_list AND pathway
+  b <- length(setdiff(gene_list, pathway_genes))    # In gene_list but NOT pathway
+  c <- length(setdiff(pathway_genes, gene_list))    # In pathway but NOT gene_list
+  d <- length(setdiff(all_genes, union(gene_list, pathway_genes))) # Neither in gene_list nor pathway
+  
+  # Create 2x2 table
+  contingency_table <- matrix(c(a, b, c, d), nrow = 2, byrow = TRUE)
+  
+  # Perform Fisher's Exact Test
+  test_result <- fisher.test(contingency_table)
+  
+  
+  OR <- test_result$estimate  # Odds Ratio
+  SE <- sqrt(1/a + 1/b + 1/c + 1/d)  # Standard Error of log OR
+  
+  # Return odds ratio and p-value
+  return(list(OR = OR, SE = SE, P_Value = test_result$p.value))
+  
+  
+  # return(list(Odds_Ratio = test_result$estimate, P_Value = test_result$p.value))
+}
+
+```
+
+Enrichment for lasonder genes
+```{r}
+# Run enrichment test for gene_list1 and gene_list2
+fhe_fle_enrichment <- enrichment_test(fhe_fle_gns, all_genes, tr_gns)
+fhe_only_enrichment <- enrichment_test(fhe_only_gns, all_genes, tr_gns)
+fhe_plus_fle_enrichment <- enrichment_test(fhe_plus_fle_gns, all_genes, tr_gns)
+
+# Print results
+cat("Gene List 1: Odds Ratio =", fhe_fle_enrichment$OR, ", P-value =", fhe_fle_enrichment$P_Value, "\n")
+cat("Gene List 2: Odds Ratio =", fhe_only_enrichment$OR, ", P-value =", fhe_only_enrichment$P_Value, "\n")
+cat("Gene List 2: Odds Ratio =", fhe_plus_fle_enrichment$OR, ", P-value =", fhe_plus_fle_enrichment$P_Value, "\n")
+
+```
+
+```{r}
+fold_enrichment = fhe_fle_enrichment$OR/fhe_only_enrichment$OR
+fold_enrichment
+```
+
+Enrichment for Rios genes
+```{r}
+# Run enrichment test for gene_list1 and gene_list2
+fhe_fle_enrichment_rios <- enrichment_test(fhe_fle_gns, all_genes, rios_tr_gns)
+fhe_only_enrichment_rios <- enrichment_test(fhe_only_gns, all_genes, rios_tr_gns)
+fhe_plus_fle_enrichment_rios <- enrichment_test(fhe_plus_fle_gns, all_genes, rios_tr_gns)
+
+# Print results
+cat("Gene List 1: Odds Ratio =", fhe_fle_enrichment_rios$OR, ", P-value =", fhe_fle_enrichment_rios$P_Value, "\n")
+cat("Gene List 2: Odds Ratio =", fhe_only_enrichment_rios$OR, ", P-value =", fhe_only_enrichment_rios$P_Value, "\n")
+cat("Gene List 2: Odds Ratio =", fhe_plus_fle_enrichment_rios$OR, ", P-value =", fhe_plus_fle_enrichment_rios$P_Value, "\n")
+
+```
+
+```{r}
+fold_enrichment_rios = fhe_fle_enrichment_rios$OR/fhe_only_enrichment_rios$OR
+fold_enrichment_rios
+```
+
+```{r}
+
+# compare two odds ratios using a Z-test
+log_OR1 <- log(fhe_fle_enrichment$OR)
+log_OR2 <- log(fhe_only_enrichment$OR)
+  
+SE1 <- fhe_fle_enrichment$SE
+SE2 <- fhe_only_enrichment$SE
+  
+# Compute Z-score
+Z <- (log_OR1 - log_OR2) / sqrt(SE1^2 + SE2^2)
+  
+# Compute two-tailed p-value
+P_Value <- 2 * (1 - pnorm(abs(Z)))
+
+# Print results
+cat("Odds Ratio Gene List 1:", fhe_fle_enrichment$OR, "\n")
+cat("Odds Ratio Gene List 2:", fhe_only_enrichment$OR, "\n")
+cat("Z-Score:", Z, "\n")
+cat("P-Value:", P_Value, "\n")
+
+
+```
+
+
+
+```{r}
+
+# Function to compare two odds ratios using a Z-test
+compare_enrichment <- function(gene_list1, gene_list2, all_genes, pathway_genes) {
+  result1 <- enrichment_test(gene_list1, all_genes, pathway_genes)
+  result2 <- enrichment_test(gene_list2, all_genes, pathway_genes)
+  
+  log_OR1 <- log(result1$OR)
+  log_OR2 <- log(result2$OR)
+  
+  SE1 <- result1$SE
+  SE2 <- result2$SE
+  
+  # Compute Z-score
+  Z <- (log_OR1 - log_OR2) / sqrt(SE1^2 + SE2^2)
+  
+  # Compute two-tailed p-value
+  P_Value <- 2 * (1 - pnorm(abs(Z)))
+  
+  return(list(Z_Score = Z, P_Value = P_Value, OR1 = result1$OR, OR2 = result2$OR, SE1 = result1$SE, SE2 = result2$SE))
+}
+
+```
+
+Lasonder genes 
+```{r}
+
+# Run enrichment comparison
+comparison_result <- compare_enrichment(fhe_fle_gns, fhe_only_gns, all_genes, tr_gns)
+
+# Print results
+cat("Odds Ratio Gene List 1:", comparison_result$OR1, "\n")
+cat("Odds Ratio Gene List 2:", comparison_result$OR2, "\n")
+cat("Z-Score:", comparison_result$Z_Score, "\n")
+cat("P-Value:", comparison_result$P_Value, "\n")
+```
+
+Rios genes 
+```{r}
+
+# Run enrichment comparison
+comparison_result_rios <- compare_enrichment(fhe_fle_gns, fhe_only_gns, all_genes, rios_tr_gns)
+
+# Print results
+cat("Odds Ratio Gene List 1:", comparison_result_rios$OR1, "\n")
+cat("Odds Ratio Gene List 2:", comparison_result_rios$OR2, "\n")
+cat("Z-Score:", comparison_result_rios$Z_Score, "\n")
+cat("P-Value:", comparison_result_rios$P_Value, "\n")
+```
+
+```{r}
+# Example data (replace with actual OR values and confidence intervals)
+data <- data.frame(
+  GeneList = c("fhe_fle_gns", "fhe_only_gns"),
+  OR = c(comparison_result$OR1, comparison_result$OR2),  # Odds Ratios
+  SE = c(comparison_result$SE1, comparison_result$SE2)
+)
+
+# Calculate confidence intervals
+data$Lower_CI <- exp(log(data$OR) - 1.96 * data$SE)
+data$Upper_CI <- exp(log(data$OR) + 1.96 * data$SE)
+
+# Plot
+ggplot(data, aes(x = GeneList, y = OR)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_errorbar(aes(ymin = Lower_CI, ymax = Upper_CI), width = 0.2) +
+  ylab("Odds Ratio (Enrichment)") +
+  xlab("Gene List") +
+  ggtitle("Pathway Enrichment Comparison") +
+  theme_minimal()
+
+```
+
+```{r}
+# Create a data frame with counts
+prop_data <- data.frame(
+  GeneList = factor(rep(c("Female LE \n retained genes", "Female LE \n lost genes"), each = 2), levels = c("Female LE \n retained genes", "Female LE \n lost genes")),
+  Category = rep(c("TR genes", "Non-TR Genes"), 2),
+  Count = c(
+    length(intersect(fhe_fle_gns, tr_gns)),  # Pathway genes in gene_list1
+    length(setdiff(fhe_fle_gns, tr_gns)),    # Other genes in gene_list1
+    length(intersect(fhe_only_gns, tr_gns)),  # Pathway genes in gene_list2
+    length(setdiff(fhe_only_gns, tr_gns))     # Other genes in gene_list2
+  )
+)
+
+prop_data
+```
+
+
+```{r, fig.width= 4, fig.height=4.5}
+# Plot
+ggplot(prop_data, aes(x = GeneList, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", position = "fill") +  # "fill" scales to proportion
+  ylab("Proportion of Genes") +
+  xlab("Female genes") +
+  # ggtitle("Proportion of Lasonder TR Genes") +
+  scale_fill_manual(values = c("lightgray", "steelblue")) +
+  theme_classic() +
+  theme(text = element_text(size = 19),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(title.position = "top"))
+
+```
+```{r, fig.width= 6.5, fig.height=4.5}
+# Plot
+ggplot(prop_data, aes(x = GeneList, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", position = "dodge") +  # "fill" scales to proportion
+  ylab("Proportion of Genes") +
+  xlab("Female genes") +
+  # ggtitle("Proportion of Lasonder TR Genes") +
+  scale_fill_manual(values = c("lightgray", "steelblue")) +
+  theme_classic() +
+  theme(text = element_text(size = 19))
+
+```
+
+```{r}
+ggplot(prop_data, aes(x = GeneList, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", position = "dodge") +  # "dodge" places bars side by side
+  ylab("Gene Count") +
+  xlab("Gene List") +
+  ggtitle("Comparison of Pathway Gene Counts in Gene Lists") +
+  scale_fill_manual(values = c("steelblue", "lightgray")) +
+  theme_minimal()
+
+```
+
+
+```{r}
+# Create a data frame with counts
+prop_data_rios <- data.frame(
+  GeneList = factor(rep(c("Female LE \n retained genes", "Female LE \n lost genes"), each = 2), levels = c("Female LE \n retained genes", "Female LE \n lost genes")),
+  Category = rep(c("TR genes", "Non-TR Genes"), 2),
+  Count = c(
+    length(intersect(fhe_fle_gns, rios_tr_gns)),  # Pathway genes in gene_list1
+    length(setdiff(fhe_fle_gns, rios_tr_gns)),    # Other genes in gene_list1
+    length(intersect(fhe_only_gns, rios_tr_gns)),  # Pathway genes in gene_list2
+    length(setdiff(fhe_only_gns, rios_tr_gns))     # Other genes in gene_list2
+  )
+)
+
+prop_data_rios
+```
+
+
+```{r, fig.width= 4, fig.height=4.5}
+# Plot
+ggplot(prop_data_rios, aes(x = GeneList, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", position = "fill") +  # "fill" scales to proportion
+  ylab("Proportion of Genes") +
+  xlab("Female genes") +
+  # ggtitle("Proportion of Lasonder TR Genes") +
+  scale_fill_manual(values = c("lightgray", "steelblue")) +
+  theme_classic() +
+  theme(text = element_text(size = 17),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(title.position = "top"))
+
+```
+
+```{r, message=FALSE}
+f_canonical_loss <- read_xlsx('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali1_thesis/data/raw/from_sk21/figs24_f.xlsx', sheet = "933")
+f_all_loss <- read_xlsx('/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali1_thesis/data/raw/from_sk21/figs24_f.xlsx', sheet = "Sheet2")
+
+
+f_canonical_loss_gns <- f_canonical_loss %>% dplyr::pull(`Gene ID`) %>% str_replace(., '_', '-')
+f_all_loss_gns <- f_all_loss %>% dplyr::pull(`Gene ID`) %>% str_replace(., '_', '-')
+
+
+```
+
+
+```{r, message=FALSE}
+f_canonical_loss_gns
+f_all_loss_gns
+```
+
+
+
+```{r, fig.height=3.8, fig.width=3.8}
+# M48, M49, M60
+ggvenn(list("All_lost" = f_all_loss_gns,
+            "Canonical_lost" = f_canonical_loss_gns,
+            "TR" = tr_gns),
+       show_percentage = F,
+       text_size = 6)
+
+
+```
+
+```{r, fig.height=3.8, fig.width=3.8}
+
+ggvenn(list("All_lost" = f_all_loss_gns,
+            "Canonical_lost" = f_canonical_loss_gns,
+            "FL_FH_Core" = fhe_fle_gns,
+            "TR" = tr_gns),
+       show_percentage = F,
+       text_size = 6)
+
+
+```
+
+
+```{r, fig.height=3.8, fig.width=3.8}
+ggvenn(list("All_lost" = f_all_loss_gns,
+            "Canonical_lost" = f_canonical_loss_gns,
+            "FH_only_core" = fhe_only_gns,
+            "TR" = tr_gns),
+       show_percentage = F,
+       text_size = 6)
+
+
+```
+
+
+
+26 male genes bound by RNA binding proteins in P.yoeli and retain introns upon knockout of Rbpm1
+
+PY17X_1311800
+PY17X_1323900
+PY17X_1357300
+PY17X_1335600
+PY17X_1122300
+PY17X_1109100
+PY17X_0521800
+PY17X_0523500
+PY17X_1452900
+PY17X_1241500
+PY17X_0302800
+PY17X_0721100
+PY17X_1333900
+PY17X_0510800
+PY17X_0204100
+PY17X_0919000
+PY17X_0603800
+PY17X_0105800
+PY17X_1216400
+PY17X_0415900
+PY17X_0833600
+PY17X_0508900
+PY17X_1450400
+PY17X_1341200
+PY17X_1305400
+PY17X_1320300
+
+https://www-nature-com.ezp.lib.cam.ac.uk/articles/s41467-024-49002-9#Sec46
+Guan et al., 2024
+```{r, fig.height=3.8, fig.width=3.8}
+guan_26_gns <- c("PY17X_1311800","PY17X_1323900","PY17X_1357300","PY17X_1335600","PY17X_1122300","PY17X_1109100","PY17X_0521800","PY17X_0523500","PY17X_1452900","PY17X_1241500","PY17X_0302800","PY17X_0721100","PY17X_1333900","PY17X_0510800","PY17X_0204100","PY17X_0919000","PY17X_0603800","PY17X_0105800","PY17X_1216400","PY17X_0415900","PY17X_0833600","PY17X_0508900","PY17X_1450400","PY17X_1341200","PY17X_1305400","PY17X_1320300")
+
+
+```
+
+```{r, fig.height=3.8, fig.width=3.8}
+pf_guan_ortho <- ortho %>% filter(yoelii %in% guan_26_gns)
+
+```
+
+
+```{r, fig.height=3.8, fig.width=3.8}
+ pf_guan_ortho %>% select(falciparum, yoelii)
+
+```
+
+
+```{r, fig.height=3.8, fig.width=3.8}
+ 
+
+```
+
+```{r, fig.height=3.8, fig.width=3.8}
+ 
+
+```
+
