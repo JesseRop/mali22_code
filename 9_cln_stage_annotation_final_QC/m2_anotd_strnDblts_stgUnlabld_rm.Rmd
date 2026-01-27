@@ -1,0 +1,418 @@
+---
+title: "Integration of donor only and with lab"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  # library(patchwork)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(knitr)
+  # library(readxl)
+  # library(SCpubr)
+  # library(ggh4x)
+  # library(htmlwidgets)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  
+})
+```
+
+
+#  integration of all MSC
+
+
+```{r setup}
+sample_set = "Mali2"
+
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("mali22_code_lnk/pf_common_vars.R")
+```
+
+
+```{r}
+optimum_k_qcd <- c("MSC33" =8, "MSC48" =4, "MSC49" =6, "MSC55" =6, "MSC60" =7, "MSC66" =8, "MSC38" =4, "MSC40" =8, "MSC50_MACS" =1, "MSC53" =1, "MSC57" =1, "MSC24" =1, "MSC37" =5, "MSC39" =4, "MSC45" =1, "MSC50_SLO" =2, "MSC54" =1, "MSC67" =1, "MSC68" =3, "MSC70" =1, "MSC41"= 3, "MSC51"= 1, "MSC25"= 2)
+
+optimum_k_qcd_21 <- c("MSC1" =5, "MSC3" =2, "MSC13" =2, "MSC14" =8, "MSC12" =2)
+
+optimum_k_qcd <- c(optimum_k_qcd_21, optimum_k_qcd)
+
+optimum_k_qcd <- optimum_k_qcd[sort(names(optimum_k_qcd))]
+```
+
+
+```{r, eval=T}
+pf_all_id_decode <- read_csv("data/raw/pf_all_id_decode.csv")
+pf_all_id_decode$sample_nm
+```
+
+
+```{r, eval=T}
+# pf_solo_mixed_mdata_decode <- read_csv("data/raw/pf_solo_mixed_mdata_decode.csv")
+pf_solo_mixed_mdata_decode <- pf_all_id_decode 
+
+```
+
+## Select Sample Names
+
+```{r}
+# Select sample names, remove poor quality and mixed infection samples
+slct_sample_names <- pf_solo_mixed_mdata_decode$sample_nm
+
+## poor quality samples
+sample_rm <- c("MSC1", "MSC24", "MSC36", "MSC37", "MSC38", "MSC39")
+sample_mxd <- pf_solo_mixed_mdata_decode %>% filter(mixed_infection2 == "mixed") %>% pull(sample_nm)
+# slct_sample_names <- slct_sample_names[!(slct_sample_names %in% c(sample_rm, sample_mxd))]
+
+all_samples2rm <- c(sample_rm, sample_mxd)
+all_samples2rm <- c(all_samples2rm, paste0(all_samples2rm, "C"), paste0(all_samples2rm, "noJC"))
+slct_sample_names <- slct_sample_names[!slct_sample_names %in% all_samples2rm]
+# slct_sample_names <- c("MSC3", "MSC33C")
+
+# Filter metadata for selected samples
+pf_solo_mixed_mdata_decode_slct <- pf_solo_mixed_mdata_decode %>% filter(sample_nm %in% slct_sample_names)
+
+# Sorted sample names and irods IDs
+sample_name <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+smpl_nms <- str_sort(pf_solo_mixed_mdata_decode_slct$sample_nm)
+source_irods <- pf_solo_mixed_mdata_decode_slct[,c('sample_nm', 'irods_id')] %>% deframe() %>% .[sample_name]
+```
+
+```{r, message=F, warning=F, eval=T}
+## Remove combined and JC and leave as was originally
+samples_all_orig <- sample_name[!str_detect(sample_name, "C$")]
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get samples for which JC was also run
+samples_jcode <- unique(str_remove(sample_name[str_detect(sample_name, "C$")], "noJC|JC|C$"))
+samples_1run <- sample_name[!str_detect(sample_name, paste0(samples_jcode, collapse = "|"))]
+
+## Select only those with combined data
+samples_all_c <- c(samples_1run, paste0(samples_jcode, "C"))
+```
+
+```{r}
+samples_all_c
+```
+
+## read files
+
+
+
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+all_msc_qcd_anotd_slim <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd_slim3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|/all_msc_qcd_anot.*'))) %>% 
+  # .[sample_name_all] %>%
+  .[sample_name] %>%
+  map(readRDS)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, cells.highlight = colnames(.x[,.x@meta.data$Strain_DN == "Doublet"])) + labs(title = .y) ))
+```
+
+```{r}
+# ## Adding stage annotations to query cells
+# all_msc_qcd_anotd_slim <- list(all_msc_qcd_anotd_slim) %>%
+#   pmap(~ ..1@meta.data %>%
+#          mutate(Strain_DN = Strain_K_verified) %>% 
+#          AddMetaData(..1, .) 
+#   )
+
+```
+
+```{r}
+imap(all_msc_qcd_anotd_slim, ~DimPlot(.x, group.by = "stage_fld") + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r}
+imap(all_msc_qcd_anotd_slim, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "stage_fld") + labs(title = .y)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(all_msc_qcd_anotd_slim[c("MSC50_SLOC", "MSC50_MACS", "MSC50_SLO")], ~.x@meta.data %>% count(stage_asx_c, stage_fld))
+```
+
+## Remove gams from msc50 slo since these have been subjected to SLO
+```{r, warning=FALSE, message=FALSE}
+all_msc_qcd_anotd_slim[["MSC50_SLOC"]] = subset(all_msc_qcd_anotd_slim[["MSC50_SLOC"]], subset = stage_asx_c == "Asexual")
+```
+
+```{r, warning=FALSE, message=FALSE}
+all_msc_qcd_anotd_slim[["MSC50_SLO"]] = subset(all_msc_qcd_anotd_slim[["MSC50_SLO"]], subset = stage_asx_c == "Asexual")
+all_msc_qcd_anotd_slim[["MSC50_SLOnoJC"]] = subset(all_msc_qcd_anotd_slim[["MSC50_SLOnoJC"]], subset = stage_asx_c == "Asexual")
+
+```
+## Remove gams from msc50 macs since these are few and subjected to MACS? process?
+
+```{r, warning=FALSE, message=FALSE}
+all_msc_qcd_anotd_slim[["MSC50_MACS"]] = subset(all_msc_qcd_anotd_slim[["MSC50_MACS"]], subset = stage_asx_c != "Asexual")
+```
+
+
+```{r}
+imap(all_msc_qcd_anotd_slim, ~DimPlot(.x, group.by = "stage_fld") + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
+```
+
+```{r}
+before_rm <- map(all_msc_qcd_anotd_slim, dim)%>% as.data.frame() %>% .[2,] 
+before_rm
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, cells.highlight = colnames(.x[,.x@meta.data$scrub_doublet == "Doublet"]))+ labs(title = .y)))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(all_msc_qcd_anotd_slim, possibly(~DimPlot(.x, label = T, group.by = "Strain_DN") + labs(title = .y) ))
+```
+
+```{r, eval=T}
+map(all_msc_qcd_anotd_slim, ~.x@meta.data %>% count(Strain_DN) )
+```
+
+```{r}
+## Barcodes removed
+strn_k_dbt_rm_bcodes <- map(all_msc_qcd_anotd_slim, possibly(~colnames(subset(.x, Strain_DN != "Doublet", invert = T))))
+```
+
+```{r}
+## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+all_anotd_no_dbt <- map(all_msc_qcd_anotd_slim, ~subset(.x, Strain_DN != "Doublet"))
+
+strn_k_dbt_rm <- map(all_anotd_no_dbt, dim)%>% as.data.frame() %>% .[2,] 
+strn_k_dbt_rm
+```
+
+##### NOTE !!! uncomment the next three chunks to remove likely strain doublets here - keeping them for now and will remove them later to ensure the results for committed rings stay intact
+```{r}
+# ## Barcodes removed
+# strn_k_likelyDbt_rm_bcodes <- map(all_anotd_no_dbt, possibly(~colnames(subset(.x, Strain_K_verified_QC != "dbt_like", invert = T))))
+```
+
+```{r}
+# ## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+# all_anotd_no_all_dbt <- map(all_anotd_no_dbt, ~subset(.x, Strain_K_verified_QC != "dbt_like"))
+# 
+# strn_k_likelyDbt_rm <- map(all_anotd_no_all_dbt, dim)%>% as.data.frame() %>% .[2,] 
+# strn_k_likelyDbt_rm
+```
+
+```{r}
+# ## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+# all_anotd_no_dbt <- all_anotd_no_all_dbt
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(all_anotd_no_dbt, possibly(~DimPlot(.x, label = T, cells.highlight = colnames(.x[,.x@meta.data$stage_fld == "Unassigned"]))))
+
+```
+
+
+
+```{r, eval=T}
+map(all_anotd_no_dbt, ~.x@meta.data %>% count(stage_fld, stage_fld) %>% filter(stage_fld == "Unassigned"))
+```
+
+```{r}
+## Barcodes removed
+stg_unassignd_rm_bcodes <- map(all_anotd_no_dbt, possibly(~colnames(subset(.x, stage_fld != "Unassigned", invert = T))))
+```
+
+
+```{r}
+## ¡¡¡¡¡¡ NOTE - STRAIN doublet removal Needs to move to another tab
+cln_anotd <- map(all_anotd_no_dbt, ~subset(.x, stage_fld != "Unassigned"))
+
+stg_unassignd_rm <- map(cln_anotd, dim)%>% as.data.frame() %>% .[2,] 
+stg_unassignd_rm
+```
+
+
+
+```{r, eval=T}
+## write out qcd and annotated files
+# imap(all_msc_qcd_anotd, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/all_msc_qcd_anotd.RDS")))
+imap(cln_anotd, ~saveRDS(.x, paste0("data/processed/Pf/",.y,"/seu_obj/cln_anotd3.RDS")))
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Save the finalQC verified doublets and unnassigned cells barcodes for plotting
+finalQC_rm_bcodes <- list(strn_k_dbt_rm_bcodes, stg_unassignd_rm_bcodes) %>% set_names(c("strn_k_dbt_rm_bcodes", "stg_unassignd_rm_bcodes"))
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# Save the poorQC cells barcodes for plotting
+saveRDS(finalQC_rm_bcodes, "data/processed/Pf/m2_all/lowQC_rm_plotting/finalQC_rm_bcodes.RDS")
+```
+
+
+```{r}
+
+filt_flow_fnlQC <- list(strn_k_dbt_rm, stg_unassignd_rm) %>% set_names(c("strn_k_dbt", "stg_unassignd")) %>% 
+  bind_rows(., .id = "filt_metric") %>% 
+  mutate(across(filt_metric, ~factor(., levels = c("strn_k_dbt", "stg_unassignd"))))
+
+```
+
+```{r eval=FALSE}
+## Number of cell population removed by respective filter
+filt_diff <- (filt_flow_fnlQC[-nrow(filt_flow_fnlQC), ] - filt_flow_fnlQC[-1, ]) 
+
+filt_diff$filt_metric <- paste0(filt_flow_fnlQC[-1, ]$filt_metric, "_rm")
+filt_diff_t <- filt_diff  %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+filt_diff_t
+
+## Proportion of cell population removed by respective filter
+filt_diff_prop <- round(filt_diff/filt_flow_fnlQC[-nrow(filt_flow_fnlQC), ] * 100, 2)
+filt_diff_prop$filt_metric <- paste0(filt_flow_fnlQC[-1, ]$filt_metric, "_rm_prop")
+filt_diff_prop_t <- filt_diff_prop %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+## Merge number of cells and those that are removed
+filt_flow_fnlQC_diff <- bind_rows(
+  filt_flow_fnlQC %>% 
+  mutate(row_id = row_number(), source = 2),
+  filt_diff %>% 
+  mutate(row_id = row_number(), source = 2)
+) #%>%
+  # arrange(row_number() + (row_number() > nrow(df)))
+
+filt_flow_fnlQC_diff_t <- filt_flow_fnlQC_diff %>% arrange(row_id, source) %>% 
+  select(-row_id, -source) %>% column_to_rownames("filt_metric") %>% t() %>% as.data.frame() 
+
+filt_flow_fnlQC_diff_t
+```
+
+
+```{r, eval=FALSE}
+# saveRDS(filt_flow_fnlQC_diff_t, "data/processed/Pf/m2_all/filt_flow_fnlQC_diff_t.RDS")
+saveRDS(filt_flow_fnlQC_diff_t, "data/processed/Pf/m2_all/filt_flow_fnlQC_diff_t3.RDS") 
+
+```
+
+```{r}
+
+filt_flow_fnlQC %>% 
+  pivot_longer(cols = contains("MSC"), names_to = "donor", values_to = "cell_counts") %>%  
+  ggplot(aes(x = filt_metric, y = cell_counts, colour = donor, group = donor)) + 
+  geom_point() + 
+  geom_line()
+
+```
+
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_bsub.sh
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/cln_anotd3.RDS" \
+
+```
+
+```{r, eval=T}
+gogo()
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh
+# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/cln_anotd3.RDS" \
+
+```
+
+```{bash, eval=TRUE}
+ORIG="/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_sct_CbEdCr_bsub.sh"
+INPUT_SEU="/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/cln_anotd3.RDS"
+HVG=600
+CLUSTER_RESOLN=0.4
+
+TMP=$(mktemp --tmpdir=/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/tmp submsn_XXXXXX.sh)
+# build tmp script: keep shebang from original, then inject variables, then the rest of the original
+{ head -n1 "$ORIG"; echo "INPUT_SEU=\"$INPUT_SEU\""; echo "HVG=\"$HVG\""; echo "CLUSTER_RESOLN=\"$CLUSTER_RESOLN\""; sed '1d' "$ORIG"; } > "$TMP"
+chmod +x "$TMP"
+
+# dry-run check (optional)
+head -n 25 "$TMP"
+echo "bsub < $TMP"
+```
+
+```{bash, eval=TRUE}
+# cleanup
+rm "$TMP"
+```
+
+```{bash, eval=TRUE}
+ORIG="/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_CbEdCr_bsub.sh"
+INPUT_SEU="/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/MSC*/seu_obj/cln_anotd3.RDS"
+HVG=600
+CLUSTER_RESOLN=0.4
+
+TMP=$(mktemp --tmpdir=/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/tmp submsn_XXXXXX.sh)
+# build tmp script: keep shebang from original, then inject variables, then the rest of the original
+{ head -n1 "$ORIG"; echo "INPUT_SEU=\"$INPUT_SEU\""; echo "HVG=\"$HVG\""; echo "CLUSTER_RESOLN=\"$CLUSTER_RESOLN\""; sed '1d' "$ORIG"; } > "$TMP"
+chmod +x "$TMP"
+
+# dry-run check (optional)
+head -n 25 "$TMP"
+echo "bsub < $TMP"
+```
+
+
+
