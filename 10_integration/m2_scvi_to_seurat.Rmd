@@ -93,20 +93,21 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 
 
 ```{r}
-obj_names = c('M55', 'no_M55')
+obj_names = c('M55', 'no_M55', 'no_M55_all_gns', 'asex_allgns', 'fem_allgns', 'male_allgns')
 
 ```
 
+
 ```{r}
-map(obj_names, ~Convert(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_", .x,".h5ad"), dest = "h5seurat", overwrite = T))
+map(obj_names, ~Convert(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/scvi/m2_all_scvi_", .x,".h5ad"), dest = "h5seurat", overwrite = T))
 ```
 
 ```{r}
-m2_all_scvi_seu <- map(obj_names, ~LoadH5Seurat(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_", .x,".h5seurat"), meta.data = FALSE, misc = FALSE)) %>% set_names(obj_names)
+m2_all_scvi_seu <- map(obj_names, ~LoadH5Seurat(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/scvi/m2_all_scvi_", .x,".h5seurat"), meta.data = FALSE, misc = FALSE)) %>% set_names(obj_names)
 ```
 
 ```{r}
-m2_all_scvi_mdata <- map(obj_names, ~read_csv(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/m2_all_scvi_mdata_", .x,".csv"))) 
+m2_all_scvi_mdata <- map(obj_names, ~read_csv(paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/scvi/m2_all_scvi_mdata_", .x,".csv"))) 
 ```
 
 
@@ -129,20 +130,21 @@ map(m2_all_scvi_seu, ~DimPlot(.x, group.by = "leiden", reduction = "umap", label
 
 
 ```{r}
-# saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/m2_all_scvi_seu.RDS")
-saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/m2_all_scvi_seu3.RDS")
+# saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/scvi/m2_all_scvi_seu.RDS")
+# saveRDS(m2_all_scvi_seu, "data/processed/Pf/m2_all/scvi/m2_all_scvi_seu3.RDS")
+imap(m2_all_scvi_seu, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/scvi2seu/m2_all_scvi_", .y, "_seu.RDS")))
 
 ```
 
 ```{r}
-# m2_all_scvi_seu <- readRDS("data/processed/Pf/m2_all/m2_all_scvi_seu3.RDS")
+# m2_all_scvi_seu <- readRDS("data/processed/Pf/m2_all/scvi/m2_all_scvi_seu3.RDS")
 
 ```
 
 ```{r}
 # m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/m2_all_raw_mrg.RDS")
 # m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_mrg3.RDS")
-m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_mrg3.RDS")
+m2_all_raw_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_jcC_mrg3.RDS")
 
 ```
 
@@ -152,7 +154,10 @@ m2_all_raw_mrg <- NormalizeData(m2_all_raw_mrg)
 ```
 
 ```{r}
-m2_all_raw_mrg_list <- list(m2_all_raw_mrg, m2_all_raw_mrg[,m2_all_raw_mrg$orig.ident != "MSC55.mrna"]) %>% set_names(obj_names)
+# m2_all_raw_mrg_list <- map(m2_all_scvi_seu, ~{
+#   m2_all_raw_mrg[,colnames(.x)]
+# }) %>% 
+#   set_names(names(m2_all_scvi_seu))
 
 ```
 
@@ -163,22 +168,22 @@ m2_all_raw_mrg_list <- list(m2_all_raw_mrg, m2_all_raw_mrg[,m2_all_raw_mrg$orig.
 ```
 
 ```{r}
-m2_all_raw_mrg_list <- map(m2_all_scvi_seu, ~m2_all_raw_mrg[,colnames(.x)]) 
+all_jcC_seu_scvi <- map(m2_all_scvi_seu, ~m2_all_raw_mrg[,colnames(.x)]) 
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 ## Add scvi dimensions to the seurat object
-for (nm in names(m2_all_raw_mrg_list)) {
-  m2_all_raw_mrg_list[[nm]][["scvi_umap"]] <- m2_all_scvi_seu[[nm]][["umap"]]
-  m2_all_raw_mrg_list[[nm]][["scvi"]] <- m2_all_scvi_seu[[nm]][["scVI"]]
-  m2_all_raw_mrg_list[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")] <- m2_all_scvi_seu[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")]
+for (nm in names(all_jcC_seu_scvi)) {
+  all_jcC_seu_scvi[[nm]][["scvi_umap"]] <- m2_all_scvi_seu[[nm]][["umap"]]
+  all_jcC_seu_scvi[[nm]][["scvi"]] <- m2_all_scvi_seu[[nm]][["scVI"]]
+  all_jcC_seu_scvi[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")] <- m2_all_scvi_seu[[nm]]@meta.data[,c("_scvi_batch", "_scvi_labels", "leiden")]
 }
 ```
 
 
 ```{r}
-m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~AddMetaData(.x, 
+all_jcC_seu_scvi <- map(all_jcC_seu_scvi, ~AddMetaData(.x, 
                                   .x@meta.data %>%
                                     mutate(stage = stage_fld,
                                            stage_afm = case_when(stage %in% c("Early ring", "Late ring", "Early trophozoite", "Late trophozoite", "Schizont", "Gametocyte (developing)") ~ "Asexual",
@@ -194,29 +199,34 @@ m2_all_raw_mrg_list <- map(m2_all_raw_mrg_list, ~AddMetaData(.x,
 
 
 ```{r}
-map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+map(all_jcC_seu_scvi, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
 
 ```
 
 ```{r, fig.height=6, fig.width=10}
-map(m2_all_raw_mrg_list, ~DimPlot(.x, reduction = "scvi_umap", group.by = "stage_fld", cols = sp_col_new, pt.size = 0.01, raster = F))
+map(all_jcC_seu_scvi, ~DimPlot(.x, reduction = "scvi_umap", group.by = "stage_fld", cols = sp_col_new, pt.size = 0.01, raster = F))
+```
+
+
+```{r, fig.height=6, fig.width=10}
+map(all_jcC_seu_scvi, ~FeaturePlot(.x, features = "PF3D7-1102500", reduction = "scvi_umap", pt.size = 0.01, raster = F, order = T))
 ```
 
 ```{r}
-# map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "umap.rpca_sct_PC10", label = T))
+# map(all_jcC_seu_scvi, ~DimPlot(.x, group.by = "leiden", reduction = "umap.rpca_sct_PC10", label = T))
 
 ```
 
 ```{r}
 # saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list.RDS")
 # saveRDS(m2_all_raw_mrg_list, "data/processed/Pf/m2_all/m2_all_raw_mrg_list3.RDS")
-imap(m2_all_raw_mrg_list, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/m2_all_raw_mrg_", .y, "_3.RDS")))
+imap(all_jcC_seu_scvi, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/scvi2seu/all_jcC_seu_scvi", .y, ".RDS")))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 #ap2g
-m2_all_raw_mrg_list_umap_mdata <- map(m2_all_raw_mrg_list, ~{
+all_jcC_seu_scvi_umap_mdata <- map(all_jcC_seu_scvi, ~{
   .x@meta.data %>% 
     rownames_to_column("bcode") %>%
       left_join(., .x@reductions$scvi_umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") %>%
@@ -227,14 +237,15 @@ m2_all_raw_mrg_list_umap_mdata <- map(m2_all_raw_mrg_list, ~{
 ```{r, message=FALSE, warning=FALSE, eval=T}
 # Save the clean umaps for plotting
 # saveRDS(m2_all_raw_mrg_list_umap_mdata, "data/processed/Pf/m2_all/all_stgs_figs/m2_all_raw_mrg_list_umap_mdata.RDS")
-imap(m2_all_raw_mrg_list_umap_mdata, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/m2_all_raw_mrg_", .y, "_umap_mdata_3.RDS")))
+# imap(m2_all_raw_mrg_list_umap_mdata, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/scvi2seu/m2_all_raw_mrg_", .y, "_umap_mdata_3.RDS")))
+imap(all_jcC_seu_scvi_umap_mdata, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/scvi2seu/all_jcC_seu_scvi_", .y, "_umap_mdata_3.RDS")))
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-for (nm in names(m2_all_raw_mrg_list)) {
-  m2_all_raw_mrg_list[[nm]][["RNA"]]$data <- as(m2_all_raw_mrg_list[[nm]][["RNA"]]$data, Class = "dgCMatrix")
-  # Idents(m2_all_raw_mrg_list[[nm]]) <- "leiden"
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+for (nm in names(all_jcC_seu_scvi)) {
+  all_jcC_seu_scvi[[nm]][["RNA"]]$data <- as(all_jcC_seu_scvi[[nm]][["RNA"]]$data, Class = "dgCMatrix")
+  # Idents(all_jcC_seu_scvi[[nm]]) <- "leiden"
 }
 ```
 
@@ -245,61 +256,112 @@ for (nm in names(m2_all_raw_mrg_list)) {
 
 ```
 
+```{r}
+gogo()
+```
+
+#####!!! DE below in seurat. Already done using scvi. Not sure which one to go with
 
 ```{r}
-m2_all_raw_mrg_list_stg <- map(m2_all_raw_mrg_list, ~SplitObject(.x, split.by= "stage_afm")) %>% unlist(., recursive = F)
+all_jcC_seu_scvi_stg_noM55_afm <- SplitObject(all_jcC_seu_scvi[["no_M55"]], split.by= "stage_afm")
+```
+
+```{r}
+map(all_jcC_seu_scvi_stg_noM55_afm, ~.x@meta.data %>% count(stage_afm, leiden) %>% arrange(desc(n)))
+```
+
+```{r}
+map(all_jcC_seu_scvi_stg_noM55_afm, ~.x@meta.data %>% count(leiden) %>% arrange(desc(n)))
+
+```
+
+```{r}
+clusters2keep4DE <- map(all_jcC_seu_scvi_stg_noM55_afm, ~.x@meta.data %>% count(leiden) %>% arrange(desc(n)) %>% filter(n>150) %>% pull(leiden))
+
+```
+
+```{r, fig.height=6, fig.width=10}
+## Highlight likely misplaced clusters to remove
+map2(all_jcC_seu_scvi_stg_noM55_afm, clusters2keep4DE, ~DimPlot(.x, reduction = "scvi_umap", pt.size = 0.01, cells.highlight = colnames(.x[,!.x$leiden %in% .y])))
+```
+
+```{r}
+all_jcC_seu_scvi_stg_noM55_afm <- map2(all_jcC_seu_scvi_stg_noM55_afm, clusters2keep4DE, ~subset(.x, subset = leiden %in% .y))
+```
+
+```{r}
+map(all_jcC_seu_scvi_stg_noM55_afm, ~.x@meta.data %>% count(leiden) %>% arrange(desc(n)))
+```
+
+```{r}
+DimPlot(all_jcC_seu_scvi[["no_M55"]], group.by = "leiden", reduction = "scvi_umap", label = T)
+
+```
+
+```{r}
+map(all_jcC_seu_scvi_stg_noM55_afm, ~.x@meta.data %>% count(stage_afm, leiden, orig.ident) %>% group_by(leiden) %>% arrange(desc(n), .by_group = T) %>% filter(n>50))
+
+```
+
+```{r}
+all_jcC_seu_scvi_stg_noM55_afm <- map(all_jcC_seu_scvi_stg_noM55_afm, ~SetIdent(.x, value = "leiden"))
+
 ```
 
 
 ```{r}
-map(m2_all_raw_mrg_list_stg, ~.x@meta.data %>% count(stage_afm, leiden) %>% arrange(desc(n)))
+seu_scviLeiden_markers <- map(all_jcC_seu_scvi_stg_noM55_afm, ~FindAllMarkers(.x ))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+seu_scviLeiden_markers_anot <- map(seu_scviLeiden_markers, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+# seu_scviLeiden_markers_anot
+```
+
+
+```{r}
+# saveRDS(seu_scviLeiden_markers_anot, "data/processed/Pf/m2_all/seu_scviLeiden_markers_anot.RDS")
+saveRDS(seu_scviLeiden_markers_anot, "data/processed/Pf/m2_all/scvi2seu/seu_scviLeiden_markers_anot3.RDS")
 
 ```
 
 
 ```{r}
-m2_all_raw_mrg_list_stg <- map(m2_all_raw_mrg_list_stg, ~SetIdent(.x, value = "leiden"))
+map(all_jcC_seu_scvi_stg_noM55_afm, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "scvi_umap", label = T))
+map(all_jcC_seu_scvi_stg_noM55_afm, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
 
 ```
 
-
 ```{r}
-scvi_markers <- map(m2_all_raw_mrg_list_stg, ~FindAllMarkers(.x ))
-```
-
-
-```{r}
-map(m2_all_raw_mrg_list, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+DimPlot(all_jcC_seu_scvi[["no_M55"]], group.by = "leiden", reduction = "scvi_umap", label = T)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-scvi_markers_anot <- map(scvi_markers, ~.x %>%  left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
-
-# scvi_markers_anot
-```
-
-
-```{r}
-# saveRDS(scvi_markers_anot, "data/processed/Pf/m2_all/scvi_markers_anot.RDS")
-saveRDS(scvi_markers_anot, "data/processed/Pf/m2_all/scvi_markers_anot3.RDS")
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-map(scvi_markers_anot, ~.x %>% 
+map(seu_scviLeiden_markers_anot2, ~.x %>% 
   # filter(gene %in% gns) %>% 
   arrange(desc(avg_log2FC)) %>% 
     filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
     group_by(cluster) %>% 
-    slice_min(order_by = p_val_adj, n = 5) %>% 
-    slice_max(order_by = avg_log2FC, n = 5))
+    slice_min(order_by = p_val_adj, n = 30) %>% 
+    slice_max(order_by = avg_log2FC, n = 10))
+```
+
+```{r}
+map(all_jcC_seu_scvi, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+
+```
+
+```{r, fig.height=6, fig.width=10}
+# kahrp
+map(all_jcC_seu_scvi, ~FeaturePlot(.x, features = "PF3D7-0202000", reduction = "scvi_umap", pt.size = 0.01, raster = F, order = T))
 ```
 
 
-
 ```{r, warning=FALSE, message=FALSE}
-map2(scvi_markers_anot[c("M55.Female", "no_M55.Female")], list(c("8"), c("9", "13", "10")), ~.x %>% 
+map2(seu_scviLeiden_markers_anot[c("M55.Female", "no_M55.Female")], list(c("8"), c("9", "13", "10")), ~.x %>% 
   filter(cluster %in% .y) %>%
   arrange(desc(avg_log2FC)) %>% 
     filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
@@ -317,18 +379,19 @@ Ngwa activated gametocytes https://opus.bibliothek.uni-wuerzburg.de/opus4-wuerzb
 ## Ngwa activated gametocytes https://opus.bibliothek.uni-wuerzburg.de/opus4-wuerzburg/frontdoor/deliver/index/docId/6822/file/PhD_thesis_Che_Julius_Ngwa_final.pdf
 ngwa_up_activ_gam <- c("PF3D7_0827800", "Pf3D7_1246200", "PF3D7_1218800", "PF3D7_1239400", "PF3D7_0704100", "PF3D7_0417400", "PF3D7_1321000", "PF3D7_131670") %>% str_replace(., "_", "-")
 
-map(scvi_markers_anot[c("M55.Female", "no_M55.Female")], ~.x %>% 
+map(seu_scviLeiden_markers_anot[c("M55.Female", "no_M55.Female")], ~.x %>% 
   filter(gene %in% ngwa_up_activ_gam) %>% 
     filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
   arrange(desc(avg_log2FC)) )
 ```
 ```{r, warning=FALSE, message=FALSE}
 ## Gamete top marker - PF3D7_0825800 https://www.nature.com/articles/s41586-025-09653-0
-map(m2_all_raw_mrg_list, ~FeaturePlot(.x, features = c("PF3D7-0825800"), order =T, ncol = 1))
+map(all_jcC_seu_scvi, ~FeaturePlot(.x, features = c("PF3D7-0825800"), order =T, ncol = 1))
 
 ```
+
 ```{r, warning=FALSE, message=FALSE}
-map2(scvi_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("18","21", "8"), c("14","20", "9")), ~.x %>% 
+map2(seu_scviLeiden_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("18","21", "8"), c("14","20", "9")), ~.x %>% 
   filter(cluster %in% .y) %>%
   arrange(desc(avg_log2FC)) %>% 
     filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
@@ -337,7 +400,7 @@ map2(scvi_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("18","21", "8
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=16, fig.height=6}
-map(m2_all_raw_mrg_list_stg[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = c("PF3D7-0829900", "PF3D7-1229200", "PF3D7-1222600", "PF3D7-1102500", "PF3D7-0818900"), order =T, ncol = 3))
+map(all_jcC_seu_scvi_stg_noM55_afm[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = c("PF3D7-0829900", "PF3D7-1229200", "PF3D7-1222600", "PF3D7-1102500", "PF3D7-0818900"), order =T, ncol = 3))
 
 ```
 
@@ -352,13 +415,13 @@ cold_activated_RNAs <- c("PF3D7-1148100", "PF3D7-1148200", "PF3D7-1148500", "PF3
 
 
 ```{r, fig.width=14, fig.height=8}
-map(m2_all_raw_mrg_list_stg[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = cold_activated_RNAs, order =T, ncol = 3))
+map(all_jcC_seu_scvi_stg_noM55_afm[c("M55.Asexual", "no_M55.Asexual")], ~FeaturePlot(.x, features = cold_activated_RNAs, order =T, ncol = 3))
 ```
 
 
 
 ```{r, warning=FALSE, message=FALSE}
-map2(scvi_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("14","16", "17"), c("16","15", "10")), ~.x %>% 
+map2(seu_scviLeiden_markers_anot[c("M55.Asexual", "no_M55.Asexual")], list(c("14","16", "17"), c("16","15", "10")), ~.x %>% 
   filter(cluster %in% .y) %>%
   arrange(desc(avg_log2FC)) %>% 
     filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
