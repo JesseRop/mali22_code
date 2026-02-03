@@ -74,7 +74,7 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_postQC_cln_header.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_preQC_cln_header.R")
 # source("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code/local_rmd_nbooks/m2_pbulk_gtypes_1vcf_header.R")
-source("mali22_code_lnk/local_rmd_nbooks/m2_pbulk_gtypes_headers/m2_pbulk_gtypes_preQC_1VCF_final_header.R")
+source("mali22_code_lnk/pseudobulk_gtyping_postQC/postQC_pbulk_gtypes_headers/m2_pbulk_gtypes_postQC_1VCF_final_header.R")
 
 ```
 
@@ -199,6 +199,46 @@ ss_afm_pf7M_cln_gt <- map(ss_afm_pf7M_cln_gt, ~.x[,!(str_detect(colnames(.x), pa
 ```
 
 
+
+```{r}
+ss_afm_pf7M_cln_gt_calledin5_maf.01 <- map(ss_afm_pf7M_cln_gt, ~{
+  
+  df = .x
+  
+  ## 1. Extract genotype matrix
+  geno <- as.matrix(df[ , grep("^M", names(df))])
+  geno <- matrix(as.numeric(geno), nrow = nrow(geno))
+  
+  ## 2. Sample-level QC: keep samples with ≥100 called SNPs
+  sample_called <- colSums(!is.na(geno))
+  keep_samples <- sample_called >= 100
+  geno <- geno[ , keep_samples, drop = FALSE]
+  
+  ## 3. Site-level stats
+  n_samples <- ncol(geno)
+  
+  n_called <- rowSums(!is.na(geno))
+  alt_freq <- rowMeans(geno == 1, na.rm = TRUE)
+  maf <- pmin(alt_freq, 1 - alt_freq)
+  
+  ## 4. Site-level QC: call rate + MAF
+  keep_sites <- n_called >= ceiling(0.5 * n_samples) & maf > 0.05
+  geno <- geno[keep_sites, , drop = FALSE]
+  
+  ## 5. Keep samples with ≥100 called SNPs
+  sample_called <- colSums(!is.na(geno))
+  geno <- geno[ , sample_called >= 100, drop = FALSE]
+  
+  ## 5. (Optional) keep metadata in sync
+  df_qc <- df[keep_sites, c(
+    "id", "chrom", "pos", "alleles", "chr",
+    names(df)[grep("^M", names(df))][keep_samples]
+  )]
+  
+  
+})
+
+```
 
 ```{r}
 ## !!!NOTE - REMOVE MSC55 - WE SHOULD REMOVE IT AT THE STRAIN ASSIGNMENT LEVEL OR 
@@ -988,8 +1028,10 @@ dcf_pm <- ss_cln_all_high_n_mtx[["all.strain_qcd"]] %>%
   mutate(locus = paste0(chrom, "_", id)) %>%
   select(sampleID, locus, allele )
 
-saveRDS(dcf_pm, "data/processed/Pf/dcf_pm.rds")
-  
+# saveRDS(dcf_pm, "data/processed/Pf/dcf_pm.rds")
+## save clean with maf filters
+saveRDS(dcf_pm, "data/processed/Pf/dcf_pm_cln_maf.rds")
+   
 ```
 
 Run below in farm
@@ -998,11 +1040,12 @@ gogogo()
 ## NOTE - Takes long so request an interactive session and run there
 
 # dcifer
-# module load HGI/softpack/groups/team222/Pf_scRNAseq/25
+############# module load HGI/softpack/groups/team222/Pf_scRNAseq/25
+# module load HGI/softpack/groups/team222/Pf_scRNAseq/34
 # bsub -Is -q normal -n 10 -M 15000 -R "span[hosts=1] select[mem>15000] rusage[mem=15000]" R
 
 
-## bsub -Is -q normal -n 25 -M 150000 -R "span[hosts=1] select[mem>150000] rusage[mem=150000]" R
+## bsub -Is -q normal -n 20 -M 100000 -R "span[hosts=1] select[mem>100000] rusage[mem=100000]" R
 
 
 ```
@@ -1011,6 +1054,7 @@ gogogo()
 
 # library(dplyr)
 # library(dcifer)
+# library(purrr)
 # 
 # # setwd("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/")
 # dcf_pm <- readRDS("data/processed/Pf/dcf_pm.rds")
@@ -1031,6 +1075,30 @@ gogogo()
 ```
 
 
+```{r, eval=F}
+# ### !!!!!!! NOTE - Similar as above but for clean filtered genotypes
+# library(dplyr)
+# library(dcifer)
+# library(purrr)
+# 
+# setwd("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/")
+# dcf_pm_cln_maf <- readRDS("data/processed/Pf/dcf_pm_cln_maf.rds")
+# #
+# dsmp_pm_cln_maf <- formatDat(dcf_pm_cln_maf, svar = "sampleID", lvar = "locus", avar = "allele")
+# saveRDS(dsmp_pm_cln_maf, "data/processed/Pf/dsmp_pm_cln_maf.rds")
+# #
+# coi_pm_cln_maf  <- rep(1, dim(dcf_pm_cln_maf)[1]) %>% set_names(paste0(dcf_pm_cln_maf$sampleID,".", dcf_pm_cln_maf$locus))
+# saveRDS(coi_pm_cln_maf, "data/processed/Pf/coi_pm_cln_maf.rds")
+# #
+# afreq_pm_cln_maf <- calcAfreq(dsmp_pm_cln_maf, coi_pm_cln_maf, tol = 1e-5)
+# str(afreq_pm_cln_maf, list.len = 2)
+# saveRDS(afreq_pm_cln_maf, "data/processed/Pf/afreq_pm_cln_maf.rds")
+# #
+# dres0_pm_cln_maf <- ibdDat(dsmp_pm_cln_maf, coi_pm_cln_maf, afreq_pm_cln_maf, pval = TRUE, confint = TRUE, rnull = 0,
+#                 alpha = 0.05, nr = 1e3)
+# saveRDS(dres0_pm_cln_maf, "data/processed/Pf/dres0_pm_cln_maf.rds")
+```
+
 ```{r, eval=T}
 #dcifer
 dcf_pm_ag <- ss_cln_all_high_n_mtx[["all.stage_ag_strain_qcd"]] %>%
@@ -1038,8 +1106,10 @@ dcf_pm_ag <- ss_cln_all_high_n_mtx[["all.stage_ag_strain_qcd"]] %>%
   mutate(locus = paste0(chrom, "_", id)) %>%
   select(sampleID, locus, allele )
 
-saveRDS(dcf_pm_ag, "data/processed/Pf/dcf_pm_ag.rds")
-  
+# saveRDS(dcf_pm_ag, "data/processed/Pf/dcf_pm_ag.rds")
+## save clean with maf filters
+saveRDS(dcf_pm_ag, "data/processed/Pf/dcf_pm_ag_cln_maf.rds")
+ 
 ```
 
 Run below in farm
@@ -1048,7 +1118,8 @@ gogogo()
 ## NOTE - Takes long so request an interactive session and run there
 
 # dcifer
-# module load HGI/softpack/groups/team222/Pf_scRNAseq/25
+# module load HGI/softpack/groups/team222/Pf_scRNAseq/34
+# bsub -Is -q normal -n 10 -M 100000 -R "span[hosts=1] select[mem>100000] rusage[mem=100000]" R
 # bsub -Is -q normal -n 25 -M 150000 -R "span[hosts=1] select[mem>150000] rusage[mem=150000]" R
 
 
@@ -1078,6 +1149,30 @@ gogogo()
 # saveRDS(dres0_pm_ag, "data/processed/Pf/dres0_pm_ag.rds")
 ```
 
+```{r, eval=F}
+# ### !!!!!!! NOTE - Similar as above but for clean filtered genotypes
+# library(dplyr)
+# library(dcifer)
+# library(purrr)
+# 
+# setwd("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/")
+# dcf_pm_ag_cln_maf <- readRDS("data/processed/Pf/dcf_pm_ag_cln_maf.rds")
+# 
+# dsmp_pm_ag_cln_maf <- formatDat(dcf_pm_ag_cln_maf, svar = "sampleID", lvar = "locus", avar = "allele")
+# saveRDS(dsmp_pm_ag_cln_maf, "data/processed/Pf/dsmp_pm_ag_cln_maf.rds")
+# 
+# coi_pm_ag_cln_maf  <- rep(1, dim(dcf_pm_ag_cln_maf)[1]) %>% set_names(paste0(dcf_pm_ag_cln_maf$sampleID,".", dcf_pm_ag_cln_maf$locus))
+# saveRDS(coi_pm_ag_cln_maf, "data/processed/Pf/coi_pm_ag_cln_maf.rds")
+# 
+# afreq_pm_ag_cln_maf <- calcAfreq(dsmp_pm_ag_cln_maf, coi_pm_ag_cln_maf, tol = 1e-5)
+# str(afreq_pm_ag_cln_maf, list.len = 2)
+# saveRDS(afreq_pm_ag_cln_maf, "data/processed/Pf/afreq_pm_ag_cln_maf.rds")
+# 
+# dres0_pm_ag_cln_maf <- ibdDat(dsmp_pm_ag_cln_maf, coi_pm_ag_cln_maf, afreq_pm_ag_cln_maf, pval = TRUE, confint = TRUE, rnull = 0,
+#                 alpha = 0.05, nr = 1e3)
+# saveRDS(dres0_pm_ag_cln_maf, "data/processed/Pf/dres0_pm_ag_cln_maf.rds")
+```
+
 
 ```{r, eval = F}
 # optionally, extract location information
@@ -1092,13 +1187,13 @@ gogogo()
 #dcifer
 # dcf_pm <- readRDS("data/processed/Pf/dcf_pm.rds")
   
-dsmp_pm <- readRDS("data/processed/Pf/dsmp_pm.rds")
+dsmp_pm <- readRDS("data/processed/Pf/dsmp_pm_cln_maf.rds")
 
 # coi_pm <- readRDS("data/processed/Pf/coi_pm.rds")
 
 # afreq_pm <- readRDS("data/processed/Pf/afreq_pm.rds")
 
-dres0_pm <- readRDS("data/processed/Pf/dres0_pm.rds")
+dres0_pm <- readRDS("data/processed/Pf/dres0_pm_cln_maf.rds")
 ```
 
 
@@ -1260,14 +1355,23 @@ remove M50 MACS
 ```{r}
 
 est <- dres0_pm[, , "estimate"] 
-est <- est[!str_detect(rownames(est), "MACS"), !str_detect(colnames(est), "MACS")]
+# est <- est[!str_detect(rownames(est), "MACS"), !str_detect(colnames(est), "MACS")]
 # colnames(est) <- str_remove(colnames(est), "_SLO")
 # rownames(est) <- str_remove(rownames(est), "_SLO")
 
 pval <- dres0_pm[, , "p_value"] 
-pval <- pval[!str_detect(rownames(pval), "MACS"), !str_detect(colnames(pval), "MACS")]
+# pval <- pval[!str_detect(rownames(pval), "MACS"), !str_detect(colnames(pval), "MACS")]
 # colnames(pval) <- str_remove(colnames(pval), "_SLO")
 # rownames(pval) <- str_remove(rownames(pval), "_SLO")
+
+```
+
+```{r}
+colnames(est) <- str_replace(colnames(est), "C_", "_")
+rownames(est) <- str_replace(rownames(est), "C_", "_")
+
+colnames(pval) <- str_replace(colnames(pval), "C_", "_")
+rownames(pval) <- str_replace(rownames(pval), "C_", "_")
 
 ```
 
@@ -1283,7 +1387,7 @@ pval <- pval[!str_detect(rownames(pval), "MACS"), !str_detect(colnames(pval), "M
 
   strn_numbers = clustr_numbers_s_m1_m2 
   strn_number_col = "strain_n" 
-  str2remove_rowcolnms = "M[0-9]+_|_.$|SLO_"
+  str2remove_rowcolnms = "M[0-9]+_|_.$|SLO_|MACS_"
   
   
   full_samples <- union(rownames(est), colnames(est))  # All unique sample names
@@ -1322,7 +1426,7 @@ diag(p_mtx) <- 1
   # fa = str_extract(colnames(sibd_pht_mtx), 'M[0-9]+')
   # fa = str_replace_all(str_remove(colnames(sibd_pht_mtx), '_SC.*'), c("_MACS" = "M", "_SLO" = "S"))
   # fa = str_remove(colnames(sibd_pht_mtx), '_SC.*')
-  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')
+  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   c_d = cluster_within_group(sibd_pht_mtx, fa)
   # c_names = str_remove(colnames(sibd_pht_mtx), "M.*_") %>% set_names(colnames(sibd_pht_mtx))
   c_names = str_remove_all(colnames(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(colnames(sibd_pht_mtx))
@@ -1332,17 +1436,17 @@ diag(p_mtx) <- 1
   
   
   # fr = str_extract(rownames(sibd_pht_mtx), 'M[0-9]+')
-  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO')
+  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   print(fr)
   c_r = cluster_within_group(sibd_pht_mtx, fr)
   # r_names = str_remove(row.names(sibd_pht_mtx), "M.*_") %>% set_names(row.names(sibd_pht_mtx))
   r_names = str_remove_all(row.names(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(row.names(sibd_pht_mtx))
   
   # create annotation dataframe
-  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
+  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
   
   # nms = unique(str_extract(colnames(sibd_pht_mtx), 'M[0-9]+'))
-  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO'))
+  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS'))
   # sample_c_cols <- met.brewer("Thomas")[1:length(nms)] %>% set_names(nms)
   # sample_c_cols <- cols_rand[1:length(nms)] %>% set_names(nms)
   sample_c_cols <- donor_cols
@@ -1435,19 +1539,24 @@ hm
 #dcifer
 # dcf_pm_ag <- readRDS("data/processed/Pf/dcf_pm_ag.rds")
   
-dsmp_pm_ag <- readRDS("data/processed/Pf/dsmp_pm_ag.rds")
+# dsmp_pm_ag <- readRDS("data/processed/Pf/dsmp_pm_ag_cln_maf.rds")
+dsmp_pm_ag <- readRDS("data/processed/Pf/dsmp_pm_ag_cln_maf.rds")
 
 # coi_pm_ag <- readRDS("data/processed/Pf/coi_pm_ag.rds")
 
 # afreq_pm_ag <- readRDS("data/processed/Pf/afreq_pm_ag.rds")
 
-dres0_pm_ag <- readRDS("data/processed/Pf/dres0_pm_ag.rds")
+# dres0_pm_ag <- readRDS("data/processed/Pf/dres0_pm_ag_cln_maf.rds")
+dres0_pm_ag <- readRDS("data/processed/Pf/dres0_pm_ag_cln_maf.rds")
+
 ```
+
+
 
 
 ```{r}
 # optionally, extract location information
-meta_ag <- data.frame("sampleID" = names(dsmp_pm_ag ), "donor" = str_remove(names(dsmp_pm_ag ), '_SC.*')) %>% 
+meta_ag <- data.frame("sampleID" = str_replace_all(names(dsmp_pm_ag ), "C_", "_"), "donor" = str_remove_all(names(dsmp_pm_ag ), '_SC.*|C')) %>% 
   left_join(all_pf_status, by = "donor")# %>% 
   # column_to_rownames("rname")
 
@@ -1458,14 +1567,30 @@ meta_ag <- data.frame("sampleID" = names(dsmp_pm_ag ), "donor" = str_remove(name
 retain only asexuals with >100
 ```{r}
 est_ag <- dres0_pm_ag[, , "estimate"] 
-est_ag <- est_ag[!str_detect(rownames(est_ag), "MACS"), !str_detect(colnames(est_ag), "MACS")]
+
+## Clean donor names to remove 'SLO and C'
+colnames(est_ag) <- str_replace(str_remove(colnames(est_ag), "_SLO"), "C_", "_")
+rownames(est_ag) <- str_replace(str_remove(rownames(est_ag), "_SLO"), "C_", "_")
+
+strn_numbers <- clustr_numbers_ag_m1_m2
+## Remove strain clusters with less than 150 cells
+strain_ag_150 <- colnames(est_ag)[colnames(est_ag) %in% (strn_numbers %>% filter(strain_ag_n > 200) %>% pull(sample_cluster))]
+est_ag <- est_ag[strain_ag_150, strain_ag_150]
+
+# est_ag <- est_ag[!str_detect(rownames(est_ag), "MACS"), !str_detect(colnames(est_ag), "MACS")]
 est_a <- est_ag[str_detect(rownames(est_ag), "_A"), str_detect(colnames(est_ag), "_A")]
 est_g <- est_ag[str_detect(rownames(est_ag), "_G"), str_detect(colnames(est_ag), "_G")]
-# colnames(est) <- str_remove(colnames(est), "_SLO")
-# rownames(est) <- str_remove(rownames(est), "_SLO")
 
+## Clean donor names to remove 'SLO and C'
 pval_ag <- dres0_pm_ag[, , "p_value"] 
-pval_ag <- pval_ag[!str_detect(rownames(pval_ag), "MACS"), !str_detect(colnames(pval_ag), "MACS")]
+colnames(pval_ag) <- str_replace(str_remove(colnames(pval_ag), "_SLO"), "C_", "_")
+rownames(pval_ag) <- str_replace(str_remove(rownames(pval_ag), "_SLO"), "C_", "_")
+
+## Remove strain clusters with less than 150 cells
+pval_ag <- pval_ag[strain_ag_150, strain_ag_150]
+
+
+# pval_ag <- pval_ag[!str_detect(rownames(pval_ag), "MACS"), !str_detect(colnames(pval_ag), "MACS")]
 pval_a <- pval_ag[str_detect(rownames(pval_ag), "_A"), str_detect(colnames(pval_ag), "_A")]
 pval_g <- pval_ag[str_detect(rownames(pval_ag), "_G"), str_detect(colnames(pval_ag), "_G")]
 # colnames(pval) <- str_remove(colnames(pval), "_SLO")
@@ -1473,6 +1598,13 @@ pval_g <- pval_ag[str_detect(rownames(pval_ag), "_G"), str_detect(colnames(pval_
 
 ```
 
+
+```{r}
+## Remove clusters with less than 150 cells
+strn_numbers <- clustr_numbers_ag_m1_m2
+strain_ag_150 <- colnames(est_a)[colnames(est_a) %in% (strn_numbers %>% filter(strain_ag_n > 200) %>% pull(sample_cluster))]
+
+```
 
 ```{r, fig.height=12.5, fig.width=11, eval=T}
   est <- est_a
@@ -1487,8 +1619,9 @@ pval_g <- pval_ag[str_detect(rownames(pval_ag), "_G"), str_detect(colnames(pval_
   dendo = "no_clustering"
 
   strn_numbers = clustr_numbers_ag_m1_m2 
+  # strn_numbers = strn_numbers %>% filter(strain_ag_n > 150)
   strn_number_col = "strain_ag_n" 
-  str2remove_rowcolnms = "M[0-9]+_|SLO_"
+  str2remove_rowcolnms = "M[0-9]+_|SLO_|MACS_"
   
   
   full_samples <- union(rownames(est), colnames(est))  # All unique sample names
@@ -1527,7 +1660,7 @@ diag(p_mtx) <- 1
   # fa = str_extract(colnames(sibd_pht_mtx), 'M[0-9]+')
   # fa = str_replace_all(str_remove(colnames(sibd_pht_mtx), '_SC.*'), c("_MACS" = "M", "_SLO" = "S"))
   # fa = str_remove(colnames(sibd_pht_mtx), '_SC.*')
-  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')
+  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   c_d = cluster_within_group(sibd_pht_mtx, fa)
   # c_names = str_remove(colnames(sibd_pht_mtx), "M.*_") %>% set_names(colnames(sibd_pht_mtx))
   c_names = str_remove_all(colnames(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(colnames(sibd_pht_mtx))
@@ -1537,17 +1670,17 @@ diag(p_mtx) <- 1
   
   
   # fr = str_extract(rownames(sibd_pht_mtx), 'M[0-9]+')
-  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO')
+  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   print(fr)
   c_r = cluster_within_group(sibd_pht_mtx, fr)
   # r_names = str_remove(row.names(sibd_pht_mtx), "M.*_") %>% set_names(row.names(sibd_pht_mtx))
   r_names = str_remove_all(row.names(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(row.names(sibd_pht_mtx))
   
   # create annotation dataframe
-  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
+  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
   
   # nms = unique(str_extract(colnames(sibd_pht_mtx), 'M[0-9]+'))
-  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO'))
+  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS'))
   # sample_c_cols <- met.brewer("Thomas")[1:length(nms)] %>% set_names(nms)
   # sample_c_cols <- cols_rand[1:length(nms)] %>% set_names(nms)
   sample_c_cols <- donor_cols
@@ -1650,7 +1783,7 @@ hm
 
   strn_numbers = clustr_numbers_ag_m1_m2 
   strn_number_col = "strain_ag_n" 
-  str2remove_rowcolnms = "M[0-9]+_|SLO_"
+  str2remove_rowcolnms = "M[0-9]+_|SLO_|MACS_"
   
   
   full_samples <- union(rownames(est), colnames(est))  # All unique sample names
@@ -1826,7 +1959,7 @@ gogo()
 
   strn_numbers = clustr_numbers_ag_m1_m2 
   strn_number_col = "strain_ag_n" 
-  str2remove_rowcolnms = "M[0-9]+_|SLO_"
+  str2remove_rowcolnms = "M[0-9]+_|SLO_|MACS_"
   
   
   full_samples <- union(rownames(est), colnames(est))  # All unique sample names
@@ -1865,7 +1998,7 @@ diag(p_mtx) <- 1
   # fa = str_extract(colnames(sibd_pht_mtx), 'M[0-9]+')
   # fa = str_replace_all(str_remove(colnames(sibd_pht_mtx), '_SC.*'), c("_MACS" = "M", "_SLO" = "S"))
   # fa = str_remove(colnames(sibd_pht_mtx), '_SC.*')
-  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')
+  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   c_d = cluster_within_group(sibd_pht_mtx, fa)
   # c_names = str_remove(colnames(sibd_pht_mtx), "M.*_") %>% set_names(colnames(sibd_pht_mtx))
   c_names = str_remove_all(colnames(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(colnames(sibd_pht_mtx))
@@ -1875,17 +2008,17 @@ diag(p_mtx) <- 1
   
   
   # fr = str_extract(rownames(sibd_pht_mtx), 'M[0-9]+')
-  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO')
+  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
   print(fr)
   c_r = cluster_within_group(sibd_pht_mtx, fr)
   # r_names = str_remove(row.names(sibd_pht_mtx), "M.*_") %>% set_names(row.names(sibd_pht_mtx))
   r_names = str_remove_all(row.names(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(row.names(sibd_pht_mtx))
   
   # create annotation dataframe
-  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
+  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
   
   # nms = unique(str_extract(colnames(sibd_pht_mtx), 'M[0-9]+'))
-  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO'))
+  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS'))
   # sample_c_cols <- met.brewer("Thomas")[1:length(nms)] %>% set_names(nms)
   # sample_c_cols <- cols_rand[1:length(nms)] %>% set_names(nms)
   sample_c_cols <- donor_cols
@@ -1974,12 +2107,14 @@ hm
 ```
 
 ```{r}
-est_ag <- dres0_pm_ag[, , "estimate"] 
-est_ag <- est_ag[!str_detect(rownames(est_ag), "MACS"), !str_detect(colnames(est_ag), "MACS")]
+# est_ag <- dres0_pm_ag[, , "estimate"] 
+# 
+# est_ag <- est_ag[!str_detect(rownames(est_ag), "MACS"), !str_detect(colnames(est_ag), "MACS")]
 est_m49m66 <- est_ag[str_detect(rownames(est_ag), "M49|M66"), str_detect(colnames(est_ag), "M49|M66")]
 
-pval_ag <- dres0_pm_ag[, , "p_value"] 
-pval_ag <- pval_ag[!str_detect(rownames(pval_ag), "MACS"), !str_detect(colnames(pval_ag), "MACS")]
+# pval_ag <- dres0_pm_ag[, , "p_value"] 
+# 
+# pval_ag <- pval_ag[!str_detect(rownames(pval_ag), "MACS"), !str_detect(colnames(pval_ag), "MACS")]
 pval_m49m66 <- pval_ag[str_detect(rownames(pval_ag), "M49|M66"), str_detect(colnames(pval_ag), "M49|M66")]
 
 
@@ -2147,6 +2282,167 @@ hm<-  Heatmap(sibd_pht_mtx, name='IBD',
 hm
 ```
 
+
+```{r, fig.height=18.5, fig.width=15, eval=T}
+  est <- est_ag
+  pval <- pval_ag
+
+
+  # colFun = suppressWarnings(brewer.pal(100, 'YlGnBu'))
+  colFun = suppressWarnings(brewer.pal(100, 'Blues'))
+  colFun = circlize::colorRamp2(seq(0, 1, length.out = length(colFun)), 
+                                  colFun)
+
+  dendo = "no_clustering"
+
+  strn_numbers = clustr_numbers_ag_m1_m2 
+  strn_number_col = "strain_ag_n" 
+  str2remove_rowcolnms = "M[0-9]+_|SLO_|MACS_"
+  
+  
+  full_samples <- union(rownames(est), colnames(est))  # All unique sample names
+  mtx_full <- matrix(NA, nrow = length(full_samples), ncol = length(full_samples),
+                 dimnames = list(full_samples, full_samples))
+
+# Fill in the existing data
+mtx <- mtx_full
+mtx[rownames(est), colnames(est)] <- est
+diag(mtx) <- 1
+
+# Fill in the existing data
+p_mtx <- mtx_full
+p_mtx[rownames(pval), colnames(pval)] <- pval
+diag(p_mtx) <- 1
+
+  print(str(mtx))
+   
+   ##Remove columns and rows where everything in NA
+   mtx <- mtx[,colSums(is.na(mtx)) < nrow(mtx)]
+   mtx <- mtx[rowSums(is.na(mtx)) < ncol(mtx),]
+   
+   p_mtx <- p_mtx[rownames(mtx), colnames(mtx)]
+   
+   # Mirror the matrix
+   m_mtx <- mtx
+   m_mtx[upper.tri(m_mtx)] <- t(m_mtx)[upper.tri(m_mtx)]
+   diag(m_mtx) <- 0
+   
+   m_p_mtx <- p_mtx
+   m_p_mtx[upper.tri(m_p_mtx)] <- t(m_p_mtx)[upper.tri(m_p_mtx)]
+
+   
+  sibd_pht_mtx <- m_mtx  
+  
+  # fa = str_extract(colnames(sibd_pht_mtx), 'M[0-9]+')
+  # fa = str_replace_all(str_remove(colnames(sibd_pht_mtx), '_SC.*'), c("_MACS" = "M", "_SLO" = "S"))
+  # fa = str_remove(colnames(sibd_pht_mtx), '_SC.*')
+  fa = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
+  c_d = cluster_within_group(sibd_pht_mtx, fa)
+  # c_names = str_remove(colnames(sibd_pht_mtx), "M.*_") %>% set_names(colnames(sibd_pht_mtx))
+  c_names = str_remove_all(colnames(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(colnames(sibd_pht_mtx))
+  
+  ## Add total cell numbers in bracket to the column names
+  c_names_w_n <- c_names %>% data.frame() %>% rownames_to_column("sample_cluster") %>% left_join(., strn_numbers, by = 'sample_cluster') %>% mutate(nm = paste0(., " (", !!rlang::sym(strn_number_col),")")) %>% select(sample_cluster, nm) %>% deframe
+  
+  
+  # fr = str_extract(rownames(sibd_pht_mtx), 'M[0-9]+')
+  fr = str_remove_all(rownames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')
+  print(fr)
+  c_r = cluster_within_group(sibd_pht_mtx, fr)
+  # r_names = str_remove(row.names(sibd_pht_mtx), "M.*_") %>% set_names(row.names(sibd_pht_mtx))
+  r_names = str_remove_all(row.names(sibd_pht_mtx), str2remove_rowcolnms) %>% set_names(row.names(sibd_pht_mtx))
+  
+  # create annotation dataframe
+  fa_df <- data.frame("rname" = colnames(sibd_pht_mtx), "donor" = str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS')) %>% left_join(all_pf_status, by = "donor") %>% column_to_rownames("rname")
+  
+  # nms = unique(str_extract(colnames(sibd_pht_mtx), 'M[0-9]+'))
+  nms = unique(str_remove_all(colnames(sibd_pht_mtx), '_SC.*|_SLO|_MACS'))
+  # sample_c_cols <- met.brewer("Thomas")[1:length(nms)] %>% set_names(nms)
+  # sample_c_cols <- cols_rand[1:length(nms)] %>% set_names(nms)
+  sample_c_cols <- donor_cols
+  
+  # sibd_pht_mtx_cln <- sibd_pht_mtx %>% as.data.frame()%>% rownames_to_column('sid') %>% mutate(across(sid, ~str_replace_all(., c('G_MSC' = 'M')))) %>% rename_with(~str_replace_all(., c('G_MSC' = 'M')), starts_with('SC')) %>% column_to_rownames('sid') %>% as.matrix()
+  
+  split_df <- fa_df[, c("Status", "donor")] %>% mutate(across(Status, ~factor(., levels = c("Asymptomatic", "Symptomatic"))))
+  
+  split_gap_lens <- split_df %>% distinct() %>% arrange(Status) %>% count(Status) %>% pull(n)
+  split_gap_key <- c(rep(1.2, split_gap_lens[1]-1),5, rep(1.2, split_gap_lens[2]))
+  split_donor_names <- split_df %>% arrange(Status, donor) %>% distinct() %>% pull(donor) #%>% paste0(., "| ")
+  
+  # sibd_pht_mtx[upper.tri(sibd_pht_mtx)] <- NA
+  diag(sibd_pht_mtx) <- NA
+  
+hm<-  Heatmap(sibd_pht_mtx, name='IBD', 
+                     col = colFun, 
+                     show_row_names = TRUE, 
+                     row_labels = r_names,
+                     row_names_side = c("left"), 
+                     show_column_names = TRUE,  
+                     column_labels = c_names_w_n,
+                     show_row_dend = F,  
+                     show_column_dend = F, 
+                     row_title_rot = 0, 
+                     # cluster_rows = c_r, 
+                     # cluster_columns = c_d, 
+                     cluster_rows = T,
+                     cluster_columns = T,
+                     column_names_gp = gpar(fontsize = 16), 
+                     row_names_gp = gpar(fontsize = 17), 
+                     heatmap_legend_param = list(title_gp = gpar(fontsize = 17, fontface = "bold"), 
+                                                 labels_gp = gpar(fontsize = 17),
+                                                 direction = "horizontal"),
+                     bottom_annotation = HeatmapAnnotation(df = fa_df,
+                                                           col = list(donor = sample_c_cols, 
+                                                                      Status = c("Asymptomatic" = "lightblue", "Symptomatic" = "lightgreen") ),
+                                                           annotation_name_gp = gpar(fontsize = 0, fontface = 'bold'), 
+                                                           annotation_legend_param = list(
+                                                             donor = list(title = "Donor",
+                                                                          title_gp = gpar(fontsize = 17, fontface = "bold"), 
+                                                                          labels_gp = gpar(fontsize = 17),
+                                                                          direction = "horizontal",
+                                                                          nrow = 3),
+                                                             Status = list(title_gp = gpar(fontsize = 17, fontface = "bold"), 
+                                                                           labels_gp = gpar(fontsize = 17),
+                                                                           direction = "horizontal",
+                                                                           nrow = 2)
+                                                           )),
+                     # column_split = length(nms), 
+                     border = TRUE, 
+                     # border_gp = gpar(col = "white"),
+                     left_annotation=rowAnnotation(df = fa_df[, c("Status","donor")],
+                                                   col = list(donor = sample_c_cols, 
+                                                              Status = c("Asymptomatic" = "lightblue", "Symptomatic" = "lightgreen") ),
+                                                   annotation_name_gp = gpar(fontsize = 17, fontface = 'bold'), 
+                                                   show_legend = F), 
+                     # row_split = length(nms), 
+                     row_split = split_df,
+                     cluster_column_slices =F,
+                     cluster_row_slices =F,
+                     row_gap = unit(split_gap_key, "mm"),
+                     column_split = split_df,
+                     column_gap = unit(split_gap_key, "mm"),
+                     column_title = split_donor_names,
+                     column_title_gp = gpar(fontsize = 17, fill = c("white"), fontface = "bold"),
+                     column_title_side = c("bottom"),
+                     column_title_rot = 90,
+                     row_title = split_donor_names,
+                     row_title_gp = gpar(fontsize = 17, fill = c("white"), fontface = "bold"),
+                      na_col = "white",
+                     layer_fun = function(j, i, x, y, width, height, fill) {
+                      v = pindex(m_p_mtx, i, j)
+                      l = v < 0.05
+                      if (any(l)) {  # Only execute if there are TRUE values in l
+                      grid.rect(x[l], y[l], width = width, height = height, gp = gpar(col = "red", lwd = 2, fill = "transparent"))
+                      }
+                      # grid.rect(x[l], y[l], width = width, height = height, gp = gpar(col = "red", lwd = 2, fill = "transparent"))
+                      }
+                     # border='black',row_gap=unit(.015, "npc"), column_gap=unit(.015, "npc"), 
+  ) %>%
+    # draw(., merge_legend = TRUE)
+    draw(., newpage = F, merge_legends = T, heatmap_legend_side = "bottom", annotation_legend_side = "bottom")
+
+hm
+```
 
 ### Write out for IBD analysis
 ```{r}
