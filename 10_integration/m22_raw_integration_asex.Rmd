@@ -109,8 +109,8 @@ Integrated asexual to integrate with the rescued parasites
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
 # m2_asex_raw_jcC_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg.RDS")
 # m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_asex_mrg.RDS")
-m2_asex_raw_jcC_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg3.RDS")
-m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_asex_mrg3.RDS")
+# m2_asex_raw_jcC_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_c_asex_mrg3.RDS")
+# m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_asex_mrg3.RDS")
 
 
 # %in% c("MSC25" ,"MSC41", "MSC51")
@@ -118,7 +118,28 @@ m2_asex_raw_jcO_mrg <- readRDS("data/processed/Pf/m2_all/all_msc_qcd_anotd_orig_
 ```
 
 ```{r}
-m2_asex_raw_mrg <- list(m2_asex_raw_jcC_mrg, m2_asex_raw_jcO_mrg) %>% set_names(c("jcC", "jcO"))
+mrg_names <- c("jcC", "jcO")
+```
+
+```{r, message=F, warning=F}
+##Read BPcells matrices
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "all_msc_qcd_anotd3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+#   set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj/|all_msc_qcd_anot.*'))) %>% 
+# all_msc_qcd_anotd <- list.files("data/processed/Pf", pattern = "cln_anotd3_sct.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+m2_asex_raw_mrg <- list.files("data/processed/Pf/m2_all/", pattern = "all_msc_qcd_anotd_asex_jc.*mrg3.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/|/all_msc_qcd_anotd_asex_|_mrg3.RDS'))) %>% 
+  # .[sample_name_all] %>%
+  .[mrg_names] %>%
+  map(readRDS)
+```
+
+```{r}
+m2_asex_raw_mrg[[1]]
+```
+
+```{r}
+# m2_asex_raw_mrg <- list(m2_asex_raw_jcC_mrg, m2_asex_raw_jcO_mrg) %>% set_names(c("jcC", "jcO"))
 
 ```
 
@@ -321,26 +342,18 @@ imap(v3_m2_asex_cr_filt_noM55, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_
 gogo()
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_seu_norm_integration_bsub.sh
 
-# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}.RDS" \
-# --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --integrtd_pc30 "no" \
-# --ncores "6" --mem "100 GB" --run_time="55.min" \
-
 # --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_3.RDS" \
 # --hvg 400 --cluster_resoln 0.1 --cl_nm "seurat_clusters" --integrtd_pc30 "no" \
-# --ncores "6" --mem "100 GB" --run_time="55.min" \
+# --ncores "5" --mem "50 GB" --run_time="55.min" \
 ```
 
 
 ```{r, eval=T}
 # bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_intgrtn_pc_harmony_bsub.sh
 
-# --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_norm.RDS" \
-# --mthd_nm "harmony_PC_man" --cluster_resoln 0.5 --intgrtn_pc 8 --integrtd_pc_man "yes" \
-# --ncores "8" --mem "100 GB" --run_time="1.hour" \
-
 # --input_seu "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/m2_all/v3_m2_asex_cr_filt_*{jcC,jcO}_3_norm.RDS" \
 # --mthd_nm "harmony_PC_man" --cluster_resoln 0.5 --intgrtn_pc 8 --integrtd_pc_man "yes" \
-# --ncores "8" --mem "100 GB" --run_time="1.hour" \
+# --ncores "5" --mem "40 GB" --run_time="1.hour" \
 ```
 
 ```{r, message=F, warning=F}
@@ -361,6 +374,17 @@ v3_m2_asex_cr_filt_norm_harmony <- list.files("data/processed/Pf", pattern = "v3
   map(readRDS)
 
 ```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony[[3]]
+```
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony[[3]]@meta.data %>% count(orig.ident)
+```
+
 
 ```{r, warning=FALSE, message=FALSE}
 #ap2g
@@ -394,6 +418,7 @@ saveRDS(v3_m2_asex_cr_filt_norm_harmony_umap_mdata, "data/processed/Pf/m2_all/as
 # v3_m2_asex_cr_filt_norm_harmony_elbo <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_elbo.RDS")
 # v3_m2_asex_cr_filt_norm_harmony_elbo
 ```
+
 
 ```{r, warning=FALSE, message=FALSE}
 map(v3_m2_asex_cr_filt_norm_harmony, ~DimPlot(.x, label = T, reduction = "integrated.harmony_PC_man"))
@@ -546,7 +571,8 @@ for (nm in names(v3_m2_asex_cr_filt_norm_harmony_jnd_slim)) {
 
 ```{r}
 # save object
-imap(v3_m2_asex_cr_filt_norm_harmony_jnd_slim, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_all_", .y, "_norm_harmony_jnd_slim3.RDS")))
+imap(v3_m2_asex_cr_filt_norm_harmony_jnd_slim, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y, "_norm_harmony_jnd_slim3.RDS")))
+
 ```
 
 ######################END## Save a diet slim object which is lighter for faster processing if one just needs counts#####################
