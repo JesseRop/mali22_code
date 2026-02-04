@@ -105,7 +105,8 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
 # v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_(all|noM55)_jc._norm_harmony_jnd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 # v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_noM55_jc._norm_harmony_jnd.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
 # v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_noM55_jc._norm_harmony_jnd3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_noM55_jc._norm_harmony_jnd_slim3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+# v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_noM55_jc._norm_harmony_jnd_slim3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
+v3_m2_asex_cr_filt_norm_harmony_jnd <- list.files("data/processed/Pf", pattern = "v3_m2_asex_cr_filt_(noM55|all)_jcC_norm_harmony_jnd_slim3.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/v3_m2_asex_cr_filt_|_norm.*'))) %>% 
   # .[sample_name] %>%
   map(readRDS)
@@ -123,7 +124,7 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~DimPlot(.x, label = F, reduction = "um
 
 
 ```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~DimPlot(.x, label = F, reduction = "umap.harmony_PC_man", group.by = "stage_fld") + scale_color_manual(values = sp_col_new))
+map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~DimPlot(.x, label = F, reduction = "umap.harmony_PC_man", group.by = "stage_fld", dims = c(1, 3)) + scale_color_manual(values = sp_col_new))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -374,20 +375,31 @@ FetchData(object = v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm
 
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FindClusters(.x, resolution = 0.85, cluster.name = "harmony_clusters_fine_erings"))
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FindClusters(.x, resolution = 0.9, cluster.name = "harmony_clusters_fine_erings"))
 
-rm(v3_m2_asex_cr_filt_norm_harmony_jnd)
+# rm(v3_m2_asex_cr_filt_norm_harmony_jnd)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings"))
+
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings", dims = c(1,3)))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width=7, fig.height=3.5}
+#SURF1.2 gexp02
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man",  label = T, features = c("PF3D7-0113600", "PF3D7-1102500"), order = T, dims = c(1,3)))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# gogo()
 # imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd.RDS")))
 imap(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd_fine_clustrs3.RDS")))
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings"))
-```
 
 
 ```{r, warning=FALSE, message=FALSE}
@@ -413,7 +425,8 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x[, .x$harmo
 # er_clstr_set <- list(c("6", "4"), "5")
 # er_clstr_set <- list(c("1", "10"), c("6", "11"))
 # er_clstr_set <- list(c("4", "10"), c("6", "12"))
-er_clstr_set <- list(c("4", "10"), c("7", "12"))
+# er_clstr_set <- list(c("4", "10"), c("7", "12"))
+er_clstr_set <- list(c("0","5","12"), c("2","11","13"))
 
 
 v3_early_asex <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, er_clstr_set, ~.x[, .x$harmony_clusters_fine_erings %in% .y])
