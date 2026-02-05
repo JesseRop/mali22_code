@@ -701,8 +701,8 @@ map(v3_early_asex, ~plot_ly(data = data.frame(.x@reductions[["umap"]]@cell.embed
 
 ```{r, message=F, warning=F}
 ##Read BPcells matrices
-bp_CbendrCr_prelim_stg_sct_m68C <- readRDS("data/processed/Pf/MSC68C/seu_obj/bp_CbendrCr3_prelim_stg_sct.RDS")
-bp_CbendrCr_prelim_stg_sct_m68 <- readRDS("data/processed/Pf/MSC68/seu_obj/bp_CbendrCr3_prelim_stg_sct.RDS")
+bp_CbendrCr_prelim_stg_sct_m68C <- readRDS("data/processed/Pf/MSC68C/seu_obj/bp_CbendrCr_prelim_stg_sct.RDS")
+bp_CbendrCr_prelim_stg_sct_m68 <- readRDS("data/processed/Pf/MSC68/seu_obj/bp_CbendrCr_prelim_stg_sct.RDS")
 raw_seu_m68 <- list(bp_CbendrCr_prelim_stg_sct_m68C, bp_CbendrCr_prelim_stg_sct_m68) %>% set_names(c("m68C", "m68"))
 ```
 
@@ -1089,8 +1089,9 @@ v3_early_asex_jnd <-  map2(v3_early_asex, v3_early_asex_jnd, ~.x@meta.data %>%
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-v3_early_asex_jnd <- map(v3_early_asex_jnd, ~FindClusters(.x, resolution = 0.2, random.seed = 489))
+# v3_early_asex_jnd <- map(v3_early_asex_jnd, ~FindClusters(.x, resolution = 0.2, random.seed = 489))
 # v3_early_asex_jnd <- map(v3_early_asex_jnd, ~FindClusters(.x, resolution = 0.26))
+v3_early_asex_jnd <- map2(v3_early_asex_jnd, c(0.16, 0.16), ~FindClusters(.x, resolution = .y, random.seed = 489))
 
 ```
 
@@ -1101,7 +1102,8 @@ map(v3_early_asex_jnd, ~DimPlot(.x, label = T, reduction = "umap", group.by = "s
 
 ```{r, warning=FALSE, message=FALSE, fig.width=5.3, fig.height=3.65, eval=T}
 # cmtd_rings <- list(c('2','1'), c('3', '0'), c('1', '4'), c('4', '6'))
-cmtd_rings_devlpmnt <- list(c('0','4'), c('2', '5'))
+# cmtd_rings_devlpmnt <- list(c('0','4'), c('2', '5'))
+cmtd_rings_devlpmnt <- list(c('2','1'), c('1', '3'))
 # cmtd_rings_devlpmnt <- list(c('1','3'), c('1', '3'))
 
 ```
