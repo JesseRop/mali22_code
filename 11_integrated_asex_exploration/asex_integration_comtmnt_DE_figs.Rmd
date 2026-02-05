@@ -94,7 +94,7 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/project_plotting_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
-source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/cell_calling/plotting_fns_n_variables.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/2_cell_calling/plotting_fns_n_variables.R")
 
 
 ```
@@ -164,29 +164,33 @@ don_order_m <- str_remove_all(key_samples, "SC|C$")
 
 ```{r, message=F, warning=F}
 ## Generated in 'm2_integration_asx_clustr_gn_explrtn.Rmd'
-asex_noM55_jcC_harmony <- readRDS('data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_norm_harmony_jnd_fine_clustrs3.RDS')
+# asex_noM55_jcC_harmony <- readRDS('data/processed/Pf/m2_all/v3_m2_asex_cr_filt_noM55_jcC_norm_harmony_jnd_fine_clustrs3.RDS')
+asex_noM55_jcC_harmony <- readRDS('data/processed/Pf/m2_all/integrated_asex_exploration/v3_m2_asex_cr_filt_noM55_jcC_norm_harmony_jnd_fine_clustrs.RDS')
 
 ```
 
 ```{r, message=F, warning=F}
-asex_noM55_jcC_harmony_light <- CreateSeuratObject(counts = LayerData(asex_noM55_jcC_harmony, layer = "counts"), data = LayerData(asex_noM55_jcC_harmony, layer = "data"),  meta.data = asex_noM55_jcC_harmony@meta.data)
-
-asex_noM55_jcC_harmony_light@reductions$umap.harmony_PC_man = asex_noM55_jcC_harmony@reductions$umap.harmony_PC_man
-
-asex_noM55_jcC_harmony_light
+# asex_noM55_jcC_harmony <- CreateSeuratObject(counts = LayerData(asex_noM55_jcC_harmony, layer = "counts"), data = LayerData(asex_noM55_jcC_harmony, layer = "data"),  meta.data = asex_noM55_jcC_harmony@meta.data)
+# 
+# asex_noM55_jcC_harmony@reductions$umap.harmony_PC_man = asex_noM55_jcC_harmony@reductions$umap.harmony_PC_man
+# 
+# asex_noM55_jcC_harmony
 
 ```
 
 ```{r, message=F, warning=F}
-rm(asex_noM55_jcC_harmony)
+# rm(asex_noM55_jcC_harmony)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-seu_cols <- brewer.pal(12, name = "Set3") %>% set_names(c(0:11))
+seu_cols_base <- brewer.pal(12, name = "Set3") %>% set_names(c(0:11))
+seu_cols <- setNames(rev(colorRampPalette(seu_cols_base)(19)), 0:18)
+seu_cols
+
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
-DimPlot(asex_noM55_jcC_harmony_light, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings", label.size = 6, label.box = F) +
+DimPlot(asex_noM55_jcC_harmony, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings", label.size = 6, label.box = F) +
   scale_color_manual(values = seu_cols) +
   scale_fill_manual(values = seu_cols) +
   theme_classic() +
@@ -200,7 +204,7 @@ DimPlot(asex_noM55_jcC_harmony_light, label = T, reduction = "umap.harmony_PC_ma
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
-DimPlot(asex_noM55_jcC_harmony_light, label = T, reduction = "umap.harmony_PC_man", dims = c(1,3), group.by = "harmony_clusters_fine_erings", label.size = 6, label.box = F) +
+DimPlot(asex_noM55_jcC_harmony, label = F, reduction = "umap.harmony_PC_man", dims = c(1,3), group.by = "harmony_clusters_fine_erings", label.size = 6, label.box = F, pt.size = 0.001) +
   scale_color_manual(values = seu_cols) +
   scale_fill_manual(values = seu_cols) +
   theme_classic() +
@@ -215,14 +219,14 @@ DimPlot(asex_noM55_jcC_harmony_light, label = T, reduction = "umap.harmony_PC_ma
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=5, fig.height=4}
-asex_noM55_jcC_harmony_light_figs <- asex_noM55_jcC_harmony_light@meta.data %>%
+asex_noM55_jcC_harmony_light_figs <- asex_noM55_jcC_harmony@meta.data %>%
   mutate(across(donor, ~factor(str_remove_all(., "SC|C$"), levels = don_order_m)),
          # across(donor, ~factor(str_remove(., "C$"), levels = don_order)),
          stage_fld = str_replace_all(stage_fld, c("Mid trophozoite" = "Early trophozoite", ".*schizont" = "Schizont", "Gametocyte \\(developing\\)" = "Early ring")),
          across(stage_fld, ~factor(., levels = stg_refnd_lvls)),
          condition = factor(if_else(orig.ident == "MSC50_SLOC.mrna", "Symptomatic", condition), levels = c("Asymptomatic", "Symptomatic"))) %>%
   select(donor, stage_fld, condition) %>% 
-  AddMetaData(asex_noM55_jcC_harmony_light, .)
+  AddMetaData(asex_noM55_jcC_harmony, .)
 
 ```
 
@@ -273,7 +277,7 @@ p
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=2.5, fig.height=4}
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1222600"), reduction = "umap.harmony_PC_man", order = T, ncol = 1)+
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1222600"), reduction = "umap.harmony_PC_man", order = T, ncol = 1)+
   theme_classic() +
   labs(title = "", x = "UMAP1", y= "UMAP2") +
   theme(text = element_text(size = 22),
@@ -285,24 +289,36 @@ FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1222600"), reducti
 ```
 
 
+```{r, warning=FALSE, message=FALSE, fig.width=2.5, fig.height=4}
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1222600"), reduction = "umap.harmony_PC_man", order = T, ncol = 1, dims = c(1,3))+
+  theme_classic() +
+  labs(title = "", x = "UMAP1", y= "UMAP3") +
+  theme(text = element_text(size = 22),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank()) 
+
+```
+
 ```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=3}
 # ap2g, surf1.2, gexp05
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", order = T, ncol = 3)
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", order = T, ncol = 3)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=3}
 # antisense gdv1 , gdv1
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-0935390", "PF3D7-0935400"), reduction = "umap.harmony_PC_man", order = T, ncol = 2, pt.size = 0.5)
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-0935390", "PF3D7-0935400"), reduction = "umap.harmony_PC_man", order = T, ncol = 2, pt.size = 0.5, dims = c(1,3))
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-0935390", "PF3D7-0935400"), reduction = "umap.harmony_PC_man", order = T, ncol = 2, pt.size = 0.5)
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-0935390", "PF3D7-0935400"), reduction = "umap.harmony_PC_man", order = T, ncol = 2, pt.size = 0.5, dims = c(1,3))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=3}
 # antisense gdv1 , gdv1
-gdv1_asgdv1 <- FetchData(object = asex_noM55_jcC_harmony_light, layer = "data", vars = c("PF3D7-0935400", "PF3D7-0935390"))
-gdv1_asgdv1_mdata_umap2 <- cbind(asex_noM55_jcC_harmony_light@meta.data, asex_noM55_jcC_harmony_light@reductions$umap@cell.embeddings, gdv1_asgdv1)
+gdv1_asgdv1 <- FetchData(object = asex_noM55_jcC_harmony, layer = "data", vars = c("PF3D7-0935400", "PF3D7-0935390"))
+gdv1_asgdv1_mdata_umap2 <- cbind(asex_noM55_jcC_harmony@meta.data, asex_noM55_jcC_harmony@reductions$umap@cell.embeddings, gdv1_asgdv1)
 gdv1_asgdv1_mdata_umap2 %>% glimpse
 ```
 
@@ -319,33 +335,38 @@ gdv1_asgdv1 %>% head
 
 ```{r, warning=FALSE, message=FALSE}
 # CBP2
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1301700"), reduction = "umap.harmony_PC_man")
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1301700"), reduction = "umap.harmony_PC_man", dims = c(1,3))
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1301700"), reduction = "umap.harmony_PC_man")
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1301700"), reduction = "umap.harmony_PC_man", dims = c(1,3))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # PTP4, PF3D7-0406500
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-0730900"), reduction = "umap.harmony_PC_man", dims = c(1,3))
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-0406500"), reduction = "umap.harmony_PC_man", dims = c(1,3))
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-0730900"), reduction = "umap.harmony_PC_man", dims = c(1,3))
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-0406500"), reduction = "umap.harmony_PC_man", dims = c(1,3))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=3}
 # CBP2
-VlnPlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1301700"), group.by = "harmony_clusters_fine_erings", pt.size = 0)
+VlnPlot(asex_noM55_jcC_harmony, features = c("PF3D7-1301700"), group.by = "harmony_clusters_fine_erings", pt.size = 0)
 ```
 ```{r}
-asex_noM55_jcC_harmony_light@meta.data %>% ggplot(aes(y = nFeature_RNA, x = seurat_clusters)) + geom_violin() + geom_hline(yintercept = 300)
-asex_noM55_jcC_harmony_light@meta.data %>% ggplot(aes(y = nCount_RNA, x = seurat_clusters)) + geom_violin() + geom_hline(yintercept = 1000)
+asex_noM55_jcC_harmony@meta.data %>% ggplot(aes(y = nFeature_RNA, x = seurat_clusters)) + geom_violin() + geom_hline(yintercept = 300)
+asex_noM55_jcC_harmony@meta.data %>% ggplot(aes(y = nCount_RNA, x = seurat_clusters)) + geom_violin() + geom_hline(yintercept = 1000)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=9, fig.height=3}
-FeaturePlot(asex_noM55_jcC_harmony_light, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", order = T, ncol = 3, dims = c(1,3))
+FeaturePlot(asex_noM55_jcC_harmony, features = c("PF3D7-1222600", "PF3D7-0113600", "PF3D7-1102500"), reduction = "umap.harmony_PC_man", order = T, ncol = 3, dims = c(1,3))
 
 ```
+
+```{r, message=F, warning=F, eval=T}
+gogo()
+```
+
 
 ## Seurat object for committed rings object
 
