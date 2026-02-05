@@ -372,12 +372,15 @@ FetchData(object = v3_m2_asex_cr_filt_norm_harmony_jnd[, v3_m2_asex_cr_filt_norm
 
 
 ############# END find all markers to test for merozoites #############
-
+############# START Recluster to make the early and late commited gametocytes form distint clusters #############
 
 ```{r, warning=FALSE, message=FALSE}
-v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FindClusters(.x, resolution = 0.9, cluster.name = "harmony_clusters_fine_erings"))
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd, ~FindNeighbors(.x, dims = 1:10, reduction = "integrated.harmony_PC_man"))
 
-# rm(v3_m2_asex_cr_filt_norm_harmony_jnd)
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FindClusters(.x, resolution =1.3, cluster.name = "harmony_clusters_fine_erings", random.seed = 949))
+
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~RunUMAP(.x, reduction = "integrated.harmony_PC_man", dims = 1:10, seed.use = 949, reduction.name = "umap.harmony_PC_man", n.components = 3L, min.dist = 0.3, n.neighbors = 30))
+
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -385,21 +388,258 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, re
 
 map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings", dims = c(1,3)))
 
+map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, c("16", "18"), ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x$harmony_clusters_fine_erings %in% .y]), dims = c(1,3), sizes.highlight = 0.01))
+map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, c("16", "18"), ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", cells.highlight = colnames(.x[,.x$harmony_clusters_fine_erings %in% .y]), dims = c(1,2), sizes.highlight = 0.01))
+
 ```
 
 
-```{r, warning=FALSE, message=FALSE, fig.width=7, fig.height=3.5}
-#SURF1.2 gexp02
-map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man",  label = T, features = c("PF3D7-0113600", "PF3D7-1102500"), order = T, dims = c(1,3)))
+
+```{r, warning=FALSE, message=FALSE, eval=F}
+# Display the combined datasets as an interactive 3D plot
+
+plot_ly(data = data.frame(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs[["noM55_jcC"]]@reductions[["umap.harmony_PC_man"]]@cell.embeddings),
+        x = ~umapharmonyPCman_1, y = ~umapharmonyPCman_2, z = ~umapharmonyPCman_3,
+        color= v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs[["noM55_jcC"]]@meta.data$harmony_clusters_fine_erings,
+        # colors = c('blue', 'red'),
+        opacity = 0.8,
+        size = 0.1, 
+        type = 'scatter3d'
+)
+
 ```
+
+
+```{r, warning=FALSE, message=FALSE}
+map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, c("16", "18"), ~DimPlot(.x, label = T, reduction = "integrated.harmony_PC_man", cells.highlight = colnames(.x[,.x$harmony_clusters_fine_erings %in% .y]), dims = c(1,3), sizes.highlight = 0.01))
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=12, fig.height=3.5}
+#SURF1.2 gexp02 Pfg14-744 ap2g
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man",  label = T, features = c("PF3D7-0113600", "PF3D7-1102500", "PF3D7-1477300", "PF3D7-1222600"), order = T, dims = c(1,3), ncol = 4))
+```
+
+############# START Findmarkers in the commited cluster in the overal asexual integrated object to avoid subclustering figure #############
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~SetIdent(.x, value = "harmony_clusters_fine_erings"))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+object_nms <- c("all_jcC", "noM55_jcC")
+
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+commited_de_hi_res <- map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
+# commited_de <- map(v3_early_asex_jnd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+commited_de_hi_res_anot <- map(commited_de_hi_res, ~.x %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+# commited_de_anot
+```
+
+```{r, warning=FALSE, message=FALSE}
+# saveRDS(commited_de_anot, "data/processed/Pf/m2_all/commited_de_anot3.RDS")
+```
+
+```{r, eval=FALSE}
+imap(commited_de_hi_res_anot, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integrated_asex_exploration/commited_de_hi_res_anot_", .y, ".RDS")))
+
+```
+
+```{r}
+commited_de_hi_res_anot <- map(object_nms, ~readRDS(paste0("data/processed/Pf/m2_all/integrated_asex_exploration/commited_de_hi_res_anot_", .x, ".RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_fine_erings", dims = c(1,3)))
+
+```
+
+```{r}
+early_ring_clstr <- list(list(c("10","5")), list(c("13", "4")))
+early_comtd_clstr <- list(list(c("12","13")), list("15"))
+late_comtd_clstr <- list(list("16"), list("18"))
+
+merged_clstrs <- Map(c, early_ring_clstr, early_comtd_clstr, late_comtd_clstr)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+map2(commited_de_hi_res_anot, merged_clstrs,  ~.x %>% 
+  filter(cluster %in% .y) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05 & avg_log2FC>0 & pct.2 < 0.1) %>%
+    group_by(cluster) %>% 
+    slice_min(order_by = p_val_adj, n = 10) %>% 
+    slice_max(order_by = avg_log2FC, n = 10))
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_asex_ring_v_commited_gns <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, merged_clstrs, ~FindMarkers(.x, ident.1 = c(.y[[2]], .y[[3]]), ident.2 = .y[[1]], assay = "RNA", slot = "data", test.use = "MAST", latent.vars = "donor"))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_asex_ring_v_commited_gns_anot <- map(cmtd_rings_de_asex_ring_v_commited_gns, ~.x %>% filter(p_val_adj < 0.05) %>% arrange(p_val_adj) %>% rownames_to_column("gene") %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+cmtd_rings_de_asex_ring_v_commited_gns_anot
+```
+
+```{r, eval=FALSE}
+imap(cmtd_rings_de_asex_ring_v_commited_gns_anot, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_asex_ring_v_commited_gns_anot_", .y, ".RDS")))
+
+```
+
+```{r}
+cmtd_rings_de_asex_ring_v_commited_gns_anot <- map(object_nms, ~readRDS(paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_asex_ring_v_commited_gns_anot_", .x, ".RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_asex_ring_v_commited_gns_anot, ~.x %>% 
+  filter(avg_log2FC > 0) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_asex_ring_v_commited_gns_anot, ~.x %>% 
+  filter(avg_log2FC < 0) %>%
+  arrange(desc(abs(avg_log2FC))) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+
+```{r}
+
+merged_clstrs <- Map(c, early_ring_clstr, early_comtd_clstr, late_comtd_clstr)
+```
+
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_late_v_all_gns <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, merged_clstrs, ~FindMarkers(.x, ident.1 = .y[[3]], ident.2 = c(.y[[1]], .y[[2]]), assay = "RNA", slot = "data", test.use = "MAST", latent.vars = "donor"))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_late_v_all_gns_anot <- map(cmtd_rings_de_late_v_all_gns, ~.x %>% filter(p_val_adj < 0.05) %>% arrange(p_val_adj) %>% rownames_to_column("gene") %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+cmtd_rings_de_late_v_all_gns_anot
+```
+
+```{r, eval=FALSE}
+imap(cmtd_rings_de_late_v_all_gns_anot, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_late_v_all_gns_anot_", .y, ".RDS")))
+
+```
+
+```{r}
+cmtd_rings_de_late_v_all_gns_anot <- map(object_nms, ~readRDS(paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_late_v_all_gns_anot_", .x, ".RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_late_v_all_gns_anot, ~.x %>% 
+  filter(avg_log2FC > 0) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_late_v_all_gns_anot, ~.x %>% 
+  filter(avg_log2FC < 0) %>%
+  arrange(desc(abs(avg_log2FC))) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+
+```{r}
+# gogo()
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_early_v_all_gns <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, merged_clstrs, ~FindMarkers(.x, ident.1 = .y[[2]], ident.2 = c(.y[[1]], .y[[3]]), assay = "RNA", slot = "data", test.use = "MAST", latent.vars = "donor"))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+cmtd_rings_de_early_v_all_gns_anot <- map(cmtd_rings_de_early_v_all_gns, ~.x %>% filter(p_val_adj < 0.05) %>% arrange(p_val_adj) %>% rownames_to_column("gene") %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+cmtd_rings_de_early_v_all_gns_anot
+```
+
+```{r, eval=FALSE}
+imap(cmtd_rings_de_early_v_all_gns_anot, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_early_v_all_gns_anot_", .y, ".RDS")))
+
+```
+
+```{r}
+cmtd_rings_de_early_v_all_gns_anot <- map(object_nms, ~readRDS(paste0("data/processed/Pf/m2_all/integrated_asex_exploration/cmtd_rings_de_early_v_all_gns_anot_", .x, ".RDS")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_early_v_all_gns_anot, ~.x %>% 
+  filter(avg_log2FC > 0) %>%
+  arrange(desc(avg_log2FC)) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(cmtd_rings_de_early_v_all_gns_anot, ~.x %>% 
+  filter(avg_log2FC < 0) %>%
+  arrange(desc(abs(avg_log2FC))) %>% 
+    filter(p_val_adj< 0.05) %>%
+    slice_min(order_by = p_val_adj, n = 20)) 
+```
+
+Based on clusters markers above we can now specify the commited clusters
+
+
+```{r, warning=FALSE, message=FALSE}
+v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, merged_clstrs, ~.x@meta.data %>%
+                                                          rownames_to_column("bcode") %>%
+                                                          mutate(commitment_status = 
+                                                                   case_when(harmony_clusters_fine_erings %in% .y[[1]] ~ "early asexual rings",
+                                                                             harmony_clusters_fine_erings %in% .y[[2]] ~ "early committed rings",
+                                                                             harmony_clusters_fine_erings %in% .y[[3]] ~ "late committed rings",
+                                                                             T ~ stage_fld)) %>%
+                                                          column_to_rownames("bcode") %>%
+                                                          select(commitment_status) %>%
+                                                          AddMetaData(.x, .)
+                                                        )
+
+```
+
 
 ```{r, warning=FALSE, message=FALSE}
 # gogo()
 # imap(v3_m2_asex_cr_filt_norm_harmony_jnd, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd.RDS")))
-imap(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd_fine_clustrs3.RDS")))
+# imap(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~saveRDS(., paste0("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd_fine_clustrs3.RDS")))
+
+imap(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~saveRDS(., paste0("data/processed/Pf/m2_all/integrated_asex_exploration/v3_m2_asex_cr_filt_", .y,"_norm_harmony_jnd_fine_clustrs.RDS")))
 
 ```
 
+
+############# END Findmarkers in the commited cluster in the overal asexual integrated object to avoid subclustering figure #############
 
 
 ```{r, warning=FALSE, message=FALSE}
@@ -407,8 +647,13 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~DimPlot(.x, label = F, re
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x, label = T, reduction = "umap.harmony_PC_man", features = "scf_score_rand", order = T))
+map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x, label = T, reduction = "umap.harmony_PC_man", features = "scf_score_rand", order = T, dims = c(1,3)))
 ```
+
+############# START Findmarkers in the commited cluster in the main figure #############
+
+
+############# END Findmarkers in the commited cluster in the main figure #############
 
 ############# START SK21 gene likely commited vs non-commited #############
 
@@ -426,36 +671,39 @@ map(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, ~FeaturePlot(.x[, .x$harmo
 # er_clstr_set <- list(c("1", "10"), c("6", "11"))
 # er_clstr_set <- list(c("4", "10"), c("6", "12"))
 # er_clstr_set <- list(c("4", "10"), c("7", "12"))
-er_clstr_set <- list(c("0","5","12"), c("2","11","13"))
 
+# er_clstr_set <- list(c("5","10","12","13","16"), c("4","13","15","18"))
+# 
+# v3_early_asex <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, er_clstr_set, ~.x[, .x$harmony_clusters_fine_erings %in% .y])
 
-v3_early_asex <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, er_clstr_set, ~.x[, .x$harmony_clusters_fine_erings %in% .y])
+v3_early_asex <- map2(v3_m2_asex_cr_filt_norm_harmony_jnd_fine_clustrs, er_clstr_set, ~subset(.x, subset = commitment_status %in% c("early asexual rings", "early committed rings", "late committed rings")))
+
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # gene_count
-map(v3_early_asex, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "harmony_PC_man_clusters") + geom_hline(yintercept = 600))
+map(v3_early_asex, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "harmony_clusters_fine_erings") + geom_hline(yintercept = 600))
 # map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA") + geom_hline(yintercept = 2000))
-map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA", group.by = "harmony_PC_man_clusters") + geom_hline(yintercept = 5000))
+map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA", group.by = "harmony_clusters_fine_erings") + geom_hline(yintercept = 5000))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # gene_count
-map(v3_early_asex, ~VlnPlot(.x, features = "nFeature_RNA") + geom_hline(yintercept = 600))
+map(v3_early_asex, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "harmony_clusters_fine_erings") + geom_hline(yintercept = 500))
 # map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA") + geom_hline(yintercept = 2000))
-map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA") + geom_hline(yintercept = 5000))
+map(v3_early_asex, ~VlnPlot(.x, features = "nCount_RNA", group.by = "harmony_clusters_fine_erings") + geom_hline(yintercept = 1000))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 # gene_count
-v3_early_asex <- map(v3_early_asex, ~subset(.x, subset = nFeature_RNA < 600))
+v3_early_asex <- map(v3_early_asex, ~subset(.x, subset = nFeature_RNA < 500))
 # v3_early_asex <- map(v3_early_asex, ~subset(.x, subset = nCount_RNA < 2500))
-v3_early_asex <- map(v3_early_asex, ~subset(.x, subset = nCount_RNA < 5000))
+v3_early_asex <- map(v3_early_asex, ~subset(.x, subset = nCount_RNA < 1000))
 
 ```
 
@@ -609,6 +857,8 @@ v3_early_asex <- map(v3_early_asex, ~FindClusters(.x, resolution = 0.05))
 ```{r, warning=FALSE, message=FALSE, fig.width=5.3, fig.height=3.65}
 map(v3_early_asex, ~DimPlot(.x, label = T, reduction = "umap", group.by = "seurat_clusters"))
 map(v3_early_asex, ~DimPlot(.x, label = T, reduction = "umap", group.by = "seurat_clusters", dims = c(1,3)))
+map(v3_early_asex, ~DimPlot(.x, label = T, reduction = "umap", group.by = "harmony_clusters_fine_erings", dims = c(1,2)))
+
 
 ```
 
@@ -795,6 +1045,11 @@ map(v3_early_asex, ~DimPlot(.x, split.by =  "donor", reduction = "umap", pt.size
 
 ```
 
+```{r, warning=FALSE, message=FALSE, fig.width=12, fig.height=3}
+# ap2-g pfs16 gene_count
+map(v3_early_asex, ~DimPlot(.x, split.by =  "donor", reduction = "umap", group.by = "harmony_clusters_fine_erings", pt.size = 0.01))
+
+```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=15, fig.height=3}
 # ap2-g pfs16 gexp02 gene_count
@@ -1091,19 +1346,15 @@ v3_early_asex_jnd <-  map2(v3_early_asex, v3_early_asex_jnd, ~.x@meta.data %>%
 ```{r, warning=FALSE, message=FALSE}
 # v3_early_asex_jnd <- map(v3_early_asex_jnd, ~FindClusters(.x, resolution = 0.2, random.seed = 489))
 # v3_early_asex_jnd <- map(v3_early_asex_jnd, ~FindClusters(.x, resolution = 0.26))
-v3_early_asex_jnd <- map2(v3_early_asex_jnd, c(0.16, 0.16), ~FindClusters(.x, resolution = .y, random.seed = 489))
+v3_early_asex_jnd <- map2(v3_early_asex_jnd, c(0.18, 0.2), ~FindClusters(.x, resolution = .y, random.seed = 489))
 
-```
-
-
-```{r, warning=FALSE, message=FALSE, fig.width=5.3, fig.height=3.65, eval=T}
 map(v3_early_asex_jnd, ~DimPlot(.x, label = T, reduction = "umap", group.by = "seurat_clusters"))
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=5.3, fig.height=3.65, eval=T}
 # cmtd_rings <- list(c('2','1'), c('3', '0'), c('1', '4'), c('4', '6'))
 # cmtd_rings_devlpmnt <- list(c('0','4'), c('2', '5'))
-cmtd_rings_devlpmnt <- list(c('2','1'), c('1', '3'))
+cmtd_rings_devlpmnt <- list(c('2','0'), c('0', '4'))
 # cmtd_rings_devlpmnt <- list(c('1','3'), c('1', '3'))
 
 ```
@@ -1326,7 +1577,7 @@ map(v3_early_asex_jnd, ~FeaturePlot(.x, reduction = "umap",  label = T, features
 
 
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
 cmtd_rings_de_gns <- map2(v3_early_asex_jnd, cmtd_rings_devlpmnt, ~FindMarkers(.x, ident.1 = .y[1], ident.2 = .y[2], assay = "RNA", slot = "data", test.use = "MAST", latent.vars = "donor"))
 ```
 
