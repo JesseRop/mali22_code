@@ -1,0 +1,358 @@
+---
+title: "MSC QC and preprocessing"
+date: '2022-07-11'
+author: 'Jesse Rop'
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(sctransform)
+  # library(rgl)
+  library(patchwork)
+  # library(DoubletFinder)
+  library(ggrepel)
+  library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  library(plotly)
+  library(Hmisc)
+  library(rmarkdown)
+  library(RColorBrewer)
+  # library(Platypus)
+  library(ggvenn)
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(ggh4x)
+  library(SingleCellExperiment)
+  # library(scmap)
+  # library(ggsankey)
+  # library(findPC)
+  library(BPCells)
+  # library(furrr)
+  # library(future.batchtools)
+  library(parallel)
+  library(EnhancedVolcano)
+  library(DropletUtils)
+  library(ggforce)
+  library(slingshot)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflict_prefer("map", "purrr")
+  conflict_prefer("count", "dplyr")
+  conflicts_prefer(base::saveRDS)
+  conflicts_prefer(SingleCellExperiment::colData)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
+})
+```
+
+# MSC Preprocessing
+
+
+## setup, read input files and exploratory visualizations and general functions
+
+
+```{r, setup}
+# library(reticulate)
+# # use_condaenv("/Users/jr35/envs/scv_jupcon/", required = TRUE)
+# # matplotlib <- reticulate::import("matplotlib")
+# # matplotlib$use("Agg", force = TRUE)
+# 
+# knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali')
+knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2')
+
+```
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/seurat_sce/seu_sce_common_fns.R")
+source("/nfs/users/nfs_j/jr35/multipurpose_scripts/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r, message=F, warning=F, eval=T}
+## Get file list
+fm_leiden_w_donors_norm_harmony_jnd_list_files <- Sys.glob("data/processed/Pf/m2_all/integration/fm_leiden_w_donors_*_norm_harmony_jnd.RDS")
+
+fm_leiden_w_donors_norm_harmony_jnd_list_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+fm_leiden_w_donors_norm_harmony_jnd <- map(fm_leiden_w_donors_norm_harmony_jnd_list_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/integration/fm_leiden_w_donors_|_norm_harmony_jnd.RDS')))) %>% 
+  unlist(., recursive = F) %>% 
+  # .[sample_name] %>%
+  map(readRDS)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m", "w.5.f", "w.7.f", "w.7.m")]
+
+fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m_mLE", "all.m", "w.5.f_fLE", "w.5.f", "w.7.f", "w.7.m")]
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd %>% 
+  set_names(str_replace_all(names(fm_leiden_w_donors_norm_harmony_jnd), c("w\\." = "w_pt", "\\." = "_")))
+```
+
+############START ## Add M50_SLO metadata which I missed to add upstream - I need to rectify and add it upstream where it was needed ############
+
+```{r, fig.width=15, fig.height=5}
+# donor_mdata_slct <- readRDS("data/processed/Pf/m2_all/donor_mdata_slct.RDS")
+
+```
+
+```{r, fig.width=15, fig.height=5}
+## !!!NOTE - CHEATING : Didnt add M50 metadata properly earlier so adding the necessary metadata here. Need to go back and add properly
+# donor_mdata_slct  %>% filter(short_name == "MSC50") %>% glimpse
+```
+
+add metadata
+
+```{r}
+## !!NOTE- MISSED A SPOT - Rectify by adding M50 mdata upstream
+# 
+# fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd@meta.data %>% 
+#   mutate(condition = if_else(orig.ident == "MSC50_SLOC.mrna", "Symptomatic", condition),
+#          fever = if_else(orig.ident == "MSC50_SLOC.mrna", "Fever", fever),
+#          parasitaemia_pf = if_else(orig.ident == "MSC50_SLOC.mrna", 36308, parasitaemia_pf),
+#          smpl_wait_time = if_else(orig.ident == "MSC50_SLOC.mrna", 378, smpl_wait_time),
+#          days_frm_ssn_start = if_else(orig.ident == "MSC50_SLOC.mrna", 23, days_frm_ssn_start),
+#          gender_m_f = if_else(orig.ident == "MSC50_SLOC.mrna", "F", gender_m_f),
+#          weight_kg = if_else(orig.ident == "MSC50_SLOC.mrna", 32, weight_kg),
+#          temperature_c = if_else(orig.ident == "MSC50_SLOC.mrna", 38, temperature_c),
+#          age_years = if_else(orig.ident == "MSC50_SLOC.mrna", 7, age_years),
+#          species_by_microscopy = if_else(orig.ident == "MSC50_SLOC.mrna", "Pf", species_by_microscopy),
+#          headache = if_else(orig.ident == "MSC50_SLOC.mrna", "Y", headache),
+#          vomiting = if_else(orig.ident == "MSC50_SLOC.mrna", "Y", vomiting),
+#          diarrhoea = if_else(orig.ident == "MSC50_SLOC.mrna", "N", diarrhoea),
+#          abdominal_pain = if_else(orig.ident == "MSC50_SLOC.mrna", "Y", abdominal_pain),
+#          previous_medication = if_else(orig.ident == "MSC50_SLOC.mrna", "N", previous_medication),
+#          village = if_else(orig.ident == "MSC50_SLOC.mrna", "FALADIE", village),
+#          sympto_groups = if_else(orig.ident == "MSC50_SLOC.mrna", "sympto_fever", sympto_groups)
+#          ) %>% 
+#   select(condition, fever, parasitaemia_pf, smpl_wait_time, days_frm_ssn_start,  gender_m_f, weight_kg, temperature_c, age_years, species_by_microscopy, headache, vomiting, diarrhoea, abdominal_pain, previous_medication, village, sympto_groups) %>% 
+#   AddMetaData(fm_leiden_w_donors_norm_harmony_jnd, .)
+```
+
+############END ## Add M50_SLO metadat which I missed to add upstream - I need to rectify and add it upstream where it was needed ############
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")) 
+map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Remove the committed cluster
+fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]], subset = leiden == 8, invert = T)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")) 
+map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")) 
+
+```
+
+```{r, fig.width=12, fig.height=3}
+#hrpIII and kahrp FabZ ADF2 
+map(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = c("PF3D7-1372200", "PF3D7-0202000","PF3D7-1323000", "PF3D7-1361400"), order = T, pt.size = 0.2, label = T, ncol = 4))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=3, fig.height=3}
+# saveRDS(asex_noM55_jcC_harmony_no_comtd, "data/processed/Pf/m2_all/strain_DE/asex_noM55_jcC_harmony_no_comtd.RDS")
+
+```
+
+Slingshot
+```{r, warning=FALSE, message=FALSE}
+# DefaultAssay(asex_noM55_jcC_harmony_no_comtd) <- "RNA"
+```
+
+```{r, warning=FALSE, message=FALSE}
+resolns <- c(0.07, rep(0.08, length(fm_leiden_w_donors_norm_harmony_jnd)-2), 0.1)
+fm_leiden_w_donors_norm_harmony_jnd <- map2(fm_leiden_w_donors_norm_harmony_jnd, resolns, ~FindClusters(.x, resolution = .y, cluster.name = "harmony_clusters_ss"))
+
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", order = T, pt.size = 0.1) + labs(title = .y)) 
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']], subset = harmony_clusters_ss %in% c(0, 1))
+# fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = leiden %in% c(4, 2))
+fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = harmony_clusters_ss %in% c(0, 2))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = "nFeature_RNA", order = T, pt.size = 0.05) + labs(title = .y)) 
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = "nFeature_RNA", order = T, pt.size = 0.05) + labs(title = .y)) 
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", order = T, pt.size = 0.1, label = T) + labs(title = .y)) 
+
+
+```
+
+
+```{r, eval=T}
+# gogo()
+fm_leiden_w_donors_norm_harmony_jnd_sce <- map(fm_leiden_w_donors_norm_harmony_jnd, ~as.SingleCellExperiment(.x))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+for (nm in names(fm_leiden_w_donors_norm_harmony_jnd_sce)) {
+  fm_leiden_w_donors_norm_harmony_jnd_sce[[nm]]$feature_symbol <- rownames(fm_leiden_w_donors_norm_harmony_jnd_sce)
+}
+```
+
+
+
+```{r, eval=T}
+# rowData(asex_noM55_jcC_harmony_no_comtd_sce)$feature_symbol <- rownames(asex_noM55_jcC_harmony_no_comtd_sce)
+```
+
+
+!!!! NOTE -BEEN DOING SLINGSHOT WRONG. LOGCOUNTS SHOULD HAVE data values from seurat
+```{r, eval=T}
+# gogo()
+# Seurat_object <- m2_asex_harmony_res
+start_clusters <- c(1, 0, 0, 2, 1, 0, 0)
+end_clusters <- c(0, 1, 1, 0, 0, 1, 1)
+
+## Convert seurat object to SCE
+fm_leiden_w_donors_norm_harmony_jnd_sce_ss <- pmap(list(fm_leiden_w_donors_norm_harmony_jnd_sce, start_clusters, end_clusters), ~{
+  slingshot(..1,
+            clusterLabels = "harmony_clusters_ss",
+            # clusterLabels = "harmony_PC_man_clusters",
+            reducedDim = "UMAP.HARMONY_PC_MAN",
+            start.clus = ..2,
+            end.clus = ..3,
+            # shrink =1,
+            # stretch = 1,
+            # allow.break = F
+            )
+})
+
+
+```
+
+
+!!!! NOTE -BEEN DOING SLINGSHOT WRONG. LOGCOUNTS SHOULD HAVE data values from seurat
+```{r, eval=T}
+# # gogo()
+# # Seurat_object <- m2_asex_harmony_res
+# 
+# ## Convert seurat object to SCE
+# asex_noM55_jcC_harmony_no_comtd_sce_ss <- slingshot(asex_noM55_jcC_harmony_no_comtd_sce,
+#             clusterLabels = "harmony_clusters_ss",
+#             # clusterLabels = "harmony_PC_man_clusters",
+#             reducedDim = "UMAP.HARMONY_PC_MAN",
+#             start.clus = 1,
+#             end.clus = 2,
+#             # shrink =1,
+#             # stretch = 1,
+#             # allow.break = F
+#             )
+
+
+```
+
+
+```{r}
+##Prepare slingshot dataset (SDS) object
+fm_leiden_w_donors_norm_harmony_jnd_sce_ss_sds <- map(fm_leiden_w_donors_norm_harmony_jnd_sce_ss, ~SlingshotDataSet(.x))
+
+# plot(reducedDims(asex_noM55_jcC_harmony_no_comtd_sce_ss)$UMAP[,1:2], col = brewer.pal(9,"Set1")[as.factor(asex_noM55_jcC_harmony_no_comtd_sce_ss$stage)], pch=16, asp = 0.7)
+map2(fm_leiden_w_donors_norm_harmony_jnd_sce_ss, fm_leiden_w_donors_norm_harmony_jnd_sce_ss_sds, ~{
+  plot(reducedDims(.x)$UMAP.HARMONY_PC_MAN[,c(1,2)], col = brewer.pal(9,"Set1")[as.factor(.x$seurat_clusters)], pch=16, asp = 0.7 )
+  lines(.y, lwd=2, col="black",dims = c(1,2))
+})
+
+```
+
+
+```{r}
+
+## Add pseudotime metadata to the object
+fm_leiden_w_donors_norm_harmony_jnd_pt <- map2(fm_leiden_w_donors_norm_harmony_jnd, fm_leiden_w_donors_norm_harmony_jnd_sce_ss, ~{
+  AddMetaData(.x, data.frame(.y@colData[, c("slingPseudotime_1"), drop = F]) #%>%
+              # rename("pseudotime" = slingPseudotime_1)
+              ) 
+})
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd_pt, ~FeaturePlot(.x, features = c("slingPseudotime_1"), reduction = "umap.harmony_PC_man", pt.size = 0.01))
+```
+
+```{r}
+
+## Add pseudotime metadata to the object
+fm_leiden_w_donors_norm_harmony_jnd_pt[[4]] <- AddMetaData(fm_leiden_w_donors_norm_harmony_jnd[[4]], data.frame(fm_leiden_w_donors_norm_harmony_jnd_sce_ss[[4]]@colData[, c("slingPseudotime_1", "slingPseudotime_2"), drop = F]) #%>%
+              # rename("pseudotime" = slingPseudotime_1)
+              ) 
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd_pt[4], ~FeaturePlot(.x, features = c("slingPseudotime_2"), reduction = "umap.harmony_PC_man", pt.size = 0.01))
+```
+
+```{r}
+# go()
+## Save pseudotime objects
+imap(fm_leiden_w_donors_norm_harmony_jnd_pt, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integration/fm_leiden_w_donors_", .y, "_pt.RDS")))
+imap(fm_leiden_w_donors_norm_harmony_jnd_sce_ss, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integration/fm_leiden_w_donors_", .y, "_sce_ss.RDS")))
+imap(fm_leiden_w_donors_norm_harmony_jnd_sce_ss_sds, ~saveRDS(.x, paste0("data/processed/Pf/m2_all/integration/fm_leiden_w_donors_", .y, "_sce_ss_sds.RDS")))
+
+```
+
+
+
