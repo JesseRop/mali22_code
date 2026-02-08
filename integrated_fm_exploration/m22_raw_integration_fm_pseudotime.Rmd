@@ -110,10 +110,17 @@ fm_leiden_w_donors_norm_harmony_jnd <- map(fm_leiden_w_donors_norm_harmony_jnd_l
 
 ```
 
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "leiden") + labs(title = .y)) 
+
+```
+
 ```{r, warning=FALSE, message=FALSE}
 # fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m", "w.5.f", "w.7.f", "w.7.m")]
 
-fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m_mLE", "all.m", "w.5.f_fLE", "w.5.f", "w.7.f", "w.7.m")]
+fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m_mLE", "all.m", "w.5.f_fLE", "w.5.f", "w.7.f", "w.5.f_no_asx_dbt", "w.7.m")]
+# fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("w.5.f_no_asx_dbt")]
 
 ```
 
@@ -175,12 +182,18 @@ map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "um
 ```{r, warning=FALSE, message=FALSE}
 ## Remove the committed cluster
 fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]], subset = leiden == 8, invert = T)
+fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_no_asx_dbt"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_no_asx_dbt"]], subset = leiden == 8, invert = T)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")) 
 map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")) 
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,3), group.by = "leiden")) 
 
 ```
 
@@ -212,6 +225,8 @@ imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony
 fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']], subset = harmony_clusters_ss %in% c(0, 1))
 # fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = leiden %in% c(4, 2))
 fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = harmony_clusters_ss %in% c(0, 2))
+
+# fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE_no_asx_dbt']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE_no_asx_dbt']], subset = seurat_clusters %in% c(2, 3, 1, 0, 4))
 
 ```
 
@@ -260,8 +275,8 @@ for (nm in names(fm_leiden_w_donors_norm_harmony_jnd_sce)) {
 ```{r, eval=T}
 # gogo()
 # Seurat_object <- m2_asex_harmony_res
-start_clusters <- c(1, 0, 0, 2, 1, 0, 0)
-end_clusters <- c(0, 1, 1, 0, 0, 1, 1)
+start_clusters <- c(1, 0, 0, 2, 1, 0, 1, 0)
+end_clusters <- c(0, 1, 1, 0, 0, 1, 0, 1)
 
 ## Convert seurat object to SCE
 fm_leiden_w_donors_norm_harmony_jnd_sce_ss <- pmap(list(fm_leiden_w_donors_norm_harmony_jnd_sce, start_clusters, end_clusters), ~{
