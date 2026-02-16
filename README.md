@@ -4,18 +4,11 @@
 
 This repository contains code used to analyze approximately 20 asymptomatic and symptomatic *Plasmodium falciparum* infections as part of a collaboration between the [Lawniczak lab](https://www.sanger.ac.uk/group/lawniczak-group/) at the Wellcome Sanger Institute and the Djimdes lab in the MRTC (Malaria Research and Training Center) Mali. This analysis was conducted as part of a PhD project at the University of Cambridge.
 
-Samples were processed using 10X Genomics technology as per previously published protocols and papers.
-
-## Project summary
-
-- **Sample count**: ~20 asymptomatic and symptomatic *P. falciparum* infections
-- **Technology**: 10X Genomics single-cell RNA-seq
-- **Organisms**: *Plasmodium falciparum* parasites + human host cells
-- **Primary outcomes**: Stage-specific transcriptomics, strain identification, and comparative analysis between symptomatic and asymptomatic infections
+Samples were processed using 10X Genomics technology as per previously published protocols and papers. Key outcomes include stage-specific transcriptomics, strain identification, and comparative analysis between symptomatic and asymptomatic infections
 
 ## Analysis summary
 
-This pipeline is designed to process 10X Genomics data from raw sequencing reads through quality control, cell calling, annotation, strain deconvolution, and downstream differential expression analysis. Each numbered directory represents a sequential step in the analysis pipeline.
+This pipeline is designed to process 10X Genomics data from raw sequencing reads through cell calling, quality control, stage annotation, strain deconvolution, downstream strain differential expression (DE), and asymptomatic VS symptomatic analysis. Each numbered directory represents a sequential step in the analysis pipeline.
 
 ## Pipeline overview
 
