@@ -89,6 +89,14 @@ knitr::opts_knit$set(root.dir = '/lustre/scratch126/tol/teams/lawniczak/users/jr
 
 ```
 
+```{r}
+read_dir <- "data/processed/Pf/m2_all/strain_DE_afm/"
+save_dir <- "data/processed/Pf/m2_all/strain_DE_afm/"
+stg_nms <- c("a", "f", "m")
+
+```
+
+
 ### Common functions
 
 #### Source commong functions, varriables and tables
@@ -233,19 +241,20 @@ FeaturePlot(asex_noM55_jcC_harmony_no_comtd_pt, features = c("slingPseudotime_1"
 
 
 ```{r}
-# Generated in 'm22_raw_MAST_intradon_DE_Chiyun.Rmd' for plotting
-v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks <- readRDS("data/processed/Pf/m2_all/strain_DE/v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks.RDS")
+# Generated in 'RStudio Server.Rmd' for plotting
+afm_leiden_w_donors_pt_downsampling_chunks <- map(stg_nms, ~readRDS(paste0(read_dir, "afm_leiden_w_donors_pt_downsampling_chunks_", .x, ".RDS")))
+
 ```
 
 ```{r}
-DimPlot(v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat", cols = ptc_cols, label = T ) +
-  theme(legend.position = "none")
+map(afm_leiden_w_donors_pt_downsampling_chunks, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat", cols = ptc_cols, label = T ) +
+  theme(legend.position = "none"))
 ```
 
 
 ```{r, warning=FALSE, message=FALSE, fig.width=3.5, fig.height=3}
-DimPlot(v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat", label.size = 5, label.box = T, label = T, label.color = "white", repel = F) +
-  geom_text(aes(label=paste0("N=", dim(v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
+map(afm_leiden_w_donors_pt_downsampling_chunks, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat", label.size = 5, label.box = T, label = T, label.color = "white", repel = F) +
+  geom_text(aes(label=paste0("N=", dim(afm_leiden_w_donors_pt_downsampling_chunks)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
   theme_classic() +
   scale_color_manual(values = ptc_cols) +
   scale_fill_manual(values = ptc_cols) +
@@ -255,27 +264,33 @@ DimPlot(v3_m2_asex_cr_filt_norm_harmony_pt_downsampling_chunks, reduction = "uma
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank()) 
-
+)
 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
 # Generated in 'm22_raw_MAST_intradon_DE_Chiyun.Rmd' for plotting
-m2_asex_bal_seu_plot <- readRDS('data/processed/Pf/m2_all/m2_asex_bal_seu.RDS')
+m2_afm_bal_seu_plot <- readRDS(paste0(read_dir, 'm2_afm_bal_seu.RDS'))
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+# # Save for tradeseq and plotting 
+# saveRDS(m2_afm_bal_seu, paste0(save_dir, 'm2_afm_bal_seu.RDS'))
 
 ```
 
 ```{r}
-m2_asex_bal_seu_plot <- m2_asex_bal_seu_plot@meta.data %>%
+m2_afm_bal_seu_plot <- map(m2_afm_bal_seu_plot, ~.x@meta.data %>%
   mutate(PtimeC = str_remove(ptime_bal_cat, "PT")) %>% 
   select(PtimeC) %>%
-  AddMetaData(m2_asex_bal_seu_plot, .)
-  
+  AddMetaData(.x, .)
+)
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=3.5, fig.height=3}
-DimPlot(m2_asex_bal_seu_plot, reduction = "umap.harmony_PC_man", group.by = "ptime_bal_cat", label.size = 6, label.box = T, label = T, label.color = "black") +
-  geom_text(aes(label=paste0("N=", dim(m2_asex_bal_seu_plot)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
+map(m2_afm_bal_seu_plot, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_bal_cat", label.size = 6, label.box = T, label = T, label.color = "black") +
+  geom_text(aes(label=paste0("N=", dim(.x)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
   theme_classic() +
   scale_color_manual(values = ptc_cols2) +
   scale_fill_manual(values = ptc_cols2) +
@@ -285,13 +300,13 @@ DimPlot(m2_asex_bal_seu_plot, reduction = "umap.harmony_PC_man", group.by = "pti
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank()) 
-
+)
 
 ```
 
 
 ```{r, fig.width=8, fig.height=3}
-m2_asex_bal_seu_plot@meta.data %>% 
+map(m2_afm_bal_seu_plot, ~.x@meta.data %>%
   count( donor,  strain) %>% 
   mutate(across(donor, ~str_remove_all(., "SC|C"))) %>% 
   group_by( donor) %>% 
@@ -308,11 +323,12 @@ m2_asex_bal_seu_plot@meta.data %>%
   theme(axis.text.x = element_text(angle = 90),
         strip.text = element_text(size = 18, face = "bold"),
         text = element_text(size = 18)) 
+)
 ```
 
 
 ```{r, fig.width=16, fig.height=3}
-m2_asex_bal_seu_plot@meta.data %>% 
+map(m2_afm_bal_seu_plot, ~.x@meta.data %>%
   count( donor, ptime_bal_cat, strain) %>% 
   mutate(across(donor, ~str_remove_all(., "SC|SLO|C|_")),
          across(ptime_bal_cat, ~str_remove_all(., "\\."))) %>% 
@@ -328,26 +344,28 @@ m2_asex_bal_seu_plot@meta.data %>%
   theme(axis.text.x = element_text(angle = 90),
         strip.text = element_text(size = 14),
         text = element_text(size = 14)) 
+)
 ```
 
 ```{r, fig.width=10, fig.height=12}
 # generated in 'm2_tseq_interstrain_intradon_DE.Rmd'
-umap_meta_df_bal_cells_plot <- readRDS("data/processed/Pf/m2_all/strain_DE/umap_meta_df_bal_cells_plot.RDS")
+umap_meta_df_bal_cells_plot <- readRDS(paste0(read_dir, 'umap_meta_df_bal_cells_plot.RDS'))
 ```
 
 ```{r, fig.width=10, fig.height=8}
-umap_meta_df_bal_cells_plot_cln <- umap_meta_df_bal_cells_plot %>%
-  mutate(across(pt_set, ~str_replace(str_remove(., "SC"), "C_", "_")))
+umap_meta_df_bal_cells_plot_cln <- map(umap_meta_df_bal_cells_plot, ~.x %>%
+  mutate(across(pt_set, ~str_replace(str_remove(., "SC"), "C_", "_"))))
 
 ```
 
 ```{r, fig.width=10, fig.height=8}
-umap_meta_df_bal_cells_plot_cln_labels <- umap_meta_df_bal_cells_plot_cln %>% 
+umap_meta_df_bal_cells_plot_cln_labels <- map(umap_meta_df_bal_cells_plot_cln, ~.x %>%
                   filter(bal_de == "yes" & Strain != "Other") %>% 
                   distinct(donor, pt_set,Strain, .keep_all = T) %>%
                   group_by(donor, pt_set) %>%
                   mutate(y_pos = rank(-as.numeric(Strain)) * 1.5,
                          y_vjust = n_distinct(Strain))
+)
 ```
 
 ```{r, fig.width=3, fig.height=2.8}
@@ -356,12 +374,12 @@ strn_sizes <- ifelse(strain_nms == "Other", 0.01, 0.5) %>% set_names(strain_nms)
 ```
 
 ```{r, fig.width=10, fig.height=8}
-umap_meta_df_bal_cells_plot_cln %>%
+map2(umap_meta_df_bal_cells_plot_cln, umap_meta_df_bal_cells_plot_cln_labels, ~.x %>%
       ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain, size = Strain))+
       geom_point() +
       scale_color_manual(values = strain_cols_n)+
       scale_size_manual(values = strn_sizes) +
-      geom_text(data = umap_meta_df_bal_cells_plot_cln_labels, 
+      geom_text(data = .y, 
                 aes(x = 1, y = y_pos, vjust = y_vjust-4.6, label = strain_n), 
                 size = 5#, 
                 # color = "black"
@@ -378,11 +396,11 @@ umap_meta_df_bal_cells_plot_cln %>%
         strip.text =element_text(size=13,face="bold", colour = 'black'))+
   # guides(x = "axis_nested") +
   labs(x = "UMAP_1", y="UMAP_2")
-  
+)
 ```
 
 ```{r, fig.width=4, fig.height=4}
-umap_meta_df_bal_cells_plot_cln %>%
+map(umap_meta_df_bal_cells_plot_cln, ~.x %>%
       filter(donor == "MSC49C" & str_detect(pt_set, "M49") & Strain != "Other") %>%
       ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain))+
       geom_point() +
@@ -405,12 +423,12 @@ umap_meta_df_bal_cells_plot_cln %>%
         strip.text =element_text(size=13,face="bold", colour = 'black'))+
   # guides(x = "axis_nested") +
   labs(x = "UMAP_1", y="UMAP_2")
-  
+)
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=3.5, fig.height=2.5}
-FeaturePlot(m2_asex_bal_seu_plot[, m2_asex_bal_seu_plot$donor == "MSC49C" & m2_asex_bal_seu_plot$strain == "SC2"], reduction = "umap.harmony_PC_man", features = "pseudotime", pt.size = 2) +
-  # geom_text(aes(label=paste0("N=", dim(m2_asex_bal_seu_plot)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
+map(m2_afm_bal_seu_plot, possibly(~FeaturePlot(.x[, .x$donor == "MSC49C" & .x$strain == "SC2"], reduction = "umap.harmony_PC_man", features = "pseudotime", pt.size = 2) +
+  # geom_text(aes(label=paste0("N=", dim(m2_afm_bal_seu_plot)[2]), x = 1, y = 4), size = 8, fontface ='plain')+
   scale_color_distiller(direction = 1, palette = "Blues") + 
   theme_classic() +
   # scale_color_manual(values = ptc_cols2) +
@@ -420,24 +438,25 @@ FeaturePlot(m2_asex_bal_seu_plot[, m2_asex_bal_seu_plot$donor == "MSC49C" & m2_a
         legend.position = "none",
         axis.text = element_blank(),
         axis.ticks = element_blank(),
-        axis.title = element_blank()) 
+        axis.title = element_blank())
+))
 
 ```
 
 ```{r, fig.width=4, fig.height=4}
 
-m2_asex_bal_seu_plot_df <- m2_asex_bal_seu_plot@reductions$umap.harmony_PC_man@cell.embeddings[,c(1,2,3)] %>% 
+m2_asex_bal_seu_plot_df <- map(m2_afm_bal_seu_plot, ~.x@reductions$umap.harmony_PC_man@cell.embeddings[,c(1,2,3)] %>% 
   as.data.frame() %>%
   rownames_to_column("cell_bc") %>%
-  left_join(., m2_asex_bal_seu_plot@meta.data[,c("stage_fld", "slingPseudotime_1",  "orig.ident", "dset", "donor", "strain")] %>%
+  left_join(., .x@meta.data[,c("stage_fld", "slingPseudotime_1",  "orig.ident", "dset", "donor", "strain")] %>%
               as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% mutate(tr = 0)
-
+)
 ```
 
 ```{r, fig.width=4, fig.height=4}
-m2_asex_bal_seu_plot_df %>%
+map(m2_asex_bal_seu_plot_df, ~.x %>%
   ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2))+
-      geom_point(data = m2_asex_bal_seu_plot_df %>% filter(donor == "MSC49C"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), inherit.aes = F) +
+      geom_point(data = .x %>% filter(donor == "MSC49C"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), inherit.aes = F) +
       # scale_size_manual(values = strn_sizes) +
       # geom_text(data = umap_meta_df_bal_cells_plot_cln_labels %>% filter(donor == "MSC49C") , 
       #           aes(x = 1, y = y_pos, vjust = y_vjust-4.6, label = strain_n), 
@@ -456,18 +475,18 @@ m2_asex_bal_seu_plot_df %>%
         strip.text =element_text(size=13,face="bold", colour = 'black'))+
   # guides(x = "axis_nested") +
   labs(x = "UMAP_1", y="UMAP_2")
-  
+)
 ```
 
 
 ```{r, fig.width=3.5, fig.height=2.5}
-m2_asex_bal_seu_plot_df %>%
+map(m2_asex_bal_seu_plot_df, ~.x %>%
   ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = dset))+
       geom_point() +
       scale_color_manual(values = "grey")+
       # scale_color_manual(values = "#ededed")+
       ggnewscale::new_scale_color() +
-      geom_point(data = m2_asex_bal_seu_plot_df %>% filter(donor == "MSC49C" & strain == "SC2"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), size = 2.5, inherit.aes = F) +
+      geom_point(data = .x %>% filter(donor == "MSC49C" & strain == "SC2"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), size = 2.5, inherit.aes = F) +
       scale_color_distiller(direction = 1, palette = "Blues") + 
   theme_classic() +
  theme(#legend.position = "bottom", 
@@ -479,18 +498,18 @@ m2_asex_bal_seu_plot_df %>%
         strip.text =element_text(size=13,face="bold", colour = 'black'))+
   # guides(x = "axis_nested") +
   labs(x = "UMAP_1", y="UMAP_2")
-  
+)
 ```
 
 
 ```{r, fig.width=3.5, fig.height=2.5}
-m2_asex_bal_seu_plot_df %>%
+map(m2_asex_bal_seu_plot_df, ~.x %>%
   ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = dset))+
       geom_point() +
       scale_color_manual(values = "grey")+
       # scale_color_manual(values = "#ededed")+
       ggnewscale::new_scale_color() +
-      geom_point(data = m2_asex_bal_seu_plot_df %>% filter(donor == "MSC49C" & strain == "SC5"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), size = 2.5, inherit.aes = F) +
+      geom_point(data = .x %>% filter(donor == "MSC49C" & strain == "SC5"), aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = slingPseudotime_1), size = 2.5, inherit.aes = F) +
       scale_color_distiller(direction = 1, palette = "Blues") + 
   theme_classic() +
  theme(#legend.position = "bottom", 
@@ -502,24 +521,24 @@ m2_asex_bal_seu_plot_df %>%
         strip.text =element_text(size=13,face="bold", colour = 'black'))+
   # guides(x = "axis_nested") +
   labs(x = "UMAP_1", y="UMAP_2")
-  
+)
 ```
 
 
 ```{r, fig.width=10, fig.height=12}
 # generated in 'm2_tseq_interstrain_intradon_DE.Rmd'
-umap_meta_df_bal_cells_plot <- readRDS("data/processed/Pf/m2_all/strain_DE/umap_meta_df_bal_cells_plot.RDS")
+umap_meta_df_bal_cells_plot <- readRDS(paste0(read_dir, "umap_meta_df_bal_cells_plot.RDS"))
 ```
 
 ```{r}
 # Generated in 'm2_tseq_MAST_DE_comprsn.Rmd' 
-mast_tde_corr_tbls <- readRDS("data/processed/Pf/m2_all/strain_DE/mast_tde_corr_tbls.RDS")
+mast_tde_corr_tbls <- readRDS(paste0(read_dir, "mast_tde_corr_tbls.RDS"))
 
 ```
 
 ```{r}
 # Generated in 'm2_GO_all.Rmd' 
-mast_tde_corr_tbls_sig <- readRDS("data/processed/Pf/m2_all/strain_DE/mast_tde_corr_tbls_sig.RDS")
+mast_tde_corr_tbls_sig <- readRDS(paste0(read_dir, "mast_tde_corr_tbls_sig.RDS"))
 
 ```
 
@@ -566,30 +585,35 @@ de_corr_plts
 solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
 ```
 
+```{r, message=F, warning=F, eval=T}
+## Get file list
+afm_bal_ts_files <- Sys.glob("data/processed/Pf/*/tradeseq_afm/[a|f|m]_afm_bal_ts.RDS")
+afm_bal_ts_files
+```
 
-Read in tradeseq files from local
-```{r}
-asex_bal_ts_plts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
-  .[solo_don] %>%
+Read in asexual, female and male tradeseq output
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+afm_bal_ts <- map(afm_bal_ts_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|tradeseq_afm/|_afm_.*') %>% 
+                    gsub("(.*)/(.*)", "\\2/\\1", .) %>% 
+                    str_replace(., "/", ".")))) %>% 
+  unlist(., recursive = F) %>% 
+  # .[solo_don] %>%
   map(readRDS)
-
 ```
 
-```{r, warning=FALSE, message=FALSE}
-# for (nm in names(asex_bal_ts_plts)) {
-#   asex_bal_ts_plts[[nm]]@colData[,colnames(asex_bal_ts_plts[[nm]])] <-  asex_bal_ts_plts[[nm]]
-# }
+
+```{r, results='asis', warning=F, message=F}
+a_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "a.MSC")]
+f_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "f.MSC")]
+m_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "m.MSC")]
 ```
 
-```{r}
-asex_bal_ts_plts 
-
-```
 
 ```{r, fig.width=10, fig.height=12}
 # generated in 'm2_GO_all.Rmd'
-DE_genes_freq <- readRDS("data/processed/Pf/m2_all/strain_DE/DE_genes_freq.RDS")
+DE_genes_freq <- readRDS(paste0(read_dir, "DE_genes_freq.RDS"))
 
 ```
 
@@ -626,7 +650,7 @@ a <- imap(gns2plotsmoother[[1]][1],~{
   gn_nm <- str_remove(.y, "MS.*")
   
   map(gn_tbl, ~{
-  lg_map <- str_remove_all(levels(asex_bal_ts_plts[[.x$donor]]$tradeSeq$conditions), "M.*_|M.*SLOC_") %>% set_names(paste0("Lineage 1_", levels(asex_bal_ts_plts[[.x$donor]]$tradeSeq$conditions)))
+  lg_map <- str_remove_all(levels(afm_bal_ts[[.x$donor]]$tradeSeq$conditions), "M.*_|M.*SLOC_") %>% set_names(paste0("Lineage 1_", levels(afm_bal_ts[[.x$donor]]$tradeSeq$conditions)))
   
   cols = strain_cols_n[lg_map]
 
@@ -634,7 +658,7 @@ a <- imap(gns2plotsmoother[[1]][1],~{
   
   print(lg_map)
     
-  tde_smooth_plt_light(tde = asex_bal_ts_plts[[.x$donor]], lege_pos = "bottom", gn = .x$gene_id, gn_name = .x$donor, curve_cols = cols) +
+  tde_smooth_plt_light(tde = afm_bal_ts[[.x$donor]], lege_pos = "bottom", gn = .x$gene_id, gn_name = .x$donor, curve_cols = cols) +
       scale_colour_manual(breaks = names(lg_map),
                            labels = lg_map,
                          values = cols
@@ -653,7 +677,7 @@ a
 
 ```{r, results='asis', warning=F, message=F}
 # Generated in 'm2_tseq_MAST_DE_comprsn.Rmd' 
-gn_tble_gg_smoother<- readRDS("data/processed/Pf/m2_all/strain_DE/gn_tble_gg_smoother.RDS") 
+gn_tble_gg_smoother<- readRDS(paste0(read_dir, "gn_tble_gg_smoother.RDS") )
 # gn_tble_gg_smoother_data <- readRDS("data/processed/Pf/m2_all/strain_DE/gn_tble_gg_smoother_data.RDS")
 
 ```
@@ -678,7 +702,7 @@ manual_tseq_smoothers_plot <- function(tseq_dset, gn_xprsn_tbl, gene_id, plot_tt
 
 ```{r, fig.width=4, fig.height=4}
 
-manual_tseq_smoothers_plot(tseq_dset = asex_bal_ts_plts[["MSC60C"]], gn_xprsn_tbl = gn_tble_gg_smoother[["MSC60C"]], gene_id = "PF3D7-0113000", plot_ttl = "id")
+manual_tseq_smoothers_plot(tseq_dset = afm_bal_ts[["m.MSC60C"]], gn_xprsn_tbl = gn_tble_gg_smoother[["m.MSC60C"]], gene_id = "PF3D7-0113000", plot_ttl = "id")
 ```
 
 ```{r, results='asis', warning=F, message=F, fig.width=8, fig.height=4}
@@ -689,7 +713,7 @@ a <- imap(gns2plotsmoother[[1]][1], ~{
   print(gn_nm)
   
   map(gn_tbl, ~{
-    manual_tseq_smoothers_plot(tseq_dset = asex_bal_ts_plts[[.x$donor]], gn_xprsn_tbl = gn_tble_gg_smoother[[.x$donor]], gene_id = .x$gene_id, plot_ttl = .x$donor)
+    manual_tseq_smoothers_plot(tseq_dset = afm_bal_ts[[.x$donor]], gn_xprsn_tbl = gn_tble_gg_smoother[[.x$donor]], gene_id = .x$gene_id, plot_ttl = .x$donor)
       
     }) %>%
   cowplot::plot_grid(plotlist = ., ncol = 3, labels = gn_nm, label_size = 12, hjust = 0.1, vjust = 0.5 )
@@ -700,10 +724,10 @@ a
 
 ```{r, fig.width=4, fig.height=4}
 
-df_curves <- predictSmooth(asex_bal_ts_plts[["MSC60C"]], gene = "PF3D7-0113000", nPoints = 100, tidy = TRUE) %>% 
+df_curves <- predictSmooth(afm_bal_ts[["m.MSC60C"]], gene = "PF3D7-0113000", nPoints = 100, tidy = TRUE) %>% 
   mutate(strain = str_remove(condition, "M.*_"))
 
-ggplot(gn_tble_gg_smoother[["MSC60C"]], aes(x = slingPseudotime_1 , y = log1p(`PF3D7-0113000`+1), colour = strain)) + 
+ggplot(gn_tble_gg_smoother[["m.MSC60C"]], aes(x = slingPseudotime_1 , y = log1p(`PF3D7-0113000`+1), colour = strain)) + 
                              geom_point() +
                              geom_line(data = df_curves, aes(x = time, y = log1p(yhat+1), colour = strain), linewidth = 1) +
                              scale_colour_manual(values = strain_cols_n) +
@@ -716,9 +740,9 @@ ggplot(gn_tble_gg_smoother[["MSC60C"]], aes(x = slingPseudotime_1 , y = log1p(`P
 
 ```{r, fig.width=8, fig.height=4}
 
-df_curves_don <- map(asex_bal_ts_plts[c("MSC33C", "MSC60C", "MSC66C")], ~predictSmooth(.x, gene = "PF3D7-0113000", nPoints = 100, tidy = TRUE) %>% 
+df_curves_don <- map(afm_bal_ts[c("a.MSC33C", "a.MSC49C", "a.MSC66C")], ~predictSmooth(.x, gene = "PF3D7-0113000", nPoints = 100, tidy = TRUE) %>% 
   mutate(strain = str_remove(condition, "M.*_"))) %>% bind_rows(., .id = "donor")
-gn_tble_gg_smoother_don <- gn_tble_gg_smoother[c("MSC33C", "MSC60C", "MSC66C")] %>% bind_rows(., .id = "donor")
+gn_tble_gg_smoother_don <- gn_tble_gg_smoother[c("a.MSC33C", "a.MSC49C", "a.MSC66C")] %>% bind_rows(., .id = "donor_stg")
 
 ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(`PF3D7-0113000`+1), colour = strain)) + 
                              geom_point(size = 1) +
@@ -735,8 +759,8 @@ ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(`PF3D7-011
 
 ```{r, fig.width=8, fig.height=5}
 gn_tble_gg_smoother_don_all <- gn_tble_gg_smoother %>% 
-  bind_rows(., .id = "donor") %>% 
-  select(strain, cell_bc, starts_with("PF3D7"), donor, slingPseudotime_1)  %>% 
+  bind_rows(., .id = "donor_stg") %>% 
+  select(strain, cell_bc, starts_with("PF3D7"), donor_stg, slingPseudotime_1)  %>% 
   pivot_longer(cols = starts_with("PF3D7"), names_to = "gene_id", values_to = "expression") %>% 
   left_join(., Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene), by = 'gene_id') %>%
   mutate(across(Gene, ~ifelse(is.na(.x), gene_id, Gene)))
@@ -745,9 +769,9 @@ gn_tble_gg_smoother_don_all <- gn_tble_gg_smoother %>%
 
 ```{r, fig.width=8, fig.height=5}
 
-df_curves_don_all <- map(asex_bal_ts_plts, ~predictSmooth(.x, gene = rownames(.x), nPoints = 100, tidy = TRUE) %>% 
+df_curves_don_all <- map(afm_bal_ts, ~predictSmooth(.x, gene = rownames(.x), nPoints = 100, tidy = TRUE) %>% 
   mutate(strain = str_remove(condition, "M.*_"))) %>%
-  bind_rows(., .id = "donor") %>% 
+  bind_rows(., .id = "donor_stg") %>% 
   rename("gene_id" = gene) %>% 
   left_join(., Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene), by = c('gene_id')) %>%
   mutate(across(Gene, ~ifelse(is.na(.x), gene_id, Gene)))
@@ -755,15 +779,15 @@ df_curves_don_all <- map(asex_bal_ts_plts, ~predictSmooth(.x, gene = rownames(.x
 ```
 
 ```{r, fig.width=8, fig.height=5}
-df_curves_don <- df_curves_don_all %>% filter(gene_id %in% c("PF3D7-0113000", "PF3D7-1102700") & donor %in% c("MSC33C", "MSC60C", "MSC66C"))
+df_curves_don <- df_curves_don_all %>% filter(gene_id %in% c("PF3D7-0113000", "PF3D7-1102700") & donor_stg %in% c("a.MSC33C", "a.MSC49C", "a.MSC66C"))
 
 gn_tble_gg_smoother_don <- gn_tble_gg_smoother_don_all %>% 
-  filter(donor %in% c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C") & gene_id %in% c("PF3D7-0113000", "PF3D7-1102700")) 
+  filter(donor_stg %in% c("a.MSC33C", "a.MSC50_SLOC", "a.MSC49C", "a.MSC66C", "a.MSC68C") & gene_id %in% c("PF3D7-0113000", "PF3D7-1102700")) 
 
 ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(expression+1), colour = strain)) + 
                              geom_point(size = 1) +
                              geom_line(data = df_curves_don, aes(x = time, y = log1p(yhat+1), colour = strain), linewidth = 1) +
-                             facet_grid(gene_id ~ donor, scales = "free") +
+                             facet_grid(gene_id ~ donor_stg, scales = "free") +
                              scale_colour_manual(values = strain_cols_n) +
   labs(title = "Gene") +
   theme_classic2()+
@@ -774,7 +798,7 @@ ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(expression
 
 ### Plotting DE genes that are highly prevalent between donors
 ```{r}
-mast_tde_corr_tbls <- readRDS('data/processed/Pf/m2_all/strain_DE/mast_tde_corr_tbls.RDS')
+# mast_tde_corr_tbls <- readRDS(paste0(read_dir, "mast_tde_corr_tbls.RDS"))
 ```
 
 
@@ -821,15 +845,15 @@ top_wstat_mastLFC_noVAR <- top_wstat_mastLFC %>% filter(!str_detect(Gene, "VAR")
 
 tseq_smoother_facet_allDons_plot_fn <- function(gns = top_wstat_mastLFC_noVAR$gene_id) {
   
-  df_curves_don <- df_curves_don_all %>% filter(gene_id %in% gns & donor %in% c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C"))
+  df_curves_don <- df_curves_don_all %>% filter(gene_id %in% gns & donor_stg %in% c("a.MSC33C", "a.MSC49C", "a.MSC50_SLOC", "a.MSC60C", "a.MSC66C", "a.MSC68C"))
 
 gn_tble_gg_smoother_don <- gn_tble_gg_smoother_don_all %>% 
-  filter(donor %in% c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C") & gene_id %in% gns) 
+  filter(donor_stg %in% c("a.MSC33C", "a.MSC49C", "a.MSC50_SLOC", "a.MSC60C", "a.MSC66C", "a.MSC68C") & gene_id %in% gns) 
 
 ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(expression+1), colour = strain)) + 
                              geom_point(size = 0.5) +
                              geom_line(data = df_curves_don, aes(x = time, y = log1p(yhat+1), colour = strain), linewidth = 1.5) +
-                             facet_grid2(Gene ~ donor, scales = "free") +
+                             facet_grid2(Gene ~ donor_stg, scales = "free") +
                              scale_colour_manual(values = strain_cols_n) +
   # labs(title = "Gene") +
   theme_classic2()+
@@ -847,15 +871,15 @@ ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(expression
 
 ```{r, fig.width=10, fig.height=10}
 
-df_curves_don <- df_curves_don_all %>% filter(gene_id %in% top_wstat_mastLFC_noVAR$gene_id & donor %in% c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C"))
+df_curves_don <- df_curves_don_all %>% filter(gene_id %in% top_wstat_mastLFC_noVAR$gene_id & donor_stg %in% c("a.MSC33C", "a.MSC49C", "a.MSC50_SLOC", "a.MSC60C", "a.MSC66C", "a.MSC68C"))
 
 gn_tble_gg_smoother_don <- gn_tble_gg_smoother_don_all %>% 
-  filter(donor %in% c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C") & gene_id %in% top_wstat_mastLFC_noVAR$gene_id) 
+  filter(donor_stg %in% c("a.MSC33C", "a.MSC49C", "a.MSC50_SLOC", "a.MSC60C", "a.MSC66C", "a.MSC68C") & gene_id %in% top_wstat_mastLFC_noVAR$gene_id) 
 
 ggplot(gn_tble_gg_smoother_don, aes(x = slingPseudotime_1 , y = log1p(expression+1), colour = strain)) + 
                              geom_point(size = 0.5) +
                              geom_line(data = df_curves_don, aes(x = time, y = log1p(yhat+1), colour = strain), linewidth = 1.5) +
-                             facet_grid2(Gene ~ donor, scales = "free") +
+                             facet_grid2(Gene ~ donor_stg, scales = "free") +
                              scale_colour_manual(values = strain_cols_n) +
   # labs(title = "Gene") +
   theme_classic2()+
@@ -884,6 +908,7 @@ tseq_smoother_facet_allDons_plot_fn(gns = folate_pway_gns)
 ```{r, results='asis', warning=F, message=F, fig.width=5.5, fig.height=4}
 gns2plotsmoother_df <- map(DE_genes_freq, ~.x %>% filter(freq_btwn_don >= 3) %>% 
       select(donor, gene_id, Gene) %>% 
+      rename("donor_stg" = donor) %>%
       distinct(., .keep_all = T) #%>% 
       # split(., f = factor(.$gene_id)) #%>%
       # map(., ~split(.x, f = factor(.$donor)))
@@ -899,16 +924,16 @@ unique(gns2plotsmoother_df[[1]]$Gene) %>% dput()
 ```{r, fig.width=10, fig.height=9}
 ## Previous fig size when we incorporating strains with a lower threshold of at least than 100 cells resulting in more cells. = fig.width=10, fig.height=15
 
-df_curves_don2 <- gns2plotsmoother_df[[1]] %>% select(donor, gene_id) %>% left_join(., df_curves_don_all, by = c("donor", "gene_id")) 
+df_curves_don2 <- gns2plotsmoother_df[[1]] %>% select(donor_stg, gene_id) %>% left_join(., df_curves_don_all, by = c("donor_stg", "gene_id")) 
 
 gn_tble_gg_smoother_don2 <- gns2plotsmoother_df[[1]] %>% 
-  select(donor, gene_id) %>% 
-  left_join(., gn_tble_gg_smoother_don_all, by = c("donor", "gene_id"))  
+  select(donor_stg, gene_id) %>% 
+  left_join(., gn_tble_gg_smoother_don_all, by = c("donor_stg", "gene_id"))  
 
 ggplot(gn_tble_gg_smoother_don2, aes(x = slingPseudotime_1 , y = log1p(expression+1), colour = strain)) + 
                              geom_point(size = 0.5) +
                              geom_line(data = df_curves_don2, aes(x = time, y = log1p(yhat+1), colour = strain), linewidth = 1.5) +
-                             facet_nested_wrap(vars(Gene, donor), scales = "free", ncol = 6) +
+                             facet_nested_wrap(vars(Gene, donor_stg), scales = "free", ncol = 6) +
                              scale_colour_manual(values = strain_cols_n) +
   # labs(title = "Gene") +
   theme_classic2()+
@@ -955,12 +980,13 @@ var_cols <- c("A" = "#8343b7" , "B/C" = "#a8253a", "B" =  "#b0921d", "C" = "#fd3
 ### Annotation groups for the header ie column
 # gns = cond_gns_de_asx[["MSC49C"]] %>% filter(pvalue < 0.05) %>% arrange(desc(waldStat)) %>%   mutate(wstat_rank = rank(-waldStat)) %>% filter(., wstat_rank < 20 | str_detect(Gene, "VAR")) %>% pull(gene_id)
 
-gns = all_sig_gns_df[[1]] %>% filter(donor == "MSC49C") %>%
+gns = all_sig_gns_df_afm[[1]] %>% 
+  filter(donor == "a.MSC49C") %>%
   pull(gene_id)
 
 # print(str(gns))
 ##Edited from the original version to allow the labelling of rows with gene names
-msc_yhatSmooth_w_annot <- predictSmooth(asex_bal_ts_plts[["MSC49C"]], gene = gns, nPoints = 30, tidy = FALSE) %>% 
+msc_yhatSmooth_w_annot <- predictSmooth(afm_bal_ts[["a.MSC49C"]], gene = gns, nPoints = 30, tidy = FALSE) %>% 
   t() %>%scale() %>% t() %>% as.data.frame()%>% 
   rownames_to_column('gene_id') %>% 
   left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
@@ -977,8 +1003,8 @@ msc_yhatSmooth <- msc_yhatSmooth_w_annot %>%
   dplyr::select(-c(Ka_Ks, VAR)) 
 
 # print(str(msc_yhatSmooth))
-msc_col_annot <- predictSmooth(asex_bal_ts_plts[["MSC49C"]], gene = gns, nPoints = 30, tidy = T)  %>% 
-  mutate(point = paste0("point", rep(rep(1:30,length(unique(asex_bal_ts_plts[["MSC49C"]]@colData$tradeSeq$conditions))),length(gns))), 
+msc_col_annot <- predictSmooth(afm_bal_ts[["a.MSC49C"]], gene = gns, nPoints = 30, tidy = T)  %>% 
+  mutate(point = paste0("point", rep(rep(1:30,length(unique(afm_bal_ts[["a.MSC49C"]]@colData$tradeSeq$conditions))),length(gns))), 
          lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
   rownames_to_column('No')  %>% 
   dplyr::select(lin_id,time,condition)%>% 
@@ -1043,12 +1069,12 @@ hmap2
 
 ```{r, fig.width=10, fig.height=12}
 # generated in 'm2_GO_all.Rmd'
-all_sig_gns_df <- readRDS("data/processed/Pf/m2_all/strain_DE/all_sig_gns_df.RDS")
+all_sig_gns_df_afm <- readRDS(paste0(read_dir, "all_sig_gns_df_afm.RDS"))
 ```
 
 
 ```{r, results='asis', warning=F, message=F, fig.width= 4, fig.height=3}
-map(all_sig_gns_df, ~{.x %>% 
+map(all_sig_gns_df_afm, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don) %>%
   mutate(across(freq_btwn_don, factor)) %>% 
