@@ -287,60 +287,6 @@ plot_ly(data = data.frame(fm_leiden_w_donors_norm_harmony_jnd[["w.5.f_fLE"]]@red
 map(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "umap.harmony_PC_man", order = T))
 ```
 
-```{r, warning=FALSE, message=FALSE}
-Idents(pseudo_fm) <- "cluster_condition"
-
-bulk.mono.de <- FindMarkers(object = pseudo_fm, 
-                         ident.1 = "CD14 Mono_STIM", 
-                         ident.2 = "CD14 Mono_CTRL",
-                         test.use = "DESeq2")
-head(bulk.mono.de, n = 15)
-```
-
-```{r, warning=FALSE, message=FALSE}
-# compare the DE P-values between the single-cell level and the pseudobulk level results
-names(bulk.mono.de) <- paste0(names(bulk.mono.de), ".bulk")
-bulk.mono.de$gene <- rownames(bulk.mono.de)
-
-merge_dat <- merge(mono.de, bulk.mono.de, by = "gene")
-merge_dat <- merge_dat[order(merge_dat$p_val.bulk), ]
-
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-# create a new column to annotate sample-condition-celltype in the single-cell dataset
-ifnb$donor_id.stim <- paste0(ifnb$stim, "-", ifnb$donor_id)
-
-# generate violin plot 
-Idents(ifnb) <- "cluster_condition"
-print(merge_dat[merge_dat$gene%in%common[1:2],c('gene','p_val.sc','p_val.bulk')])
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-VlnPlot(ifnb, features = common[1:2], idents = c("CD14 Mono_CTRL", "CD14 Mono_STIM"), group.by = "stim") 
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-VlnPlot(ifnb, features = common[1:2], idents = c("CD14 Mono_CTRL", "CD14 Mono_STIM"), group.by = "donor_id.stim", ncol = 1) 
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-print(merge_dat[merge_dat$gene%in%c('SRGN','HLA-DRA'),c('gene','p_val.sc','p_val.bulk')])
-```
-
-```{r, warning=FALSE, message=FALSE}
-VlnPlot(ifnb, features <- c('SRGN','HLA-DRA'), idents = c("CD14 Mono_CTRL", "CD14 Mono_STIM"), group.by = "donor_id.stim", ncol = 1) 
-```
-
-
-######### END - Pseudobulk DE #####################
-
-
-
 
 ```{r, warning=FALSE, message=FALSE}
 cb_fm_de_leiden <- map(fm_leiden_w_donors_norm_harmony_jnd, ~FindAllMarkers(.x, assay = "RNA", slot = "data"))
