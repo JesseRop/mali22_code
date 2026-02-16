@@ -70,7 +70,6 @@ suppressPackageStartupMessages({
 })
 ```
 
-
 ```{r setup}
 sample_set = "Mali2"
 
@@ -89,7 +88,12 @@ knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/u
 source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
 source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
-source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/strain_DE/strain_DE_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/14_strain_DE/strain_DE_common_fns.R")
+```
+
+```{r}
+read_dir <- "data/processed/Pf/m2_all/strain_DE/"
+save_dir <- "data/processed/Pf/m2_all/strain_DE/"
 ```
 
 ```{r}
@@ -103,7 +107,8 @@ Integrated asexual
 ## subset where field parasites are for slingshot
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_ss_res_fld_pt.RDS")
 # v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_harmony_res_fld_pt.RDS") 
-v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_pt_no_rings.RDS")
+# v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/v3_m2_asex_cr_filt_norm_harmony_pt_no_rings.RDS")
+v3_m2_asex_harmony_ss_res_fld_pt <- readRDS("data/processed/Pf/m2_all/m2_asex_bal_seu.RDS")
 
 v3_m2_asex_harmony_ss_res_fld_pt <- v3_m2_asex_harmony_ss_res_fld_pt[, !v3_m2_asex_harmony_ss_res_fld_pt$Strain_DN %in% c("Doublet", "Negative")]
 v3_m2_asex_harmony_ss_res_fld_pt
@@ -156,33 +161,6 @@ FeaturePlot(v3_m2_asex_harmony_ss_res_fld_pt, features = "PF3D7-0925700", reduct
 # v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
 
 ```
-
-
-
-```{r}
-## Creating new stage variables which are need to fit in with old code
-v3_m2_asex_harmony_ss_res_fld_pt <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
-  mutate(#across(donor, ~str_remove_all(.x, "C$")),
-         sample_id = donor,
-         donor_nm = str_remove_all(donor, "_SLO|_MACS|C$"),
-         condition = factor(condition, levels = c("Asymptomatic", "Symptomatic")), 
-         Symptomatic = condition,
-         # across(Symptomatic, ~factor(str_replace_all(.,  c("Yes" = "Symptomatic", "No" = "Asymptomatic")), levels=c("Symptomatic", "Asymptomatic"))),
-         StageFL = stage,
-         StageFL_ND = stage,
-         dset = dset_labmrg,
-         # StrainDon = paste0(str_remove(donor, "SC"), "_", Strain_DN),
-         StrainDon = paste0(str_remove(donor_nm, "SC"), "_", Strain_DN),
-         pseudotime = slingPseudotime_1,
-         pseudotime_fld_only = slingPseudotime_1,
-         # stage = stage_fld,
-         strain = Strain_DN,
-         dset = "Field",
-         dsetC = "Field") %>% 
-  select(StageFL, StageFL_ND, dset,StrainDon,pseudotime, pseudotime_fld_only,  strain, donor_nm, condition, Symptomatic, donor, dset, dsetC) %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
-```
-
 
 
 ```{r}
@@ -252,14 +230,14 @@ colData(v3_m2_asex_harmony_sce_ss)[,colnames(v3_m2_asex_harmony_ss_res_fld_pt@me
 
 ```{r, warning=FALSE, message=FALSE}
 ## Calculate pseudotime chunks
-v3_m2_asex_harmony_sce_ss_df <- ptime_chunk_calc_df_fn(sc_df = v3_m2_asex_harmony_sce_ss@colData, ptime = "pseudotime", chunk_num = 20, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat")
+# v3_m2_asex_harmony_sce_ss_df <- ptime_chunk_calc_df_fn(sc_df = v3_m2_asex_harmony_sce_ss@colData, ptime = "pseudotime", chunk_num = 20, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat")
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
 ## Calculate pseudotime chunks
 m2_asex_tr_sce_pt_chunks_sshot <- v3_m2_asex_harmony_sce_ss
-m2_asex_tr_sce_pt_chunks_sshot@colData[,colnames(v3_m2_asex_harmony_sce_ss_df)] <- v3_m2_asex_harmony_sce_ss_df
+# m2_asex_tr_sce_pt_chunks_sshot@colData[,colnames(v3_m2_asex_harmony_sce_ss_df)] <- v3_m2_asex_harmony_sce_ss_df
 
 ```
 
@@ -369,18 +347,22 @@ Add the entire object for field lab DE and also including culture
 
 
 ```{r, warning=FALSE, message=FALSE}
-set.seed(989778)
-ds_grp <- rep('StrainDon', length(dons_bal_sset_nms))
-
-balanced_cells_tbl <- map2(m2_asex_sce, ds_grp, ~balanced_cells_fn(sc_df = .x@colData, dsample_condtn = .y , ptime_strategy = "ptime_bal_cat", multpl = 1, don_yes_no = "no"))
+# set.seed(989778)
+# ds_grp <- rep('StrainDon', length(dons_bal_sset_nms))
+# 
+# balanced_cells_tbl <- map2(m2_asex_sce, ds_grp, ~balanced_cells_fn(sc_df = .x@colData, dsample_condtn = .y , ptime_strategy = "ptime_bal_cat", multpl = 1, don_yes_no = "no"))
 ```
 
+```{r, warning=FALSE, message=FALSE}
+ds_grp <- rep('StrainDon', length(dons_bal_sset_nms))
+
+```
 
 
 
 ```{r, warning=FALSE, message=FALSE}
 ######################### !!!!!NOTE - Unbalanced alternative to increase power replacing balanced with unbalanced - switch to return balanced or viceversa 
-m2_asex_bal_sce <- map2(m2_asex_sce, balanced_cells_tbl, ~.x[, .y$cell_bc])
+m2_asex_bal_sce <- m2_asex_sce
 
 ```
 
@@ -390,14 +372,14 @@ map(m2_asex_bal_sce, ~.x@colData[,c("ptime_bal_cat", "StrainDon")] %>% data.fram
 
 
 ```{r, warning=FALSE, message=FALSE}
-## Calculate pseudotime chunks
-v3_m2_asex_harmony_sce_ss_df2 <- map(m2_asex_bal_sce, ~ptime_chunk_calc_df_fn(sc_df = .x@colData, ptime = "pseudotime", chunk_num = 7, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
+# ## Calculate pseudotime chunks
+# v3_m2_asex_harmony_sce_ss_df2 <- map(m2_asex_bal_sce, ~ptime_chunk_calc_df_fn(sc_df = .x@colData, ptime = "pseudotime", chunk_num = 7, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-for (nm in names(m2_asex_bal_sce)) {
-  m2_asex_bal_sce[[nm]]@colData[,colnames(v3_m2_asex_harmony_sce_ss_df2[[nm]])] <-  v3_m2_asex_harmony_sce_ss_df2[[nm]]
-}
+# for (nm in names(m2_asex_bal_sce)) {
+#   m2_asex_bal_sce[[nm]]@colData[,colnames(v3_m2_asex_harmony_sce_ss_df2[[nm]])] <-  v3_m2_asex_harmony_sce_ss_df2[[nm]]
+# }
 ```
 
 ```{r}
@@ -412,7 +394,7 @@ map(m2_asex_bal_sce, ~.x@colData[,c("ptime_bal_cat", "StrainDon")] %>% data.fram
 ### Retain cells with strains having more than 10 in each stage
 
 
-```{r}
+```{r, eval=FALSE}
 ##Remove groups with less than 10
 # m2_asex_bal_sce <- map2(m2_asex_bal_sce, ds_grp, ~.x[,.x@colData[, .y, drop = F] %>% data.frame()  %>% rownames_to_column('bcode') %>% group_by(!!rlang::sym(.y)) %>% filter(n() >=20) %>% pull(bcode)])
 
@@ -851,42 +833,8 @@ strn_sizes <- ifelse(strain_nms == "Other", 0.01, 0.5) %>% set_names(strain_nms)
 
 ```
 
-```{r, fig.width=10, fig.height=2.8}
-# background cells
-
-umap_meta_df %>%
-    mutate(Strain = factor(case_when(donor == "MSC68C" & ptime_bal_cat %in% "ptime_2" ~ strain, 
-                                     T ~ "Other"), 
-                           levels = strain_nms_lvls),
-           strn_rank = factor(case_when(donor == "MSC68C" & ptime_bal_cat %in% "ptime_2" ~ "Strain_rnk", 
-                                        T ~ "Other"), 
-                              levels = c("Strain_rnk", "Other")),
-           pt_set = paste0("MSC68C", "_", "1")) %>%
-    ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain, size = Strain))+
-    geom_point() +
-      facet_wrap(.~pt_set)+
-    scale_color_manual(values = strain_cols_n)+
-    scale_size_manual(values = strn_sizes) 
-```
 
 
-
-```{r, fig.width=10, fig.height=2.8}
-# background cells
-
-umap_meta_df %>%
-    mutate(Strain = factor(case_when(donor == "MSC68C" & ptime_bal_cat %in% "ptime_2" ~ strain, 
-                                     T ~ "Other"), 
-                           levels = strain_nms_lvls),
-           strn_rank = factor(case_when(donor == "MSC68C" & ptime_bal_cat %in% "ptime_2" ~ "Strain_rnk", 
-                                        T ~ "Other"), 
-                              levels = c("Strain_rnk", "Other")),
-           pt_set = paste0(donor, "_", ptime_bal_cat)) %>%
-    ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain, size = Strain))+
-    geom_point() +
-    scale_color_manual(values = strain_cols_n)+
-    scale_size_manual(values = strn_sizes) 
-```
 
 ```{r, fig.width=10, fig.height=2.8}
 # background cells
@@ -928,7 +876,12 @@ umap_meta_df_bal_cells_plot2 <- map(names(m2_asex_bal_sce), ~{
   bind_rows() #%>%
   # mutate(pt_bg = paste0(donor, "_", pt_set ))
 
- 
+
+  
+```
+
+
+```{r, fig.width=16, fig.height=12}
 umap_meta_df_bal_cells_plot2 %>%
       ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain, size = Strain))+
       geom_point() +
@@ -948,7 +901,6 @@ umap_meta_df_bal_cells_plot2 %>%
   labs(x = "UMAP_1", y="UMAP_2")
   
 ```
-
 
 ```{r, results="asis", fig.width=4, fig.height=3}
 bal100_de_cells %>% count(donor, ptime_bal_cat, StrainDon)
@@ -989,6 +941,8 @@ umap_meta_df_bal_cells_plot <- map(names(m2_asex_bal_sce), ~{
 
 ```
 
+
+
 ```{r, fig.width=10, fig.height=12}
 umap_meta_df_bal_cells_plot %>%
       ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Strain, size = Strain))+
@@ -1018,23 +972,13 @@ umap_meta_df_bal_cells_plot %>%
   labs(x = "UMAP_1", y="UMAP_2")
   
 ```
-```{r, results="asis", fig.width= 3.5, fig.height=2.8}
 
 
-
-# DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", group.by = "stage", split.by = "Symptomatic", pt.size = 0.1)+
-#   scale_color_manual(values = sp_fld_colors) +
-#   theme(axis.text=element_blank(), 
-#         axis.title=element_blank(),
-#         legend.position = "bottom",
-#         # legend.position = "none",
-#         legend.text = element_text(size = 15) ,
-#         legend.title = element_text(size = 15, face = "bold"),
-#         plot.title = element_blank(),
-#         strip.text =element_text(size=16,face="bold", colour = 'black')) +
-#     guides(color = guide_legend(title.position = "top", nrow =1, override.aes = list(size = 3))) +
-#   labs(x = "UMAP_1", y="UMAP_2") 
+```{r, fig.width=10, fig.height=12}
+# save table fot umaps with downsampled strains highlighted
+saveRDS(umap_meta_df_bal_cells_plot, paste0(save_dir, "umap_meta_df_bal_cells_plot.RDS"))
 ```
+
 
 #### Put subseted objects into a list and calculate metrics need for plotting and tradeseq input
 ```{r}
@@ -1096,29 +1040,49 @@ write_csv(cond_tbl, paste0("data/processed/Pf/cond_tbl.csv"))
 
 ```
 
+```{r}
+dput(names(m2_asex_bal_sce))
+```
+
 
 ```{r, results="asis", eval=T}
 gogo()
 ## Tradeseq script
+# bsub < /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/mali22_code_lnk/bash_scripts/submsn_tseq_condtn.sh
 
 # nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq_condtn.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/{MSC33C,MSC49C,MSC50_SLOC,MSC60C,MSC66C,MSC68C}/tradeseq/m2_asex_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_nf.R --cond_tbl "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/cond_tbl.csv" --resume
 
 ```
 
 
-Read in tradeseq files from local
-```{r}
-asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+Read in tradeseq output from above run
+```{r, message=F, warning=F, eval=T}
+## Get file list
+asex_bal_ts_files <- Sys.glob("data/processed/Pf/*/tradeseq/m2_asex_bal_ts.RDS")
+asex_bal_ts_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+asex_bal_ts <- map(asex_bal_ts_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*')))) %>% 
+  unlist(., recursive = F) %>% 
   .[names(m2_asex_bal_sce)] %>%
   map(readRDS)
-
 ```
 
 Read in tradeseq condition DE files from local
-```{r}
-asex_bal_de <- list.files('data/processed/Pf', pattern = "m2_asex_bal_de.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
+```{r, message=F, warning=F, eval=T}
+## Get file list
+asex_bal_de_files <- Sys.glob("data/processed/Pf/*/tradeseq/m2_asex_bal_de.RDS")
+asex_bal_de_files
+```
+
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+asex_bal_de <- map(asex_bal_de_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*')))) %>% 
+  unlist(., recursive = F) %>% 
   .[names(m2_asex_bal_sce)] %>%
   map(readRDS)
 ```
@@ -1177,7 +1141,7 @@ asex_bal_de_adj <- map(asex_bal_de, ~.x %>%
 
 ```{r}
 ##save condition results for GSEA
-saveRDS(asex_bal_de_adj, 'data/processed/Pf/asex_bal_de_adj.RDS')
+saveRDS(asex_bal_de_adj, paste0(save_dir, 'asex_bal_de_adj.RDS'))
 ```
 
 ```{r}
@@ -1236,7 +1200,7 @@ cond_gns_de_asx <- c(cond_gns_005_ub_de_asx) %>%
 
 ```{r}
 ##save condition results for GSEA
-saveRDS(cond_gns_de_asx, 'data/processed/Pf/cond_gns_de_asx.RDS')
+saveRDS(cond_gns_de_asx, paste0(save_dir, 'cond_gns_de_asx.RDS'))
 ```
 
 
@@ -1781,7 +1745,7 @@ msc_yhatSmooth <- msc_yhatSmooth_w_annot %>%
 
 # print(str(msc_yhatSmooth))
 msc_col_annot <- predictSmooth(asex_bal_ts[["MSC66C"]], gene = gns, nPoints = 30, tidy = T)  %>% 
-  mutate(point = paste0("point", rep(rep(1:30,length(unique(asex_bal_ts[["MSC49C"]]@colData$tradeSeq$conditions))),length(gns))), 
+  mutate(point = paste0("point", rep(rep(1:30,length(unique(asex_bal_ts[["MSC66C"]]@colData$tradeSeq$conditions))),length(gns))), 
          lin_id = paste0('lineage', lineage,'_condition', condition, '_',point)) %>%
   rownames_to_column('No')  %>% 
   dplyr::select(lin_id,time,condition)%>% 
@@ -1859,7 +1823,7 @@ msc_yhatSmooth_w_annot <- predictSmooth(asex_bal_ts[["MSC49C"]], gene = gns, nPo
   left_join(., Pf3D7_genes_plasmoDB  %>% dplyr::select("Gene", "gene_id", "Ka_Ks"), by = 'gene_id') %>% 
   left_join(., gene_annot, by = 'gene_id') %>% mutate(across(c("VAR"), ~case_when(is.na(.) ~ "NV", T ~ .))) %>%
   mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene)) %>% 
-  mutate(across(Gene, ~str_remove(., "VAR_"))) %>%
+  mutate(across(Gene, ~str_remove(., "VAR_|RPS19_|HSP90_"))) %>%
   dplyr::select(-c(gene_id)) %>% 
   column_to_rownames('Gene')
 
@@ -1928,7 +1892,7 @@ hmap_t<- ComplexHeatmap::Heatmap(msc_yhatSmooth %>% as.data.frame() %>% as.matri
 
 ```
 
-```{r, fig.height=5, fig.width=7}
+```{r, fig.height=5, fig.width=12}
 hmap_t
 # c("#b7e577", "#3ce07e")
 ```
