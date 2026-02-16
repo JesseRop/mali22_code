@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains code used to analyze approximately 20 asymptomatic and symptomatic *Plasmodium falciparum* infections as part of a collaboration between the [Lawniczak lab](https://www.sanger.ac.uk/person/lawniczak-anopheles-e/) at the Wellcome Sanger Institute and the Djimdes lab in the MRTC (Malaria Research and Training Center) Mali. This analysis was conducted as part of a PhD project at the University of Cambridge.
+This repository contains code used to analyze approximately 20 asymptomatic and symptomatic *Plasmodium falciparum* infections as part of a collaboration between the [Lawniczak lab](https://www.sanger.ac.uk/group/lawniczak-group/) at the Wellcome Sanger Institute and the Djimdes lab in the MRTC (Malaria Research and Training Center) Mali. This analysis was conducted as part of a PhD project at the University of Cambridge.
 
 Samples were processed using 10X Genomics technology as per previously published protocols and papers.
 
@@ -243,12 +243,6 @@ The pipeline generates:
 - Python scripts/notebooks: Specialized analyses (cNMF, etc.)
 - `html_notebooks/` / `farm_rmd_nbooks/`: Rendered analysis outputs
 
-## Notes
-
-- This analysis uses LSF (IBM Load Sharing Facility) for high-performance computing
-- Extensive documentation is embedded in individual R Markdown files
-- Color schemes and stage definitions are standardized across all visualizations (see `pf_common_vars.R`)
-- Backup and version-controlled scripts are maintained for reproducibility
 
 ## Citation
 
