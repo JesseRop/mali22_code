@@ -84,60 +84,61 @@ solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
 
 ```
 
-Read in tradeseq files from local
-```{r, eval=FALSE}
-mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
-# mf_bal_ts <- list.files('data/processed/Pf', pattern = "m2_mf_bal_a_.*_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>%
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq/m2_mf_bal|_t.*'))) %>%
+############# Read in gametocyte files ###############
+
+```{r}
+read_dir <- "data/processed/Pf/m2_all/strain_DE_afm/"
+save_dir <- "data/processed/Pf/m2_all/strain_DE_afm/"
+
+# read_dir_asex <- "data/processed/Pf/m2_all/strain_DE/"
+```
+
+
+```{r, results='asis', warning=F, message=F}
+# solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
+
+```
+
+```{r, message=F, warning=F, eval=T}
+## Get file list
+afm_bal_ts_files <- Sys.glob("data/processed/Pf/*/tradeseq_afm/[a|f|m]_afm_bal_ts.RDS")
+afm_bal_ts_files
+```
+
+Read in asexual, female and male tradeseq output
+```{r, message=F, warning=F, eval=T}
+## read filtered barcodes
+afm_bal_ts <- map(afm_bal_ts_files, ~.x %>% 
+  set_names(nm = (str_remove_all(.,'data/processed/Pf/|tradeseq_afm/|_afm_.*') %>% 
+                    gsub("(.*)/(.*)", "\\2/\\1", .) %>% 
+                    str_replace(., "/", ".")))) %>% 
+  unlist(., recursive = F) %>% 
+  # .[solo_don] %>%
   map(readRDS)
-
 ```
 
-Read in tradeseq files from local
+
+```{r, results='asis', warning=F, message=F}
+a_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "a.MSC")]
+f_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "f.MSC")]
+m_groups <-  names(afm_bal_ts)[str_detect(names(afm_bal_ts), "m.MSC")]
+```
+
+Read in asexual, female and male MAST and tradeseq condition test results
 ```{r}
-asex_bal_ts <- list.files('data/processed/Pf', pattern = "m2_asex_bal_ts.RDS$", full.names = T, recursive = T, include.dirs = T) %>% 
-  set_names(nm = (str_remove_all(.,'data/processed/Pf/|/tradeseq.*'))) %>%
-  .[solo_don] %>%
-  map(readRDS)
+mast_tde_corr_tbls <- readRDS(paste0(save_dir, "mast_tde_corr_tbls.RDS"))
 
 ```
 
+############### Read in gametocyte files ###########################
 
-```{r, eval=FALSE}
-##save condition results for GSEA
-cond_gns_de_gam <- readRDS('data/processed/Pf/cond_gns_de_gam.RDS')
-```
-
-
-```{r}
-##save condition results for GSEA
-cond_gns_de_asx <- readRDS('data/processed/Pf/cond_gns_de_asx.RDS')
-```
-
-
-```{r}
-##save condition results for GSEA
-mast_tde_corr_tbls <- readRDS('data/processed/Pf/m2_all/strain_DE/mast_tde_corr_tbls.RDS')
-```
-
-
+Keep if needed for selection of some donors
 ```{r, results='asis', warning=F, message=F}
 # solo_don <- c("MSC33", "MSC49", "MSC60", "MSC66")
 # solo_don2 <- c("MSC49",  "MSC66")
 solo_don <- c("MSC33C", "MSC49C", "MSC50_SLOC", "MSC60C", "MSC66C", "MSC68C")
 solo_don2 <- c("MSC49C",  "MSC66C")
 
-# # all_sig_asx_gns <- map(cond_gns_de_asx[solo_don], ~{
-# all_sig_asx_gns <- map(mast_tde_corr_tbls[solo_don], ~{
-#   .x %>% 
-#   select(-c(starts_with("df"))) %>%
-#   rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
-#   pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
-#                      # names_pattern = "(.*)_(SC._vs.*)",
-#                      names_pattern = "(waldStat|pvalue)_(.*)",
-#                      names_to = c( ".value", "pw_comparison")) %>%
-#     filter(waldStat > 20 & pvalue < 0.001)
-# }) 
 
 ```
 
@@ -150,46 +151,32 @@ mast_tde_corr_tbls_sig <- map(mast_tde_corr_tbls, ~.x %>%
 mast_tde_corr_tbls_sig
 ```
 
-
-```{r, results='asis', warning=F, message=F}
-all_sig_asx_gns <- mast_tde_corr_tbls_sig
-```
-
-```{r, results='asis', warning=F, message=F, eval=FALSE}
-all_sig_f_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_f")], ~{
-  .x %>% 
-  select(-c(starts_with("df"))) %>%
-  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
-  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
-                     # names_pattern = "(.*)_(SC._vs.*)",
-                     names_pattern = "(waldStat|pvalue)_(.*)",
-                     names_to = c( ".value", "pw_comparison")) %>%
-    filter(waldStat > 20 & pvalue < 0.001)
-}) 
+Read in significant asexual, female and male MAST and tradeseq condition test results
+```{r}
+saveRDS(mast_tde_corr_tbls_sig, paste0(save_dir, "mast_tde_corr_tbls_sig.RDS"))
 
 ```
 
 ```{r, results='asis', warning=F, message=F, eval=FALSE}
-all_sig_m_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_m")], ~{
-  .x %>% 
-  select(-c(starts_with("df"))) %>%
-  rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
-  pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
-                     # names_pattern = "(.*)_(SC._vs.*)",
-                     names_pattern = "(waldStat|pvalue)_(.*)",
-                     names_to = c( ".value", "pw_comparison")) %>%
-    filter(waldStat > 20 & pvalue < 0.001)
-}) 
+# all_sig_f_gns <- map(cond_gns_de_gam[str_detect(names(cond_gns_de_gam), "[0-9]_f")], ~{
+#   .x %>% 
+#   select(-c(starts_with("df"))) %>%
+#   rename("wstat_overal"=waldStat, "p_overal"=pvalue) %>%
+#   pivot_longer(.,cols = starts_with(c('waldStat_','pvalue_')), 
+#                      # names_pattern = "(.*)_(SC._vs.*)",
+#                      names_pattern = "(waldStat|pvalue)_(.*)",
+#                      names_to = c( ".value", "pw_comparison")) %>%
+#     filter(waldStat > 20 & pvalue < 0.001)
+# }) 
 
 ```
+
 
 ```{r, results='asis', warning=F, message=F}
 # a_af_separator <- c("[0-9]_f$", "[0-9]_a_f$") %>% set_names(c("f", "a_f"))
-stg_nms <- c(#"f", "m", 
-             "asx")
+stg_nms <- c("a", "f", "m")
 
-all_sig_gns_df <- map(list(#all_sig_f_gns, all_sig_m_gns, 
-                           all_sig_asx_gns), ~{
+all_sig_gns_df_afm <- map(list(mast_tde_corr_tbls_sig[a_groups], mast_tde_corr_tbls_sig[f_groups], mast_tde_corr_tbls_sig[m_groups]), ~{
   .x %>%
   bind_rows(., .id = "donor") %>%
   group_by(gene_id) %>%
@@ -197,31 +184,36 @@ all_sig_gns_df <- map(list(#all_sig_f_gns, all_sig_m_gns,
   group_by(donor, gene_id) %>%
   mutate("freq_wthn_don" = n_distinct(pw_comparison)) %>%
   ungroup()
-      }) %>% set_names(stg_nms)
+      }) %>% 
+  set_names(stg_nms)
 
 ```
 
 
 ```{r, results='asis', warning=F, message=F}
-DE_genes_freq <- map(all_sig_gns_df, ~{.x %>% 
+DE_genes_freq <- map(all_sig_gns_df_afm, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don)}
 )
+
 DE_genes_freq
 ```
 
+```{r}
+## Save the DE genes for the paper
+saveRDS(DE_genes_freq, paste0(save_dir, "DE_genes_freq.RDS"))
 
-```{r, results='asis', warning=F, message=F}
-saveRDS(all_sig_gns_df, "data/processed/Pf/m2_all/strain_DE/all_sig_gns_df.RDS")
 ```
 
-```{r, results='asis', warning=F, message=F}
-saveRDS(DE_genes_freq, "data/processed/Pf/m2_all/strain_DE/DE_genes_freq.RDS")
+```{r}
+## Save the DE genes for the paper
+saveRDS(all_sig_gns_df_afm, paste0(save_dir, "all_sig_gns_df_afm.RDS"))
+
 ```
 
 
 ```{r, results='asis', warning=F, message=F}
-map(all_sig_gns_df, ~{.x %>%
+map(all_sig_gns_df_afm, ~{.x %>%
     count(donor, pw_comparison) %>% 
   arrange(desc(n))  }
 )
@@ -229,7 +221,7 @@ map(all_sig_gns_df, ~{.x %>%
 
 
 ```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
-map(all_sig_gns_df, ~{.x %>% 
+map(all_sig_gns_df_afm, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don) %>%
   mutate(across(freq_btwn_don, factor)) %>% 
@@ -237,6 +229,7 @@ map(all_sig_gns_df, ~{.x %>%
   count(freq_btwn_don) 
 })
 ```
+
 ```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
 305 +181+86+31+6
 
@@ -244,8 +237,9 @@ map(all_sig_gns_df, ~{.x %>%
 
 41+2
 ```
+
 ```{r, results='asis', warning=F, message=F, fig.width= 2.8, fig.height=1.8}
-map(all_sig_gns_df, ~{.x %>% 
+map(all_sig_gns_df_afm, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don) %>%
   mutate(across(freq_btwn_don, factor)) %>% 
@@ -261,7 +255,7 @@ map(all_sig_gns_df, ~{.x %>%
 
 
 ```{r, results='asis', warning=F, message=F, fig.width= 4, fig.height=3}
-map(all_sig_gns_df, ~{.x %>% 
+map(all_sig_gns_df_afm, ~{.x %>% 
   arrange(desc(freq_btwn_don), Gene) %>%
   distinct(donor, gene_id, Gene, freq_btwn_don) %>%
   mutate(across(freq_btwn_don, factor)) %>% 
@@ -280,10 +274,10 @@ map(all_sig_gns_df, ~{.x %>%
 
 
 ```{r, results='asis', warning=F, message=F}
-# fem_gns_don <- map2(all_sig_gns_df,c(4,4,2), ~{.x %>% 
-# fem_gns_don <- map2(c(all_sig_gns_df, all_sig_gns_df["asx"]), c(3,3,2,1), ~{.x %>% 
-# fem_gns_don <- map2(c(all_sig_gns_df[1:2], all_sig_gns_df["asx"]), c(3,3,1), ~{.x %>% 
-fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(2), ~{.x %>% 
+# afm_gns_don <- map2(all_sig_gns_df_afm,c(4,4,2), ~{.x %>% 
+# afm_gns_don <- map2(c(all_sig_gns_df_afm, all_sig_gns_df_afm["a"]), c(3,3,2,1), ~{.x %>% 
+afm_gns_don <- map2(all_sig_gns_df_afm, c(2,3,3), ~{.x %>%
+# afm_gns_don <- map2(c( all_sig_gns_df_afm["a"]), c(2), ~{.x %>% 
 
   filter(freq_btwn_don >= .y) %>%
   distinct(gene_id, .keep_all = T) 
@@ -293,8 +287,8 @@ fem_gns_don <- map2(c( all_sig_gns_df["asx"]), c(2), ~{.x %>%
   
 ```
 
-```{r, results='asis', warning=F, message=F, eval=FALSE}
-fem_gns_don[["f"]] %>% 
+```{r, results='asis', warning=F, message=F, eval=T}
+afm_gns_don[["f"]] %>% 
   pull(gene_id) %>%
   str_replace(., "-", "_") %>%
   dput()
@@ -302,18 +296,18 @@ fem_gns_don[["f"]] %>%
 ```
 
 
-```{r, eval=FALSE}
-fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
+```{r, eval=T}
+afm_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/afm_gns_don.txt")
 ```
 
 
-```{r, eval=FALSE}
-fem_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/fem_gns_don.txt")
+```{r, eval=T}
+afm_gns_don[["f"]] %>% pull(gene_id) %>% str_replace(., "-", "_") %>% write(., "data/processed/Pf/m2_all/GO_dump/afm_gns_don.txt")
 ```
 
 
 ```{r, results='asis', warning=F, message=F}
-de_gns <- map(fem_gns_don, ~{.x %>% pull(gene_id) %>% unique()})
+de_gns <- map(afm_gns_don, ~{.x %>% pull(gene_id) %>% unique()})
   
 ```
 
@@ -328,11 +322,11 @@ de_gns <- map(fem_gns_don, ~{.x %>% pull(gene_id) %>% unique()})
 
 
 
-```{r, eval=FALSE}
+```{r, eval=T}
 ## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
 ## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
 
-DE_unvrs_gns_f <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_f")], ~{
+DE_unvrs_gns_f <- map(afm_bal_ts[f_groups], ~{
   
   CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
   rownames()
@@ -344,52 +338,41 @@ DE_unvrs_gns_f <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_f")], ~{
 ```
 
 
-```{r, eval=FALSE}
+```{r, eval=T}
 ## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
 ## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
 
-DE_unvrs_gns_m <- map(mf_bal_ts[str_detect(names(mf_bal_ts), "[0-9]_m")], ~{
+DE_unvrs_gns_afm <- map(list(a_groups, f_groups, m_groups), ~{
   
-  CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
-  rownames()
-}) %>% 
-  unlist() %>%
-  unique()
+  obj <- afm_bal_ts[.x]
+  map(obj, ~{
+    
+    CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
+      rownames()
+  }) %>% 
+    unlist() %>%
+    unique()
+}) %>% set_names(c("a", "f", "m"))
 
 
 ```
+
+
 
 
 ```{r}
-## get the universe for the GO overrepresentation test ie all the genes detected (average expression greater than 0) in the cell subset that go into the DE
-## get the universe for the GO overrepresentation test ie all the genes detected in more than 20 cells in each cell subset that go into the DE
-
-DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don], ~{
-# DE_unvrs_gns_asx <- map(asex_bal_ts[solo_don2], ~{
-  
-  CreateSeuratObject(counts = counts(.x), min.cells = 20) %>% 
-  rownames()
-}) %>% 
-  unlist() %>%
-  unique()
-
-
-```
-
-
-```{r}
-# stg_nms2 <- c("f", "m", "asx", "asx2")
+# stg_nms2 <- c("f", "m", "a", "a2")
 # ## Get the field and lab DE genes
 # DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
 
 ```
 
 ```{r}
-# stg_nms2 <- c("f", "m", "asx2")
-stg_nms2 <- c("asx2")
-## Get the field and lab DE genes
+# stg_nms2 <- c("a", "f", "m")
+# # stg_nms2 <- c("asx2")
+# ## Get the field and lab DE genes
 # DE_unvrs <- list(DE_unvrs_gns_f, DE_unvrs_gns_m, DE_unvrs_gns_asx) %>% set_names(stg_nms2)
-DE_unvrs <- list(DE_unvrs_gns_asx) %>% set_names(stg_nms2)
+# # DE_unvrs <- list(DE_unvrs_gns_asx) %>% set_names(stg_nms2)
 
 ```
 
@@ -431,7 +414,7 @@ go_e_fun_overrep_only_fcp  <- function(gns, unvrs, t2gn_lst){
 
 ```{r, message=FALSE}
 ## GO
-strn_DE_go_std_pdb <- list(de_gns, DE_unvrs) %>%
+strn_DE_go_std_pdb <- list(de_gns, DE_unvrs_gns_afm) %>%
     pmap(., ~{go_e_fun_overrep_only_fcp(gns = ..1, unvrs = ..2)})
 
 ```
@@ -536,8 +519,8 @@ gt_grob <- function(gt_object, wth = NULL, hgt = NULL, ...){
 
 ```{r, fig.height= 8, fig.width=7}
 ##Function to create binned windows across genome and compare pairwise strains and generate the plotting details for chromosome painting
-# fem_gns_pos <- fem_gns_don[["f"]] %>% 
-fem_gns_pos <- fem_gns_don[["asx"]] %>% 
+# fem_gns_pos <- afm_gns_don[["f"]] %>% 
+fem_gns_pos <- afm_gns_don[["a"]] %>% 
   left_join(., Pf3D7_genes_plasmoDB[, c("gene_id", "Genomic Location (Gene)")]) %>%
   mutate("chr" = str_remove_all(`Genomic Location (Gene)`,"Pf3D7_|_v3.*"),
          "start_pos" = str_remove_all(`Genomic Location (Gene)`, "Pf3.*v3:|\\..*|,"), 
@@ -595,7 +578,7 @@ test_genes <- fem_gns_pos %>% mutate(
 
 # Example: Background set of genes
 background_genes <- all_pf_gns %>%
-  filter(gene_id %in% DE_unvrs[["f"]]) %>% mutate(
+  filter(gene_id %in% DE_unvrs_gns_afm[["f"]]) %>% mutate(
     seqnames = chr,
     start = start_pos,
     end = end_pos,
