@@ -61,6 +61,7 @@ suppressPackageStartupMessages({
   library(tradeSeq)
   library(ComplexHeatmap)
   library(circlize)
+  library(ggh4x)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
   conflict_prefer("rename", "dplyr")
@@ -74,7 +75,6 @@ suppressPackageStartupMessages({
 ```{r setup}
 sample_set = "Mali2"
 
-# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
 knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
 
 ```
@@ -105,15 +105,6 @@ source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/14_strain_DE/strain_DE_common_fn
 ```
 
 Integrated asexual
-```{r}
-## subset where field parasites are for slingshot
-# all_asex_merged_int_no_actv_harmony_pt2 <- readRDS("data/processed/Pf/m2_all/all_asex_merged_int_no_actv_harmony_pt2.RDS")
-# m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony_pt.RDS")
-# m2_scvi_asex_noM12_harmony <- readRDS("data/processed/Pf/m2_scvi_asex_noM12_harmony.RDS")
-# m2_scvi_asex_noM12_harmony_pt <- readRDS("data/processed/Pf/v3_m2_asex_cr_filt_norm_harmony_pt.RDS")
-
-```
-
 ```{r, message=F, warning=F, eval=T}
 ## Get file list
 fm_leiden_w_donors_pt_list_files <- Sys.glob("data/processed/Pf/m2_all/integration/fm_leiden_w_donors_*_pt.RDS")
@@ -243,7 +234,7 @@ map(afm_leiden_w_donors_pt, ~DimPlot(.x, reduction = "umap.harmony_PC_man", grou
 ```
 
 ```{r}
-# rand_color(n = 21) %>% dput()
+# Colours for plotting pseudotime chunks
 ptc_cols <- c("#068B4CFF", "#4FB0C0FF", "#74DC09FF", "#3377ff", "#E769ACFF", 
 "#8A1708FF", "#048461FF", "#3BDF3FFF", "#5559B5FF", "#557406FF", 
 "#2A158CFF", "#B48606FF", "#CA2F4DFF", "#E75FFDFF", "#E35655FF", 
@@ -262,7 +253,7 @@ imap(afm_leiden_w_donors_pt, ~saveRDS(.x, paste0(save_dir, "afm_leiden_w_donors_
 
 
 ```{r}
-# Count the donors with atleast 2 strrains each with atleast 100 cells
+# Count the donors with atleast 2 strains each with atleast 100 cells
 don_100n <- imap(afm_leiden_w_donors_pt, ~.x@meta.data %>% count(orig.ident, StrainDon) %>% filter(n>100) %>% group_by(orig.ident) %>% filter(n_distinct(StrainDon) > 1) %>% pull(orig.ident) %>% unique() %>% str_remove(., ".mrna"))
 ```
 
@@ -277,18 +268,8 @@ don_100n <- imap(afm_leiden_w_donors_pt, ~.x@meta.data %>% count(orig.ident, Str
 # dons_bal_sset_nms <- str_remove_all(str_replace_all(dons_bal_sset, "M", "MSC"), "_$|C_$|\\|")
 dons_bal_sset_nms <- don_100n
 
-# m2_asex_sce <- map(dons_bal_sset_nms, ~m2_asex_tr_sce_pt_chunks_sshot[, str_detect(colnames(m2_asex_tr_sce_pt_chunks_sshot),.x) & !str_detect(m2_asex_tr_sce_pt_chunks_sshot@colData$StrainDon, "Negative|Doublet")]) %>% set_names(dons_bal_sset_nms)
-
-# m2_asex_seu <- map(dons_bal_sset_nms, ~afm_leiden_w_donors_pt[, str_detect(afm_leiden_w_donors_pt@meta.data$orig.ident,.x) & !str_detect(afm_leiden_w_donors_pt@meta.data$StrainDon, "Negative|Doublet")]) %>% set_names(dons_bal_sset_nms)
-
+# Retain donors with atleast 2 strains each with atleast 100 cells for each stage
 m2_afm_seu <- map2(afm_leiden_w_donors_pt, dons_bal_sset_nms, ~.x[, str_detect(.x@meta.data$orig.ident, paste(.y, collapse = "|")) & !str_detect(.x@meta.data$StrainDon, "Negative|Doublet")])
-
-```
-
-Add the entire object for field lab DE and also including culture
-```{r}
-# m2_afm_sce <- c(m2_afm_sce[dons_bal_sset_nms], m2_afm_tr_sce_pt_chunks_sshot) %>% set_names(c(dons_bal_sset_nms, "FL"))
-# m2_afm_sce <- m2_afm_sce
 
 ```
 
@@ -308,15 +289,12 @@ balanced_cells_tbl <- map(m2_afm_seu, ~balanced_cells_fn(sc_df = .x@meta.data, d
 
 ```{r, warning=FALSE, message=FALSE}
 ######################### !!!!!NOTE - Unbalanced alternative to increase power replacing balanced with unbalanced - switch to return balanced or viceversa 
-# m2_afm_bal_seu <- map2(m2_afm_seu, balanced_cells_tbl, ~.x[, .y$cell_bc])
-
-# m2_afm_bal_seu <- m2_afm_seu[, balanced_cells_tbl$cell_bc]
+# m2_afm_bal_seu <- m2_afm_seu
 m2_afm_bal_seu <- map2(m2_afm_seu, balanced_cells_tbl, ~.x[, .y$cell_bc])
 
 ```
 
 ```{r}
-# map(m2_afm_bal_seu, ~.x@colData[,c("ptime_bal_cat", "StrainDon")] %>% data.frame() %>% dplyr::count(ptime_bal_cat, StrainDon))
 m2_afm_bal_seu[[1]]@meta.data %>% data.frame() %>% dplyr::count(downsampling_ptime_bal_cat, StrainDon)
 
 ```
@@ -324,41 +302,23 @@ m2_afm_bal_seu[[1]]@meta.data %>% data.frame() %>% dplyr::count(downsampling_pti
 
 ```{r, warning=FALSE, message=FALSE}
 ## Calculate pseudotime chunks for DE
-# v3_m2_asex_harmony_sce_ss_df2 <- map(m2_asex_bal_seu, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "pseudotime", chunk_num = 7, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
-# m2_asex_bal_seu_df2 <- map(m2_asex_bal_seu, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "pseudotime", chunk_num = 7, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
-# m2_asex_bal_seu_df2 <- ptime_chunk_calc_df_fn(sc_df = m2_asex_bal_seu@meta.data, ptime = "pseudotime", chunk_num = 8, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat")
 bal_df2 <- map(m2_afm_seu, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "slingPseudotime_1", chunk_num = 7, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
 
 ```
 
 
 ```{r, warning=FALSE, message=FALSE}
-## Calculate pseudotime chunks
-# afm_leiden_w_donors_pt_bal <- map2(v3_m2_asex_harmony_sce_ss_df2, m2_asex_bal_seu ~AddMetaData(.x, .y) )
+## Add pseudotime chunks to metadata
 m2_afm_bal_seu <- map2(m2_afm_bal_seu, bal_df2, ~AddMetaData(.x, .y) )
 
 ```
 
-```{r}
-# afm_leiden_w_donors_pt_no_rings <- m2_afm_bal_seu
-
-```
-
 
 ```{r}
-## subset rings - Why did I remove rings initially? Is it because this is where commitment happens? 
-# m2_afm_bal_seu <- m2_afm_bal_seu[, !m2_afm_bal_seu$harmony_clusters_ss %in% c("1")]
-# m2_afm_bal_seu <- afm_leiden_w_donors_pt_bal
-
-```
-
-```{r}
-## subset where field parasites are for slingshot
 m2_afm_bal_seu[[1]]@meta.data %>% count(ptime_bal_cat, donor, strain)
 ```
 
 ```{r}
-## subset where field parasites are for slingshot
 map(m2_afm_bal_seu, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_cat" , label = T ))
 map(m2_afm_bal_seu, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_bal_cat" , label = T))
 ```
@@ -370,12 +330,11 @@ map(m2_afm_bal_seu, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "
 ```
 
 ```{r}
-## subset where field parasites are for slingshot
 map(m2_afm_bal_seu, ~.x@meta.data %>% count(ptime_bal_cat, donor, strain))
 ```
 
 ```{r}
-# m2_afm_ap2g_bal_sce <- m2_afm_ap2g_bal_sce[, m2_afm_ap2g_bal_sce@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>% 
+## Subset to remove within each pseudotime chunk any strain with less than 10 cells to ensure there are no pseudotime chunks where some strains are overwhelmingly underrepresented
 m2_afm_bal_seu <- map(m2_afm_bal_seu, ~.x[, .x@meta.data %>% 
                                                rownames_to_column('bcode') %>% 
                                                group_by(ptime_bal_cat, donor, strain) %>% 
@@ -391,13 +350,11 @@ m2_afm_bal_seu <- map(m2_afm_bal_seu, ~.x[, .x@meta.data %>%
 ```
 
 ```{r}
-## subset where field parasites are for slingshot
 m2_afm_bal_seu[[1]]@meta.data %>% count(donor,ptime_bal_cat,  strain) %>% group_by(donor,ptime_bal_cat) %>% mutate(strn_n = n_distinct(strain)) %>% filter(strn_n >1)
 ```
 
 
 ```{r}
-## subset where field parasites are for slingshot
 m2_afm_bal_seu[[1]]@meta.data %>% count( donor, strain) %>% group_by( donor) %>% mutate(strn_n = n_distinct(strain)) %>% filter(strn_n >1)
 ```
 
@@ -426,9 +383,8 @@ map(m2_afm_bal_seu, ~.x@meta.data %>%
 )
 ```
 
-Remove the strain that are overal less than 100 in a donor
+Remove the strain that are overal less than 200 in a donor and retain donors where atleast two strains are available for DE
 ```{r}
-# m2_afm_ap2g_bal_sce <- m2_afm_ap2g_bal_sce[, m2_afm_ap2g_bal_sce@colData[, c('ap2g_exp_all', 'ptime_bal_cat')] %>% 
 m2_afm_bal_seu <- map(m2_afm_bal_seu, ~.x[, .x@meta.data %>% 
                                                rownames_to_column('bcode') %>% 
                                                group_by(donor, strain) %>% 
@@ -556,34 +512,13 @@ Adding pseudotime metadata from the single cell experiment object
 Scaling is for visualization
 
 
-```{r}
-##REMEMBER TO REMOVE CLUSTERS WITH VERY FEW CELLS AND DOUBLETS SEURAT
-# msc_gam_combi_noLE_de <- msc_gam_combi_noLE_de[, cells_de]
-```
-
-
-```{r, message=FALSE, warning=FALSE}
-# # Add to metadata the dataset/conditions and ptime cat
-# # m2_afm_bal_seu <- m2_afm_bal_seu
-# m2_afm_bal_seu[["SCT"]] <- NULL
-# # m2_afm_bal_seu[["RNA"]]$scale.data <- NULL
-# DefaultAssay(m2_afm_bal_seu) <- "RNA"
-
-```
-
-
 ```{r, message=FALSE, warning=FALSE}
 m2_afm_bal_seu <- map(m2_afm_bal_seu, ~JoinLayers(.x, layers = c("counts", "data", "scale.data")))
 ```
 
-```{r, message=FALSE, warning=FALSE}
-# m2_afm_bal_seu[["RNA"]]$scale.data <- NULL
-
-```
 
 ```{r, message=FALSE, warning=FALSE}
 # Add to metadata the dataset/conditions and ptime cat
-# m2_afm_bal_seu@meta.data[, "don_ptime"] <- paste0(m2_afm_bal_seu$donor, "_", m2_afm_bal_seu$ptime_bal_cat)
 m2_afm_bal_seu <- map(m2_afm_bal_seu, ~AddMetaData(.x, 
                                                      .x@meta.data %>% mutate(don_ptime = paste0(donor, "_", ptime_bal_cat)) %>% select(don_ptime)) 
                        )
@@ -597,11 +532,9 @@ saveRDS(m2_afm_bal_seu, paste0(save_dir, 'm2_afm_bal_seu.RDS'))
 ```
 
 ```{r, message=FALSE, warning=FALSE}
-# Add to metadata the dataset/conditions and ptime cat
 # all_afm_de_bal_nosct <- SplitObject(m2_afm_bal_seu, split.by = "don_ptime")
 all_afm_de_bal_nosct <- map(m2_afm_bal_seu, ~SplitObject(.x, split.by = "donor")) %>% 
   unlist(recursive = T)
-# go()
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -612,8 +545,6 @@ afm_m2_bal_seu <- map2(all_afm_de_bal_nosct,all_gns, ~{
          NormalizeData(., normalization.method = "LogNormalize", scale.factor = 10000, verbose = FALSE) %>%
          ScaleData(., features = .y,  verbose = FALSE)
   })
-
-# m2_bal_seu <- list(m2_bal_seu) %>% set_names("gam")
 
 ```
 
@@ -633,10 +564,6 @@ saveRDS(afm_m2_bal_mast, paste0(save_dir, 'afm_m2_bal_mast.RDS'))
 ```
 
 
-```{r, message=FALSE, warning=FALSE}
-##shortcut to run relevant donors subsets only
-# m2_bal_mast_noM55M54 <- subset(m2_bal_mast[["gam"]], subset = donor %in% c("MSC68", "MSC66", "MSC70", "MSC60", "MSC49"))
-```
 
 ```{r, warning=FALSE, message=FALSE}
 for (nm in names(afm_m2_bal_mast)) {
@@ -646,7 +573,7 @@ for (nm in names(afm_m2_bal_mast)) {
 
 ```{r, message=FALSE, warning=FALSE, eval=T}
 ##!! NB Rerun only when the DE inputs change - takes looooonng
-# go()
+go()
 ## Mast DE of dataset with male low (ml) included - shouldnt have any contribution as each stage handled differently
 ## Including lab and field strain DE
 ## !!!min.cells.group added for mh in the strain_dset where there's only balancing in lab VS field - we need to remove later
@@ -699,26 +626,6 @@ saveRDS(afm_pairwise_mkrs_seu_clustr, paste0(save_dir, 'afm_pairwise_mkrs_seu_cl
 ```
 
 
-```{r, message=FALSE, warning=FALSE, eval=F}
-##!! NB Rerun only when the DE inputs change - takes looooonng
-### Getting all genes for gsea - saved as RDS and analysis done in functional_GO_n_lit_comparison.RMD
-
-# ap2g_ub_pairwise_mkrs_pt_ml_gsea_full <- list(m2_bal_mast, rep(pts,2), de_idents) %>%
-#   pmap( ~{
-#     # ide = ..3
-#     a = combn(levels(..1@meta.data[,..3]), 2,simplify = F) 
-#     obj = ..1
-#     pseudos = ..2
-#     map(a, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], latent.vars = pseudos, logfc.threshold = 0, test.use = 'MAST', min.pct = -Inf, min.diff.pct = -Inf) %>% rownames_to_column('gene_id')) %>%
-#       set_names(map(a, ~paste(., collapse = '_vs_') %>% str_remove_all(' '))) %>%
-#       bind_rows(., .id = 'pw_comparison')
-#     
-#   })
-# saveRDS(ap2g_ub_pairwise_mkrs_pt_ml_gsea_full,'data/processed/Pf/m2_all/ap2g_ub_pairwise_mkrs_pt_ml_gsea_full.RDS')
-
-```
-
-
 ```{r, message=FALSE, warning=FALSE}
 afm_pairwise_mkrs_seu_clustr<- readRDS(paste0(save_dir, 'afm_pairwise_mkrs_seu_clustr.RDS'))
 
@@ -743,7 +650,6 @@ afm_pairwise_mkrs_seu_clustr_anot
 
 
 ```{r, warning=FALSE, message=FALSE}
-## cells that contain 2 or more gam UMI
 map(afm_pairwise_mkrs_seu_clustr_anot, ~.x  %>% filter(p_val_adj < 0.05 & avg_log2FC > 0))
 
 ## https://www-nature-com.ezp.lib.cam.ac.uk/articles/nature24280.pdf - PF3D7-0406500 and HDA1 are high in gam positive cells
@@ -752,7 +658,6 @@ map(afm_pairwise_mkrs_seu_clustr_anot, ~.x  %>% filter(p_val_adj < 0.05 & avg_lo
 
 
 ```{r, warning=FALSE, message=FALSE}
-## cells that contain 2 or more gam UMI
 imap(afm_pairwise_mkrs_seu_clustr_anot, ~.x %>% filter(p_val_adj < 0.05 & avg_log2FC < 0))
 
 ## https://www-nature-com.ezp.lib.cam.ac.uk/articles/nature24280.pdf - PF3D7-0406500 and HDA1 are high in gam positive cells
@@ -876,14 +781,6 @@ likely_cnvs_don <- map(likely_cnvs, possibly(~.x  %>%
   mutate(labl = paste0(donor, "_", Gene, "_", pw_comparison)) %>%
   select(donor, gene_id, Gene, pw_comparison, labl, avg_log2FC)
 ))
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3.5}
-# DimPlot(afm_leiden_w_donors_pt, split.by = "donor", reduction = "umap.harmony_PC_man")
-```
-
-```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3.5}
-# DimPlot(m2_afm_bal_seu, split.by = "donor", reduction = "umap.harmony_PC_man")
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3.5}
