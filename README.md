@@ -195,24 +195,6 @@ Main comparative analysis between asymptomatic and symptomatic infections.
 - `project_plotting_fns.R` - Common plotting functions
 - `bash_scripts/` - Collection of helper shell scripts for pipeline submission and data processing
 
-## Key technologies & tools
-
-### Bioinformatics pipelines
-- **Nextflow**: Workflow automation and reproducibility
-- **Cell Ranger**: Read alignment and UMI counting
-- **EmptyDrops**: Cell/background discrimination
-- **CellBender**: Ambient RNA removal
-- **Souporcell**: Strain deconvolution
-- **DoubletFinder**: Technical doublet detection
-
-### Data analysis
-- **R/Seurat**: Single-cell data processing and integration
-- **Harmony**: Batch correction
-- **scMap & SingleR**: Automated cell type/stage annotation
-- **MAST**: Differential expression testing
-- **cNMF**: Gene set extraction and interpretation
-- **scVI**: Latent representation learning
-
 ### Genome references
 - **PlasmoDB** (*P. falciparum* Genome annotations)
 - **NCBI Gene Ontology**: Functional annotation
@@ -223,16 +205,6 @@ Main comparative analysis between asymptomatic and symptomatic infections.
 - **License**: MIT License (see [LICENSE](LICENSE) file)
 - **Collaborators**: Djimdes Lab, MRTC Mali
 - **Institution**: University of Cambridge, Wellcome Sanger Institute
-
-## Output summary
-
-The pipeline generates:
-
-1. **Cell-level annotations**: Developmental stage, strain identity, quality metrics
-2. **Integrated data matrices**: Batch-corrected expression matrices for downstream analysis
-3. **Differential expression results**: Stage-specific and phenotype-specific marker genes
-4. **Interactive visualizations**: Integrated plots, pseudotime trajectories, and GO enrichment results
-5. **Supplementary tables**: Publication-ready metadata and statistics
 
 ## File organization
 
