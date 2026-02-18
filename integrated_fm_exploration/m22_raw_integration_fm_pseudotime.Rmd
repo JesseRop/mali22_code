@@ -102,7 +102,7 @@ fm_leiden_w_donors_norm_harmony_jnd_list_files
 
 ```{r, message=F, warning=F, eval=T}
 ## read filtered barcodes
-fm_leiden_w_donors_norm_harmony_jnd <- map(fm_leiden_w_donors_norm_harmony_jnd_list_files, ~.x %>% 
+fm_leiden_w_donors_norm_harmony_jnd_all <- map(fm_leiden_w_donors_norm_harmony_jnd_list_files, ~.x %>% 
   set_names(nm = (str_remove_all(.,'data/processed/Pf/m2_all/integration/fm_leiden_w_donors_|_norm_harmony_jnd.RDS')))) %>% 
   unlist(., recursive = F) %>% 
   # .[sample_name] %>%
@@ -112,14 +112,15 @@ fm_leiden_w_donors_norm_harmony_jnd <- map(fm_leiden_w_donors_norm_harmony_jnd_l
 
 
 ```{r, warning=FALSE, message=FALSE}
-imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "leiden") + labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd_all, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "leiden") + labs(title = .y)) 
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m", "w.5.f", "w.7.f", "w.7.m")]
 
-fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("all.fLE", "all.m_mLE", "all.m", "w.5.f_fLE", "w.5.f", "w.7.f", "w.5.f_no_asx_dbt", "w.7.m")]
+fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd_all[c("all.fLE", "all.m_mLE", "all.m", "w.5.f_fLE", "w.5.f", "w.7.f", "w.5.f_no_asx_dbt", "w.7.f_fLE", "w.7.m", "w.4.m")]
+# fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd_all
 # fm_leiden_w_donors_norm_harmony_jnd <- fm_leiden_w_donors_norm_harmony_jnd[c("w.5.f_no_asx_dbt")]
 
 ```
@@ -174,26 +175,40 @@ add metadata
 
 
 ```{r, warning=FALSE, message=FALSE}
-map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")) 
-map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "stage_fld")+ labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")+ labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")+ labs(title = .y)) 
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "integrated.harmony_PC_man", dims = c(1,2), group.by = "leiden")+ labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "leiden")+ labs(title = .y)) 
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-## Remove the committed cluster
+## Remove the activated and LE clusters where appropriate
 fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f"]], subset = leiden == 8, invert = T)
 fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_no_asx_dbt"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_no_asx_dbt"]], subset = leiden == 8, invert = T)
+fm_leiden_w_donors_norm_harmony_jnd[["w_pt7_f_fLE"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt7_f_fLE"]], subset = leiden == 3, invert = T)
+fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_fLE"]] <- subset(fm_leiden_w_donors_norm_harmony_jnd[["w_pt5_f_fLE"]], subset = leiden %in% c(3,8), invert = T)
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")) 
-map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", group.by = "leiden")) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "leiden") + labs(title = .y)) 
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,3), group.by = "leiden")) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,2), group.by = "seurat_clusters")+ labs(title = .y))  
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, label = T, reduction = "umap.harmony_PC_man", dims = c(1,3), group.by = "leiden")+ labs(title = .y)) 
 
 ```
 
@@ -213,7 +228,9 @@ Slingshot
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-resolns <- c(0.07, rep(0.08, length(fm_leiden_w_donors_norm_harmony_jnd)-2), 0.1)
+resolns <- c(0.07, rep(0.08, length(fm_leiden_w_donors_norm_harmony_jnd)-3), 0.1, 0.20)
+# resolns <- c(0.1, 0.20)
+
 fm_leiden_w_donors_norm_harmony_jnd <- map2(fm_leiden_w_donors_norm_harmony_jnd, resolns, ~FindClusters(.x, resolution = .y, cluster.name = "harmony_clusters_ss"))
 
 imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", order = T, pt.size = 0.1) + labs(title = .y)) 
@@ -221,18 +238,40 @@ imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony
 
 ```
 
-```{r, warning=FALSE, message=FALSE}
+
+```{r, warning=FALSE, message=FALSE, eval=T}
 fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['all_fLE']], subset = harmony_clusters_ss %in% c(0, 1))
 # fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = leiden %in% c(4, 2))
-fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = harmony_clusters_ss %in% c(0, 2))
+fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE']], subset = harmony_clusters_ss %in% c(0, 1) & stage_fld == "Female")
+
+fm_leiden_w_donors_norm_harmony_jnd[['w_pt7_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt7_f_fLE']], subset = harmony_clusters_ss %in% c(0, 1) & stage_fld == "Female")
+
+fm_leiden_w_donors_norm_harmony_jnd[['all_m_mLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['all_m_mLE']], subset = stage_fld == "Male")
 
 # fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE_no_asx_dbt']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt5_f_fLE_no_asx_dbt']], subset = seurat_clusters %in% c(2, 3, 1, 0, 4))
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-imap(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = "nFeature_RNA", order = T, pt.size = 0.05) + labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", label = T, pt.size = 0.1) + labs(title = .y)) 
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", label = T, pt.size = 0.1, dims = c(1,3)) + labs(title = .y)) 
 
+```
+
+```{r, warning=FALSE, message=FALSE}
+# fm_leiden_w_donors_norm_harmony_jnd[['w_pt7_f_fLE']] <- subset(fm_leiden_w_donors_norm_harmony_jnd[['w_pt7_f_fLE']], subset = fm_leiden_w_donors_norm_harmony_jnd[['w_pt7_f_fLE']]@reductions[["umap.harmony_PC_man"]]@cell.embeddings[, "umapharmonyPCman_1"] >-4)
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", label = T, pt.size = 0.1) + labs(title = .y)) 
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+imap(fm_leiden_w_donors_norm_harmony_jnd, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = "nFeature_RNA", order = T, pt.size = 0.05) + labs(title = .y)) 
+# go()
 
 ```
 
@@ -273,10 +312,13 @@ for (nm in names(fm_leiden_w_donors_norm_harmony_jnd_sce)) {
 
 !!!! NOTE -BEEN DOING SLINGSHOT WRONG. LOGCOUNTS SHOULD HAVE data values from seurat
 ```{r, eval=T}
-# gogo()
+gogo()
 # Seurat_object <- m2_asex_harmony_res
-start_clusters <- c(1, 0, 0, 2, 1, 0, 1, 0)
-end_clusters <- c(0, 1, 1, 0, 0, 1, 0, 1)
+start_clusters <- c(1, 0, 0, 1, 1, 0, 1, 1, 0, 0)
+end_clusters <-   c(0, 1, 1, 0, 0, 1, 0, 0, 1, 2)
+
+# start_clusters <- c(0, 0)
+# end_clusters <-   c(1, 2)
 
 ## Convert seurat object to SCE
 fm_leiden_w_donors_norm_harmony_jnd_sce_ss <- pmap(list(fm_leiden_w_donors_norm_harmony_jnd_sce, start_clusters, end_clusters), ~{
@@ -291,7 +333,6 @@ fm_leiden_w_donors_norm_harmony_jnd_sce_ss <- pmap(list(fm_leiden_w_donors_norm_
             # allow.break = F
             )
 })
-
 
 ```
 
@@ -343,21 +384,22 @@ fm_leiden_w_donors_norm_harmony_jnd_pt <- map2(fm_leiden_w_donors_norm_harmony_j
 
 
 ```{r, warning=FALSE, message=FALSE}
+map(fm_leiden_w_donors_norm_harmony_jnd_pt, ~FeaturePlot(.x, features = c("slingPseudotime_1"), reduction = "umap.harmony_PC_man", pt.size = 0.01, dims = c(1,3)))
 map(fm_leiden_w_donors_norm_harmony_jnd_pt, ~FeaturePlot(.x, features = c("slingPseudotime_1"), reduction = "umap.harmony_PC_man", pt.size = 0.01))
 ```
 
 ```{r}
-
-## Add pseudotime metadata to the object
-fm_leiden_w_donors_norm_harmony_jnd_pt[[4]] <- AddMetaData(fm_leiden_w_donors_norm_harmony_jnd[[4]], data.frame(fm_leiden_w_donors_norm_harmony_jnd_sce_ss[[4]]@colData[, c("slingPseudotime_1", "slingPseudotime_2"), drop = F]) #%>%
-              # rename("pseudotime" = slingPseudotime_1)
-              ) 
+# # gogo()
+# ## Add pseudotime metadata to the object
+# fm_leiden_w_donors_norm_harmony_jnd_pt[[4]] <- AddMetaData(fm_leiden_w_donors_norm_harmony_jnd[[4]], data.frame(fm_leiden_w_donors_norm_harmony_jnd_sce_ss[[4]]@colData[, c("slingPseudotime_1", "slingPseudotime_2"), drop = F]) #%>%
+#               # rename("pseudotime" = slingPseudotime_1)
+#               ) 
 
 
 ```
 
 ```{r, warning=FALSE, message=FALSE}
-map(fm_leiden_w_donors_norm_harmony_jnd_pt[4], ~FeaturePlot(.x, features = c("slingPseudotime_2"), reduction = "umap.harmony_PC_man", pt.size = 0.01))
+# map(fm_leiden_w_donors_norm_harmony_jnd_pt[4], ~FeaturePlot(.x, features = c("slingPseudotime_2"), reduction = "umap.harmony_PC_man", pt.size = 0.01))
 ```
 
 ```{r}
