@@ -260,6 +260,8 @@ IMC1g - https://www.sciencedirect.com/science/article/pii/S147149222400360X#ab00
 imap(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "seurat_clusters", label = T) + labs(title = .y))
 ```
 
+######### END - Pseudobulk DE #####################
+
 ```{r, warning=FALSE, message=FALSE}
 map(fm_leiden_w_donors_norm_harmony_jnd, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "leiden", label = T))
 ```
