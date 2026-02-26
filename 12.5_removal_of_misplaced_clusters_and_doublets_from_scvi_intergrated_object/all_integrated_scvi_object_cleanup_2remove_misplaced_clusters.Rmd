@@ -1,0 +1,273 @@
+
+---
+title: "Stage DE figs"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  # library(dreamlet)
+  # library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
+  library(readxl)
+  library(ggh4x)
+  library(EnhancedVolcano)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
+  
+})
+```
+
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#  integration of all MSC
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r}
+# read_dir <- "data/processed/Pf/m2_all/scvi2seu/"
+read_dir_scvi2seu <- "data/processed/Pf/m2_all/scvi2seu/"
+
+save_dir_integrated_scvi_cleanup <- "data/processed/Pf/m2_all/integrated_scvi_cleanup/"
+
+
+published_dset_dir <- "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/published_dsets/"
+
+
+```
+
+Read in the qcd integrated scvi object 
+
+```{r}
+# Generated in "scvi_leiden_clusters_seuratDE.Rmd"
+all_jcC_seu_scvi_noM55 <- readRDS(paste0(read_dir_scvi2seu, 'all_jcC_seu_scvino_M55.RDS'))
+
+```
+
+
+########################START - Visualise and remove cells in leiden/stage clusters they should not be in - the few/minority (less than 50 cells) misplaced leiden cluster stage cells  ########################
+!!!! NOTE - SHOULD BE DONE EARLIER PROBABLY BEFORE REMOVAL OF CLUSTER 8 ASEXUAL + FEMALE DOUBLETS
+
+#### Visualise the few misplaced leiden cluster cells - !!! NOTE - NEEDS TO GO TO A DIFFERENT NOTEBOOK 
+Some leiden clusters are not correlating with stage labels i.e a handful of cells from a leiden clusters that is associated with a particular stage but then end up clustering in a different stage
+
+
+
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_jcC_seu_scvi_noM55, group.by = "leiden", label = T)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width= 14, fig.height= 6.5}
+## Visualise the few misplaced leiden cluster cells - i.e. those with less than 50 cells in the asexual, female or male cells
+tbl_for_filtering_misplaced_less1percent_cells <- all_jcC_seu_scvi_noM55@meta.data %>%
+  # count(stage_afm, stage_fld, leiden) %>% 
+  count(stage_afm, leiden) %>%
+  group_by(stage_afm) %>%
+  mutate(propn = round(n/sum(n), 2)) %>%
+  arrange(desc(n), .by_group = T)
+
+
+tbl_for_filtering_misplaced_less1percent_cells
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+tbl_for_filtering_misplaced_less1percent_cells %>% 
+       ggplot(aes(y = propn, x = stage_afm)) +
+       geom_point(size = 0.1) +
+       geom_text_repel(aes(label  = leiden)) +
+       geom_hline(yintercept = 0.01) +
+       labs(y = "Proportion", x = "Leiden clusters") +
+       theme_classic() +
+       theme(text = element_text(size = 18),
+             legend.position = "none")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
+tbl_for_filtering_misplaced_less1percent_cells %>% 
+       mutate(across(leiden, factor)) %>%
+       ggplot(aes(y = propn, x = leiden)) +
+       geom_point(size = 0.2) +
+       facet_nested(.~stage_afm+leiden,  scales = "free_x", space = "free_x") +
+       geom_hline(yintercept = 0.01, linewidth = 0.1) +
+       labs(y = "Proportion", x = "Leiden clusters") +
+       # theme_classic() +
+       theme(text = element_text(size = 18),
+             legend.position = "none")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
+tbl_for_filtering_misplaced_less1percent_cells %>% 
+       mutate(across(leiden, factor)) %>%
+       filter(propn < 0.1) %>%
+       ggplot(aes(y = propn, x = leiden)) +
+       geom_point(size = 1) +
+       facet_nested(.~stage_afm+leiden,  scales = "free_x", space = "free_x") +
+       geom_hline(yintercept = 0.01, linewidth = 0.2) +
+       labs(y = "Proportion", x = "Leiden clusters") +
+       theme_classic() +
+       theme(text = element_text(size = 18),
+             legend.position = "none")
+
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width= 14, fig.height= 6.5}
+## Visualise the few misplaced leiden cluster cells - i.e. leidens with less than 1% of cells in the asexual, female or male clusters
+tbl_for_filtering_misplaced_less1percent_cells%>% filter( propn < 0.01)
+
+# all_jcC_seu_scvi_noM55@meta.data %>%
+  # # count(stage_afm, stage_fld, leiden) %>% 
+  # count(stage_afm, leiden) %>% 
+  # filter(n < 50)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width= 14, fig.height= 6.5}
+## Misplaced clusters
+underrepresented_less1percent_misplaced_clusters_stages_df <- tbl_for_filtering_misplaced_less1percent_cells %>% 
+  filter(propn < 0.01) %>% 
+  select(stage_afm, leiden) 
+
+underrepresented_less1percent_misplaced_clusters_stages <- underrepresented_less1percent_misplaced_clusters_stages_df %>%
+  split(., f = factor(.$stage_afm)) %>%
+  map(., ~.x %>% pull(leiden) %>% as.character()) 
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+str(underrepresented_less1percent_misplaced_clusters_stages)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+imap(underrepresented_less1percent_misplaced_clusters_stages, ~{
+  DimPlot(all_jcC_seu_scvi_noM55, 
+          cells.highlight = all_jcC_seu_scvi_noM55@meta.data %>% filter(stage_afm == .y & leiden %in% .x) %>% rownames(), 
+          sizes.highlight = 0.1, 
+          raster = F) +
+    labs(title = paste(.y, " misplaced"))
+})
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells <- all_jcC_seu_scvi_noM55@meta.data %>%
+  mutate(underrepd_less1percent_misplaced_clusters_stages = case_when(
+    stage_afm == "Asexual" & leiden %in%  underrepresented_less1percent_misplaced_clusters_stages[["Asexual"]] ~ "Asexual misplaced",
+    stage_afm == "Male" & leiden %in%  underrepresented_less1percent_misplaced_clusters_stages[["Male"]] ~ "Male misplaced",
+    stage_afm == "Female" & leiden %in%  underrepresented_less1percent_misplaced_clusters_stages[["Female"]] ~ "Female misplaced",
+    T ~ "Not misplaced"
+  )) %>%
+  select(underrepd_less1percent_misplaced_clusters_stages) %>%
+  AddMetaData(all_jcC_seu_scvi_noM55, .)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(c("Asexual", "Female", "Male"), ~{
+  DimPlot(all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells, 
+          cells.highlight = all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells@meta.data %>% filter(underrepd_less1percent_misplaced_clusters_stages == paste0(.x, " misplaced")) %>% rownames(), 
+          sizes.highlight = 1, 
+          raster = F) +
+    labs(title = paste(.x, " misplaced"))
+})
+
+```
+
+View the good correctly clustered cells
+```{r, warning=FALSE, message=FALSE}
+DimPlot(all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells, group.by = "underrepd_less1percent_misplaced_clusters_stages")
+
+
+```
+
+Keep the correctly clustered cells
+```{r, warning=FALSE, message=FALSE}
+all_jcC_seu_scvi_stg_noM55_afm_cln_no_cluster_misplaced_cells <- subset(all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells, subset = underrepd_less1percent_misplaced_clusters_stages == "Not misplaced")
+  
+```
+
+
+```{r, eval=T}
+saveRDS(all_jcC_seu_scvi_stg_noM55_afm_cln_no_cluster_misplaced_cells, paste0(save_dir_integrated_scvi_cleanup, 'all_jcC_seu_scvi_stg_noM55_afm_cln_no_cluster_misplaced_cells.RDS'))
+
+```
+
+########################END - Visualise and remove cells in leiden/stage clusters they should not be in - the few/minority (less than 50 cells) misplaced leiden cluster stage cells  ########################
