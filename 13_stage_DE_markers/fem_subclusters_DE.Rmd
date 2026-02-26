@@ -130,11 +130,6 @@ bulk_de_all_stgs_anot <- readRDS(paste0(read_dir_stage_DE_markers, 'bulk_de_all_
 
 ```
 
-```{r}
-## Read XX generated in XX
-all_jcC_seu_scvi_stg_noM55_ActivAsexDbts <- readRDS(paste0(read_dir_integration, "all_jcC_seu_scvi_stg_noM55_ActivAsexDbts.RDS"))
-
-```
 
 ```{r}
 # generated in 'm2_raw_integration_trial_qcd_DE.ipynb'
@@ -156,7 +151,7 @@ de_wilcox_bulk_scvi <- readRDS(paste0(read_dir_stage_DE_markers, 'de_wilcox_bulk
 # dsets to plot
 fm_dsets2 <- c("w.5.f", "all.fLE")
 ```
-
+########
 ```{r}
 # Generated in 'm2_integration_fm_clustr_gn_explrtn.Rmd'
 fm_leiden_w_donors_norm_harmony_jnd_cln_plots <- map(fm_dsets2, ~readRDS(paste0(read_dir_integration, "fm_leiden_w_donors_norm_harmony_jnd_cln_", .x, ".RDS"))) %>% set_names(fm_dsets2)
@@ -194,7 +189,7 @@ avg_expression_clustrs_df_data <- map(avg_expression_clustrs_data, ~.x$RNA %>% a
 
 ```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
 avg_expression_clustrs_df_data %>%
-  ggplot(aes(x = `g2_w.5.f_no_asx_dbt`, y = `g2_all.fLE`)) +
+  ggplot(aes(x = `g2_w.5.f`, y = `g2_all.fLE`)) +
   geom_point(size = 0.01) +
   geom_abline()
 
@@ -202,8 +197,8 @@ avg_expression_clustrs_df_data %>%
 
 ```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
 avg_expression_clustrs_df_data %>%
-  filter(g2_w.5.f_no_asx_dbt < 20 & g2_all.fLE < 20 ) %>%
-  ggplot(aes(x = `g2_w.5.f_no_asx_dbt`, y = `g2_all.fLE`)) +
+  filter(g2_w.5.f < 20 & g2_all.fLE < 20 ) %>%
+  ggplot(aes(x = `g2_w.5.f`, y = `g2_all.fLE`)) +
   geom_point(size = 0.01) +
   geom_abline()
 
@@ -211,7 +206,7 @@ avg_expression_clustrs_df_data %>%
 
 ```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
 avg_expression_clustrs_df_data %>%
-  ggplot(aes(x = `g2_w.5.f_no_asx_dbt`, y = `g2_all.fLE`)) +
+  ggplot(aes(x = `g2_w.5.f`, y = `g2_all.fLE`)) +
   geom_point(size = 0.01) +
   scale_x_log10() +
   scale_y_log10() +
@@ -229,7 +224,7 @@ avg_expression_clustrs_df_counts <- map(avg_expression_clustrs_counts, ~.x$RNA %
 
 ```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
 avg_expression_clustrs_df_counts %>%
-  ggplot(aes(x = `g2_w.5.f_no_asx_dbt`, y = `g2_all.fLE`)) +
+  ggplot(aes(x = `g2_w.5.f`, y = `g2_all.fLE`)) +
   geom_point(size = 0.01) +
   scale_x_log10() +
   scale_y_log10() +
@@ -240,7 +235,7 @@ avg_expression_clustrs_df_counts %>%
 
 ```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
 avg_expression_clustrs_df_counts %>%
-  ggplot(aes(x = `g2_w.5.f_no_asx_dbt`, y = `g2_all.fLE`)) +
+  ggplot(aes(x = `g2_w.5.f`, y = `g2_all.fLE`)) +
   geom_point(size = 0.01) +
   scale_x_log10() +
   scale_y_log10() +
@@ -259,36 +254,52 @@ avg_expression_clustrs_df_counts %>%
 
 
 ```{r}
+## Check how well the original leiden clusters correlate with the newly generated harmony_clusters_coarse_bulkDE clusters
+map(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, ~.x %>% count(leiden, harmony_clusters_coarse_bulkDE) %>% group_by(leiden) %>% mutate(prop = round(n/sum(n), 2)))
+
+```
+
+
+```{r}
 ## Get barcodes for the relevant subsets
-activ_fem <- map(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, ~.x %>% filter(harmony_clusters_coarse_bulkDE == "2") %>% pull(bcode)) 
+## Since the cluster assignment does not change largely for the females and in consistency with the original leiden annotations keep the leiden annotation. New 'harmony_clusters_coarse_bulkDE' commented out
+
+# activ_fem <- map(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, ~.x %>% filter(harmony_clusters_coarse_bulkDE == "2") %>% pull(bcode)) 
+activ_fem <- pmap(list(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, c("leiden", "harmony_clusters_coarse_bulkDE"), c("8", "2")), ~..1 %>% filter(!!rlang::sym(..2) == ..3) %>% pull(bcode)) 
+
 names(activ_fem) <- paste0("ActivFem_", names(activ_fem))
 
-fem <- map(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, ~.x %>% filter(harmony_clusters_coarse_bulkDE != "2") %>% pull(bcode)) 
+fem <- pmap(list(fm_leiden_w_donors_norm_harmony_jnd_cln_plots_umap_mdata, c("leiden", "harmony_clusters_coarse_bulkDE"), c("8", "2")), ~..1 %>% filter(!!rlang::sym(..2) != ..3) %>% pull(bcode)) 
+
 names(fem) <- paste0("Fem_", names(fem))
 ```
 
 ```{r}
 seu_scvi_fem_sub_clusters <- all_jcC_seu_scvi_noM55_afm_cln[[1]]@meta.data %>%
   rownames_to_column("bcode") %>%
-  mutate(fem_subclusters = case_when(bcode %in% activ_fem[["ActivFem_w.5.f_no_asx_dbt"]] ~ "ActivFem",
+  mutate(fem_subclusters = case_when(bcode %in% activ_fem[["ActivFem_w.5.f"]] ~ "ActivFem",
                                      bcode %in% activ_fem[["ActivFem_all.fLE"]] ~ "ActivFemLE",
-                                     bcode %in% fem[["Fem_w.5.f_no_asx_dbt"]] ~ "Female",
+                                     bcode %in% fem[["Fem_w.5.f"]] ~ "Female",
                                      bcode %in% fem[["Fem_all.fLE"]] ~ "Female (LE)",
-                                     T ~ "Rest")) %>%
-  select(bcode, fem_subclusters) %>% 
+                                     T ~ "Rest"),
+         fem_hires_subclusters = case_when(fem_subclusters == "Female" & leiden == "2" ~ "Female2",
+                                           fem_subclusters == "Female" & leiden == "4" ~ "Female4",
+                                           T ~ fem_subclusters)) %>%
+  select(bcode, fem_subclusters, fem_hires_subclusters) %>% 
   column_to_rownames("bcode") %>% 
-  AddMetaData(all_jcC_seu_scvi_noM55_afm_cln[[1]], .)
+  AddMetaData(all_jcC_seu_scvi_noM55_afm_cln[[1]], .)  
 
 ```
 
 
 ```{r}
 seu_scvi_fem_sub_clusters <- subset(seu_scvi_fem_sub_clusters, subset = fem_subclusters != "Rest")
-seu_scvi_fem_sub_clusters <- list(seu_scvi_fem_sub_clusters)
+seu_scvi_fem_sub_clusters <- list(seu_scvi_fem_sub_clusters) %>% set_names(c("f"))
 
 ```
 
 ```{r}
+map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "fem_hires_subclusters") )
 map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "fem_subclusters") )
 
 ```
@@ -301,6 +312,36 @@ map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "fem_subclusters") + geom
 
 ```{r}
 seu_scvi_fem_sub_clusters <- map(seu_scvi_fem_sub_clusters, ~.x[,.x@reductions$scvi_umap@cell.embeddings[,"umap_1"] >5 & .x@reductions$scvi_umap@cell.embeddings[,"umap_2"] <10])
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(seu_scvi_fem_sub_clusters, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_', .y,'.RDS')))
+
+```
+
+```{r}
+# Get UMAPs and metadata for plotting
+seu_scvi_fem_sub_clusters_umap_mdata <- map(seu_scvi_fem_sub_clusters, ~{
+  .x@meta.data %>% 
+    rownames_to_column("bcode") %>%
+    left_join(., .x@reductions$scvi_umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") 
+})
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(seu_scvi_fem_sub_clusters_umap_mdata, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_umap_mdata_', .y,'.RDS')))
+
+```
+
+
+######
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(seu_scvi_fem_sub_clusters, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_', .y,'.RDS')))
 
 ```
 
@@ -884,170 +925,5 @@ map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-1203300", "P
 
 ```
 
+
 ########### END DE between active FemalevsFemaleLE and between inert FemalevsFemaleLE  ################################# 
-
-########### START visualize active clusters in independent donor seurat objects  ################################# 
-
-## Samples to be included in the paper
-```{r, message=F, warning=F, eval=T}
-key_samples <- c("MSC3", "MSC13", "MSC14", "MSC33C", "MSC40C", "MSC45", "MSC48C", "MSC49C", "MSC50_MACS", "MSC50_SLOC", "MSC53", "MSC54", "MSC57", "MSC60C", "MSC66C", "MSC67", "MSC68C", "MSC70C")
-
-don_order <- str_remove(key_samples, "C$")
-
-```
-
-
-```{r, message=F, warning=F, eval=T}
-## Get file list
-all_anotd_stg_cln_norm_list_files <- Sys.glob("data/processed/Pf/*/seu_obj/all_anotd_stg_cln_norm.RDS")
-
-all_anotd_stg_cln_norm_list_files
-```
-
-```{r, message=F, warning=F, eval=T}
-## read filtered barcodes
-all_anotd_stg_cln_norm <- map(all_anotd_stg_cln_norm_list_files, ~.x %>% 
-                                set_names(nm = (str_remove_all(.,'data/processed/Pf/|/seu_obj.*')))) %>% 
-  unlist(., recursive = F) %>% 
-  # .[sample_name_all] %>%
-  .[key_samples] %>%
-  map(readRDS)
-
-```
-
-
-```{r}
-map(all_anotd_stg_cln_norm, ~dim(.x)[2]) %>% unlist()
-```
-
-```{r, fig.width=9, fig.height=3.5}
-imap(all_anotd_stg_cln_norm, ~DimPlot(.x, group.by = c("seurat_clusters","stage_final2")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
-```
-
-```{r, fig.width=9, fig.height=3.5}
-## Get female subclusters labels for active and inert clusters and split by donor
-fem_sub_clusters_labs <- map(seu_scvi_fem_sub_clusters, ~{.x@meta.data %>% 
-    select(orig.ident, fem_subclusters) %>%
-    rownames_to_column("bcode") %>% 
-    mutate(across(bcode, ~str_remove(., "M.*_"))) %>% 
-    split(., f=factor(.$orig.ident)) 
-}) %>% 
-  unlist(., recursive = F) %>% 
-  map(., ~.x %>% select(bcode, fem_subclusters) %>% remove_rownames() %>% column_to_rownames("bcode"))  
-
-names(fem_sub_clusters_labs) <- str_remove(names(fem_sub_clusters_labs), ".mrna")
-```
-
-
-```{r}
-DimPlot(all_jcC_seu_scvi_stg_noM55_ActivAsexDbts, group.by = "stage_scvi_hires_fem") 
-DimPlot(all_jcC_seu_scvi_stg_noM55_ActivAsexDbts, group.by = "stage_scvi_hires_fem", raster = F) + scale_colour_manual(values = sp_fld_colors2)
-
-```
-
-```{r}
-# Get UMAPs and metadata for plotting
-all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata <- all_jcC_seu_scvi_stg_noM55_ActivAsexDbts@meta.data %>% 
-    rownames_to_column("bcode") %>%
-    left_join(., all_jcC_seu_scvi_stg_noM55_ActivAsexDbts@reductions$scvi_umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") 
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-# Save for plotting
-saveRDS(all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata, paste0(save_dir_stage_DE_markers, 'all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata.RDS'))
-
-```
-
-```{r, fig.width=9, fig.height=3.5}
-## Get female subclusters labels for active and inert clusters and split by donor
-fem_hires_asex_dbt_labs <- all_jcC_seu_scvi_stg_noM55_ActivAsexDbts@meta.data %>% 
-  select(orig.ident, stage_scvi_hires_fem) %>%
-  rownames_to_column("bcode") %>% 
-  mutate(across(bcode, ~str_remove(., "M.*_"))) %>% 
-  split(., f=factor(.$orig.ident)) %>% 
-  # unlist(., recursive = F) %>% 
-  map(., ~.x %>% select(bcode, stage_scvi_hires_fem) %>% remove_rownames() %>% column_to_rownames("bcode"))  
-
-names(fem_hires_asex_dbt_labs) <- str_remove(names(fem_hires_asex_dbt_labs), ".mrna")
-```
-
-```{r, fig.width=9, fig.height=3.5}
-## Find donors present in both the femal subclusters and qcd independent donor objects
-donors_qcd_fem_clusters <- base::intersect(base::intersect(names(all_anotd_stg_cln_norm),names(fem_sub_clusters_labs)), names(fem_hires_asex_dbt_labs))
-```
-
-
-```{r, fig.width=9, fig.height=3.5}
-## Add the female subclusters annotation to seurat objects
-all_anotd_stg_cln_norm_w_fem_subclusters <- map2(all_anotd_stg_cln_norm[donors_qcd_fem_clusters], fem_sub_clusters_labs[donors_qcd_fem_clusters], ~AddMetaData(.x, .y))
-all_anotd_stg_cln_norm_w_fem_subclusters <- map2(all_anotd_stg_cln_norm_w_fem_subclusters[donors_qcd_fem_clusters], fem_hires_asex_dbt_labs[donors_qcd_fem_clusters], ~AddMetaData(.x, .y))
-
-```
-
-```{r, fig.width=9, fig.height=3.5}
-## Modify the female sucluster annotation to contain the other labels to allow contextualisation of these clusters with the other clusters
-
-all_anotd_stg_cln_norm_w_fem_subclusters <- map(all_anotd_stg_cln_norm_w_fem_subclusters, ~{
-  .x@meta.data %>%
-    mutate(fem_detld_labl = case_when(stage_scvi_hires_fem == "fem8_asx_dblt" ~ "fem_asx_dblt",
-                                      stage_scvi_hires_fem == "fem_non8_asx_dblt" ~ "fem_asx_dblt",
-                                      !(stage_scvi_hires_fem %in% c("fem8_asx_dblt", "fem_non8_asx_dblt")) & !is.na(fem_subclusters) ~ fem_subclusters,
-                                      !(stage_scvi_hires_fem %in% c("fem8_asx_dblt", "fem_non8_asx_dblt")) & is.na(fem_subclusters) & !is.na(stage_scvi_hires_fem) ~ stage_scvi_hires_fem,
-                                      is.na(stage_scvi_hires_fem) | is.na(fem_subclusters) ~ stage_fld,
-                                      T ~ stage_fld)) %>%
-    select(fem_detld_labl) %>% 
-    AddMetaData(.x, .)
-})
-```
-
-
-```{r, fig.width=9, fig.height=3.5}
-## Modify the female sucluster annotation to contain the other labels to allow contextualisation of these clusters with the other clusters
-map(all_anotd_stg_cln_norm_w_fem_subclusters, ~.x@meta.data %>% count(fem_detld_labl, stage_fld, stage_scvi_hires_fem, fem_subclusters))
-```
-
-
-```{r, fig.width=12, fig.height=5}
-imap(all_anotd_stg_cln_norm_w_fem_subclusters, ~DimPlot(.x, group.by = c("fem_detld_labl", "stage_final2")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
-```
-
-```{r, fig.width=12, fig.height=5}
-imap(all_anotd_stg_cln_norm_w_fem_subclusters, ~DimPlot(.x, group.by = c("fem_detld_labl", "stage_final2")) + labs(title = .y) + scale_color_manual(values = sp_col_new)) 
-```
-
-
-```{r}
-imap(all_anotd_stg_cln_norm_w_fem_subclusters, ~DimPlot(.x, group.by = c("fem_detld_labl"), pt.size = 0.5) + labs(title = .y) + scale_color_manual(values = sp_fld_colors2)) 
-```
-
-```{r, fig.height=4, fig.width=5}
-## Highlight likely misplaced clusters to remove
-imap(all_anotd_stg_cln_norm_w_fem_subclusters, possibly(~DimPlot(.x, pt.size = 0.01, sizes.highlight = 0.5, cells.highlight = colnames(.x[,.x$fem_detld_labl == "ActivFemLE"]), raster = F) + labs(title = .y)))
-```
-
-```{r, fig.height=4, fig.width=5}
-## Highlight likely misplaced clusters to remove
-imap(all_anotd_stg_cln_norm_w_fem_subclusters, possibly(~DimPlot(.x, pt.size = 0.01, sizes.highlight = 0.5, cells.highlight = colnames(.x[,.x$fem_detld_labl == "ActivFem"]), raster = F) + labs(title = .y)))
-```
-
-
-```{r}
-# Get UMAPs and metadata for plotting
-all_anotd_stg_cln_norm_w_fem_subclusters_umap_mdata <- map(all_anotd_stg_cln_norm_w_fem_subclusters, ~{
-  .x@meta.data %>% 
-    rownames_to_column("bcode") %>%
-    left_join(., .x@reductions$umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") 
-})
-```
-
-```{r, warning=FALSE, message=FALSE}
-# Save for plotting
-saveRDS(all_anotd_stg_cln_norm_w_fem_subclusters_umap_mdata, paste0(save_dir_stage_DE_markers, 'all_anotd_stg_cln_norm_w_fem_subclusters_umap_mdata.RDS'))
-
-```
-
-
-
-########### END visualize active clusters in independent donor seurat objects  ################################# 
-

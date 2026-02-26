@@ -1,0 +1,851 @@
+---
+title: "Stage DE figs"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  library(dreamlet)
+  library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
+  library(readxl)
+  library(ggh4x)
+  library(EnhancedVolcano)
+  library(GGally)
+  
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
+  
+})
+```
+
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#  integration of all MSC
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r}
+read_dir_scvi2seu <- "data/processed/Pf/m2_all/scvi2seu/"
+read_dir_stage_DE_markers <- "data/processed/Pf/m2_all/stage_DE_markers/"
+read_dir_integration <- "data/processed/Pf/m2_all/integration/"
+save_dir_stage_DE_markers <- "data/processed/Pf/m2_all/stage_DE_markers/"
+published_dset_dir <- "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/published_dsets/"
+
+
+```
+
+
+#####!!! DE below in seurat. Already done using scvi. Not sure which one to go with
+
+```{r}
+# # Generated in "scvi_leiden_clusters_seuratDE.Rmd"
+# all_jcC_seu_scvi_stg_noM55_afm_cln <- readRDS(paste0(read_dir_stage_DE_markers, 'all_jcC_seu_scvi_stg_noM55_afm_cln.RDS'))
+
+# Generated in "scvi_leiden_clusters_doublet_investigations.Rmd"
+all_jcC_seu_scvi_noM55_afm_cln <- readRDS(paste0(read_dir_integration, 'all_jcC_seu_scvi_noM55_afm_cln.RDS'))
+
+```
+
+
+```{r}
+# Generated in 'scvi_leiden_clusters_seurat_pbulkDE_n_DE_comparisons'
+de_wilcox_bulk_scvi <- readRDS(paste0(read_dir_stage_DE_markers, 'de_wilcox_bulk_scvi.RDS'))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Generated in 'fem_subclusters_DE.Rmd'
+seu_scvi_fem_sub_clusters <- map(c("f"), ~readRDS(paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_', .x,'.RDS')))
+
+```
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "fem_subclusters"))
+
+```
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "fem_subclusters") + scale_color_manual(values = sp_fld_colors2)) 
+
+```
+
+
+```{r}
+# seu_scvi_fem_sub_clusters <- list(seu_scvi_fem_sub_clusters)
+
+seu_scvi_fem_sub_clusters <- map(seu_scvi_fem_sub_clusters, ~SetIdent(.x, value = "fem_subclusters"))
+
+```
+
+##### DE on active female, active female LE, innert female, innert female LE compared versus the rest using pseudobulk DE 
+
+```{r, warning=FALSE, message=FALSE}
+## Remove pseudobulk groups with less than 50 cells - !!NOTE seems I had alread removed underepresented groups with less than 20 previously when doing pseudobulk DE 
+map(seu_scvi_fem_sub_clusters, ~.x@meta.data %>% group_by(fem_subclusters, orig.ident) %>% count())
+
+seu_scvi_fem_sub_clusters_cln4pbulkDE <- map(seu_scvi_fem_sub_clusters, ~.x[, .x@meta.data %>% rownames_to_column('bcode') %>% group_by(fem_subclusters, orig.ident) %>% filter(n() > 20) %>% pull(bcode)]) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Remove leiden clusters with less than 2 donors
+map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~ .x@meta.data %>% group_by(fem_subclusters) %>% filter(n_distinct(orig.ident) < 2) %>% count(fem_subclusters, orig.ident))
+
+
+seu_scvi_fem_sub_clusters_cln4pbulkDE <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~.x[, .x@meta.data %>% rownames_to_column('bcode') %>% group_by(fem_subclusters) %>% filter(n_distinct(orig.ident) >= 2) %>% pull(bcode)]) 
+```
+
+Retain only those genes expressed in atleast 20 cells for DE
+```{r, warning=FALSE, message=FALSE}
+seu_scvi_fem_sub_clusters_cln4pbulkDE <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~{
+  
+  counts <- GetAssayData(.x, slot = "counts")
+  
+  keep_genes <- rowSums(counts > 0) >= 20   # expressed in ≥10 cells
+  # seurat_obj <- subset(seurat_obj, features = rowSums(GetAssayData(seurat_obj, slot="counts") > 0) > 10)
+  
+  subset(.x, features = rownames(counts)[keep_genes])
+  
+})
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Count the sufficient groups
+map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~.x@meta.data %>% group_by(fem_subclusters, orig.ident) %>% count())
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_cln4pbulkDE_', .y,'.RDS')))
+
+```
+
+```{r}
+# Get UMAPs and metadata for plotting
+seu_scvi_fem_sub_clusters_cln4pbulkDE_umap_mdata <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~{
+  .x@meta.data %>% 
+    rownames_to_column("bcode") %>%
+    left_join(., .x@reductions$scvi_umap@cell.embeddings %>% data.frame() %>% rownames_to_column("bcode"), by = "bcode") 
+})
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(seu_scvi_fem_sub_clusters_cln4pbulkDE_umap_mdata, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'seu_scvi_fem_sub_clusters_cln4pbulkDE_umap_mdata_', .y,'.RDS')))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# pseudobulk by donor and leiden
+pseudo_fem_hiresfem <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~AggregateExpression(.x, assays = "RNA", return.seurat = T, group.by = c("orig.ident", "fem_hires_subclusters")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(pseudo_fem_hiresfem, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'pseudo_fem_hiresfem_', .y,'.RDS')))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# pseudo_fem <- map(pseudo_fem, ~.x@meta.data %>%
+#       mutate(cluster_condition = paste(fem_subclusters, condition)) %>%
+#       select(cluster_condition) %>%
+#       AddMetaData(.x, .)
+# )
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(pseudo_fem_hiresfem, ~.x@meta.data %>% count(fem_hires_subclusters, orig.ident))
+
+```
+
+### Pseudobulk DE between each female subcluster and all other female subclusters
+
+```{r, warning=FALSE, message=FALSE}
+pseudo_fem_hiresfem <- map(pseudo_fem_hiresfem, ~SetIdent(.x, value = "fem_hires_subclusters"))
+
+fem_hires_subclusters_bulk_de <- map(pseudo_fem_hiresfem, ~FindAllMarkers(object = .x, test.use = "DESeq2"))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+fem_hires_subclusters_bulk_de_anot <- map(fem_hires_subclusters_bulk_de, possibly(~.x %>% 
+                                                                                    # filter(p_val_adj < 0.05) %>% 
+                                                                                    group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% 
+                                                                                    left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))))
+
+fem_hires_subclusters_bulk_de_anot
+```
+
+```{r}
+# Save for plotting
+saveRDS(fem_hires_subclusters_bulk_de_anot, paste0(save_dir_stage_DE_markers, 'fem_hires_subclusters_bulk_de_anot.RDS'))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_hires_subclusters_bulk_de_anot, possibly(~.x %>% 
+                                                   filter(p_val_adj < 0.05 & avg_log2FC > 0) %>% 
+                                                   # filter(p_val_adj < 0.05) %>% 
+                                                   arrange(desc(avg_log2FC)) %>% 
+                                                   # arrange(desc(abs(avg_log2FC))) %>% 
+                                                   group_by(cluster) %>% 
+                                                   slice_min(order_by = p_val_adj, n = 20) %>% 
+                                                   slice_max(avg_log2FC, n =10)))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_hires_subclusters_bulk_de_anot, possibly(~.x %>% 
+                                                   filter(p_val_adj < 1e-8 & avg_log2FC > 0) %>% 
+                                                   arrange(desc(abs(avg_log2FC))) %>% 
+                                                   group_by(cluster) %>% 
+                                                   slice_min(order_by = p_val_adj, n = 40) %>% 
+                                                   slice_min(p_val_adj, n =10)))
+
+```
+
+```{r, fig.width=15, fig.height=3}
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-1006500", "PF3D7-0210900", "PF3D7-1421700",  "PF3D7-1214300"), reduction = "scvi_umap", order = T, ncol = 4, ))
+
+```
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~VlnPlot(.x, features = "nFeature_RNA", group.by = "leiden", pt.size = 0))
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = "nFeature_RNA", reduction = "scvi_umap", label = T))
+map(seu_scvi_fem_sub_clusters, ~DimPlot(.x, group.by = "leiden", reduction = "scvi_umap", label = T))
+
+```
+
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-1471900", "PF3D7-1323000"), reduction = "scvi_umap", label = F, order = F))
+# map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = "PF3D7-1141900", reduction = "scvi_umap", label = T))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+top_de_tbl <- map(fem_hires_subclusters_bulk_de_anot, ~.x %>% 
+                    # filter(gene %in% gns) %>% 
+                    arrange(desc(avg_log2FC)) %>% 
+                    filter(p_val_adj< 0.05 & avg_log2FC>0) %>%
+                    group_by(cluster) %>% 
+                    slice_min(order_by = p_val_adj, n = 40) %>% 
+                    slice_max(order_by = avg_log2FC, n = 20) %>%
+                    ungroup() %>%
+                    mutate(across(cluster, as.character))
+)
+
+top_de_tbl
+```
+
+###### pairwise DE between the Female sub clusters including Female2 and Female4 which seem to be good quality mature terminal gametocytes that are not activated
+```{r, warning=FALSE, message=FALSE}
+# # pseudobulk by donor and leiden
+# pseudo_fem_hiresfem <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~AggregateExpression(.x, assays = "RNA", return.seurat = T, group.by = c("orig.ident", "fem_hires_subclusters")))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# leiden_combis <- combn(c(2,3,4,8), m = 2, simplify = F)
+fem_clusters_combis <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~combn(c(unique(.x$fem_hires_subclusters)), m = 2, simplify = F))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+pseudo_fem_hiresfem <- map(pseudo_fem_hiresfem, ~SetIdent(.x, value = "fem_hires_subclusters"))
+
+fem_hires_subclusters_bulk_pwDE <- map2(pseudo_fem_hiresfem, fem_clusters_combis, ~{
+  obj = .x
+  combis = .y
+  map(combis, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], test.use = "DESeq2" )) %>% 
+    set_names(map(combis, ~paste(., collapse = "vs")))
+  
+}) %>%
+  unlist(., recursive = F)
+
+# top10gns <- map(pseudo_fem_hiresfem, ~.x %>% map(.,\(obj) obj %>% ungroup() %>% select(Gene, gene) %>% deframe()))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+fem_hires_subclusters_bulk_pwDE_anot <- map(fem_hires_subclusters_bulk_pwDE, ~.x %>% rownames_to_column("gene") %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+fem_hires_subclusters_bulk_pwDE_anot
+```
+
+```{r}
+# Save for plotting
+saveRDS(fem_hires_subclusters_bulk_pwDE_anot, paste0(save_dir_stage_DE_markers, 'fem_hires_subclusters_bulk_pwDE_anot.RDS'))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_hires_subclusters_bulk_pwDE_anot, ~.x %>% 
+      slice_min(order_by = p_val_adj, n = 30) %>% 
+      slice_max(order_by = avg_log2FC, n = 10))
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_hires_subclusters_bulk_pwDE_anot, ~.x %>%  slice_min(order_by = p_val_adj, n = 30) %>%  slice_min(order_by = avg_log2FC, n = 10))
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_hires_subclusters_bulk_pwDE_anot, ~.x %>%  slice_min(order_by = avg_log2FC, n = 30) %>% slice_min(order_by = p_val_adj, n = 10) )
+```
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), reduction = "scvi_umap", label = F, order = T, slot = "counts"))
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), reduction = "scvi_umap", label = F, order = T))
+
+```
+
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_hires_subclusters", slot = "counts"))
+map(pseudo_fem_hiresfem, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_hires_subclusters", slot = "counts"))
+
+map(seu_scvi_fem_sub_clusters, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_hires_subclusters"))
+map(pseudo_fem_hiresfem, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_hires_subclusters"))
+
+```
+
+
+```{r, fig.height=6, fig.width=6}
+# vlcano_mrg <- map(c("bulkDseq", "seuWilcox"), ~{
+#   EnhancedVolcano(de_wilcox_bulk_scvi %>% filter(cluster == "8"),
+#                 lab = de_wilcox_bulk_scvi %>% filter(cluster == "8") %>% pull(!!rlang::sym(paste0("Gene_", .x))),
+
+vlcano_actvFem <- imap(fem_hires_subclusters_bulk_pwDE_anot, ~EnhancedVolcano(.x ,
+                                                                              lab = .x %>% pull(!!rlang::sym(paste0("Gene"))),
+                                                                              # selectLab = .y,
+                                                                              x = paste0("avg_log2FC"),
+                                                                              y = paste0("p_val_adj"),
+                                                                              pCutoff = 1e-10,
+                                                                              FCcutoff = 1.2,
+                                                                              pointSize = 1.2,
+                                                                              labSize = 4.0,
+                                                                              title = .y,
+                                                                              subtitle = "",
+                                                                              titleLabSize = 20,
+                                                                              subtitleLabSize = 0,
+                                                                              axisLabSize = 22,
+                                                                              drawConnectors = TRUE,
+                                                                              # boxedLabels = TRUE,
+                                                                              # legendLabels =c( "p_val_adj"),
+                                                                              gridlines.minor = FALSE
+) +
+  # labs(title = .y)+
+  theme(legend.position = "none")
+) 
+
+vlcano_actvFem
+
+```
+
+
+###### Pairwise DE between female subclusters with cluster Female2 and Female4 combined
+
+```{r, warning=FALSE, message=FALSE}
+# pseudobulk the counts based on donor-female subclusters
+pseudo_fem <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~AggregateExpression(.x, assays = "RNA", return.seurat = T, group.by = c("orig.ident", "fem_subclusters")))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Save for plotting
+imap(pseudo_fem, ~saveRDS(.x, paste0(save_dir_stage_DE_markers, 'pseudo_fem_', .y,'.RDS')))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# leiden_combis <- combn(c(2,3,4,8), m = 2, simplify = F)
+fem_clusters_combis <- map(seu_scvi_fem_sub_clusters_cln4pbulkDE, ~combn(c(unique(.x$fem_subclusters)), m = 2, simplify = F))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+pseudo_fem_pwDE <- map(pseudo_fem, ~SetIdent(.x, value = "fem_subclusters"))
+
+fem_subclusters_bulk_pwDE <- map2(pseudo_fem_pwDE, fem_clusters_combis, ~{
+  obj = .x
+  combis = .y
+  map(combis, ~FindMarkers(obj, ident.1 = .x[1], ident.2 = .x[2], test.use = "DESeq2" )) %>% 
+    set_names(map(combis, ~paste(., collapse = "vs")))
+  
+}) %>%
+  unlist(., recursive = F)
+
+# top10gns <- map(pseudo_fem_hiresfem, ~.x %>% map(.,\(obj) obj %>% ungroup() %>% select(Gene, gene) %>% deframe()))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+fem_subclusters_bulk_pwDE_anot <- map(fem_subclusters_bulk_pwDE, ~.x %>% rownames_to_column("gene") %>% left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id")))
+
+fem_subclusters_bulk_pwDE_anot
+```
+
+```{r}
+# Save for plotting
+saveRDS(fem_subclusters_bulk_pwDE_anot, paste0(save_dir_stage_DE_markers, 'fem_subclusters_bulk_pwDE_anot.RDS'))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_subclusters_bulk_pwDE_anot, ~.x %>% 
+      slice_min(order_by = p_val_adj, n = 30) %>% 
+      slice_max(order_by = avg_log2FC, n = 10))
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_subclusters_bulk_pwDE_anot, ~.x %>%  slice_min(order_by = p_val_adj, n = 30) %>%  slice_min(order_by = avg_log2FC, n = 10))
+```
+
+```{r, warning=FALSE, message=FALSE}
+map(fem_subclusters_bulk_pwDE_anot, ~.x %>%  slice_min(order_by = avg_log2FC, n = 30) %>% slice_min(order_by = p_val_adj, n = 10) )
+```
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), reduction = "scvi_umap", label = F, order = T, slot = "counts"))
+map(seu_scvi_fem_sub_clusters, ~FeaturePlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), reduction = "scvi_umap", label = F, order = T))
+
+```
+
+
+```{r}
+map(seu_scvi_fem_sub_clusters, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_subclusters", slot = "counts"))
+map(pseudo_fem, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_subclusters", slot = "counts"))
+
+map(seu_scvi_fem_sub_clusters, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_subclusters"))
+map(pseudo_fem, ~VlnPlot(.x, features = c("PF3D7-0417500", "PF3D7-1464400"), group.by = "fem_subclusters"))
+
+```
+
+
+```{r, fig.height=6, fig.width=6}
+# vlcano_mrg <- map(c("bulkDseq", "seuWilcox"), ~{
+#   EnhancedVolcano(de_wilcox_bulk_scvi %>% filter(cluster == "8"),
+#                 lab = de_wilcox_bulk_scvi %>% filter(cluster == "8") %>% pull(!!rlang::sym(paste0("Gene_", .x))),
+
+vlcano_actvFem <- imap(fem_subclusters_bulk_pwDE_anot, ~EnhancedVolcano(.x ,
+                                                                        lab = .x %>% pull(!!rlang::sym(paste0("Gene"))),
+                                                                        # selectLab = .y,
+                                                                        x = paste0("avg_log2FC"),
+                                                                        y = paste0("p_val_adj"),
+                                                                        pCutoff = 1e-10,
+                                                                        FCcutoff = 1.2,
+                                                                        pointSize = 1.2,
+                                                                        labSize = 4.0,
+                                                                        title = .y,
+                                                                        subtitle = "",
+                                                                        titleLabSize = 20,
+                                                                        subtitleLabSize = 0,
+                                                                        axisLabSize = 22,
+                                                                        drawConnectors = TRUE,
+                                                                        # boxedLabels = TRUE,
+                                                                        # legendLabels =c( "p_val_adj"),
+                                                                        gridlines.minor = FALSE
+) +
+  # labs(title = .y)+
+  theme(legend.position = "none")
+) 
+
+vlcano_actvFem
+
+```
+
+### Leiden average expression
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
+avg_exprsn_fem_clusters_data <- map(seu_scvi_fem_sub_clusters, ~AverageExpression(.x, group.by = "fem_hires_subclusters", layer = "data") %>% .$RNA %>% as.data.frame() %>% rownames_to_column("gene"))
+avg_exprsn_fem_clusters_counts <- map(seu_scvi_fem_sub_clusters, ~AverageExpression(.x, group.by = "fem_hires_subclusters", layer = "counts") %>% .$RNA %>% as.data.frame() %>% rownames_to_column("gene"))
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
+avg_exprsn_fem_clusters_data
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      ggplot(aes(x = `Female2`, y = `Female4`)) +
+      geom_point(size = 0.01) +
+      geom_abline()
+)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      filter(Female2 < 20 & Female4 < 20 ) %>%
+      ggplot(aes(x = `Female2`, y = `Female4`)) +
+      geom_point(size = 0.01) +
+      geom_abline()
+)
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.2}
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      filter(Female2 < 20 & `Female (LE)` < 20 ) %>%
+      ggplot(aes(x = `Female2`, y = `Female (LE)`)) +
+      geom_point(size = 0.01) +
+      geom_abline()
+)
+```
+
+#### GGgally for pairwise comparisons across all clusters
+
+```{r}
+lowerfun <- function(data, mapping) {
+  ggplot(data = data, mapping = mapping) +
+    geom_point(size = 0.3, alpha = 0.3) +
+    geom_abline(slope = 1, intercept = 0, color = "blue")
+}
+
+```
+
+```{r}
+## pairwise correlation between female leiden subclusters
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      column_to_rownames("gene") %>%
+      ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+              upper = list(continuous = wrap("cor", size = 5)),
+              progress = FALSE)
+)
+```
+
+```{r}
+## pairwise correlation of each gene's expression averaged across all cells between female leiden subclusters - less than 50 transcripts
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      column_to_rownames("gene") %>%
+      filter(if_all(everything(), ~ .x <= 50)) %>%
+      ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+              upper = list(continuous = wrap("cor", size = 5)),
+              progress = FALSE)
+)
+```
+
+```{r}
+## pairwise correlation of each gene's expression averaged across all cells between female leiden subclusters - log transformed
+map(list(avg_exprsn_fem_clusters_data[[1]], avg_exprsn_fem_clusters_counts[[1]]), ~.x %>%
+      column_to_rownames("gene") %>%
+      ggpairs(lower = list(continuous = GGally::wrap(lowerfun)),
+              upper = list(continuous = wrap("cor", size = 5)),
+              progress = FALSE) +
+      
+      scale_x_log10() +
+      scale_y_log10() 
+    
+)
+```
+
+### Pseudobulk DE between each female subcluster and all other female subclusters
+
+```{r, warning=FALSE, message=FALSE}
+# pseudo_fem <- map(pseudo_fem, ~SetIdent(.x, value = "leiden"))
+
+# fem_hires_subclusters_bulk_de_allmarkers <- map(pseudo_fem, ~FindAllMarkers(object = .x, test.use = "DESeq2"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# fem_hires_subclusters_bulk_de_allmarkers_anot <- map(fem_hires_subclusters_bulk_de_allmarkers, possibly(~.x %>% 
+#                                         # filter(p_val_adj < 0.05) %>% 
+#                                         group_by(cluster) %>% arrange(p_val_adj, .by_group = T) %>% 
+#                                         left_join(., Pf3D7_genes_plasmoDB[,c("gene_id", "Gene")], by = c("gene" = "gene_id"))))
+# 
+# fem_hires_subclusters_bulk_de_allmarkers_anot
+```
+
+Findmarkers edgeR but similar to above but dreamlet
+
+```{r}
+# seu_scvi_fem_sub_clusters_sce <- map(seu_scvi_fem_sub_clusters, ~as.SingleCellExperiment(.))
+go()
+```
+
+
+```{r}
+library(edgeR)
+y <- Seurat2PB(seu_scvi_fem_sub_clusters[[1]], sample="orig.ident", cluster="leiden")
+```
+
+```{r}
+summary(y$samples$lib.size)
+
+keep.samples <- y$samples$lib.size > 5e4
+
+table(keep.samples)
+
+y <- y[, keep.samples]
+```
+
+```{r}
+keep.genes <- filterByExpr(y, group=y$samples$cluster)
+
+table(keep.genes)
+
+y <- y[keep.genes, , keep=FALSE]
+```
+
+```{r}
+y <- normLibSizes(y)
+head(y$samples, n=10L)
+
+summary(y$samples$norm.factors)
+```
+
+```{r}
+cluster <- as.factor(y$samples$cluster)
+limma::plotMDS(y, pch=16, col=c(2:8)[cluster], main="MDS")
+legend("topleft", legend=paste0("cluster",levels(cluster)), pch=16, col=2:8, cex=0.8)
+```
+
+```{r}
+donor <- factor(y$samples$sample)
+design <- model.matrix(~ cluster + donor)
+colnames(design) <- gsub("donor", "", colnames(design))
+colnames(design)[1] <- "Int"
+head(design)
+```
+
+```{r}
+dim(design)
+```
+
+```{r}
+y <- estimateDisp(y, design, robust=TRUE)
+
+y$common.dispersion
+
+plotBCV(y)
+```
+
+```{r}
+fit <- glmQLFit(y, design, robust=TRUE)
+plotQLDisp(fit)
+```
+
+```{r}
+ncls <- nlevels(cluster)
+contr <- rbind( matrix(1/(1-ncls), ncls, ncls), matrix(0, ncol(design)-ncls, ncls) )
+diag(contr) <- 1
+contr[1,] <- 0
+rownames(contr) <- colnames(design)
+colnames(contr) <- paste0("cluster", levels(cluster))
+contr
+```
+
+```{r}
+qlf <- list()
+for(i in 1:ncls){
+  qlf[[i]] <- glmQLFTest(fit, contrast=contr[,i])
+  qlf[[i]]$comparison <- paste0("cluster", levels(cluster)[i], "_vs_others")
+}
+```
+
+```{r}
+qlf
+```
+
+```{r}
+topTags(qlf[[1]], n=10L)
+
+```
+
+```{r}
+qlf[[1]]$table %>% filter(PValue < 0.05) %>% filter(logFC > 0)
+```
+
+```{r}
+dt <- lapply(lapply(qlf, decideTests), summary)
+dt.all <- do.call("cbind", dt)
+dt.all
+```
+
+```{r}
+dt <- lapply(lapply(qlf, decideTests), summary)
+
+```
+
+```{r}
+top <- 100
+topMarkers <- list()
+for(i in 1:ncls) {
+  ord <- order(qlf[[i]]$table$PValue, decreasing=FALSE)
+  up <- qlf[[i]]$table$logFC[ord] > 0
+  topMarkers[[i]] <- rownames(y)[ord[up][1:top]]
+}
+topMarkers <- unique(unlist(topMarkers))
+topMarkers
+```
+
+```{r}
+lcpm <- edgeR::cpm(y, log=TRUE)
+annot <- data.frame(cluster=paste0("cluster ", cluster))
+rownames(annot) <- colnames(y)
+ann_colors <- list(cluster=2:5)
+names(ann_colors$cluster) <- paste0("cluster ", levels(cluster))
+pheatmap::pheatmap(lcpm[topMarkers, ], breaks=seq(-2,2,length.out=101),
+                   color=colorRampPalette(c("blue","white","red"))(100), scale="row",
+                   cluster_cols=TRUE, border_color="NA", fontsize_row=5,
+                   treeheight_row=70, treeheight_col=70, cutree_cols=7,
+                   clustering_method="ward.D2", show_colnames=FALSE,
+                   annotation_col=annot, annotation_colors=ann_colors)
+```
+
+## Compare DESeq2 vs edgeR Results
+
+```{r}
+# Extract edgeR results into data frame
+edgeR_results <- map_df(qlf, ~.x$table %>% 
+                          rownames_to_column("gene") %>%
+                          mutate(comparison = .x$comparison) %>%
+                          select(gene, comparison, logFC, PValue), 
+                        .id = "contrast_idx") %>%
+  select(-contrast_idx)
+
+# Convert p-values to adjusted (approx using Benjamini-Hochberg)
+edgeR_results <- edgeR_results %>%
+  group_by(comparison) %>%
+  mutate(PValue_adj = p.adjust(PValue, method = "BH")) %>%
+  ungroup()
+
+head(edgeR_results)
+```
+
+
+```{r}
+# Extract DESeq2 results (cluster comparisons only)
+deseq2_results <- fem_subclusters_bulk_de_allmarkers_anot %>%
+  bind_rows(.id = "contrast_idx") %>%
+  mutate(comparison = paste0("cluster",cluster,"_vs_others"), 
+         test = "DESeq2") %>%
+  select(gene, avg_log2FC, p_val_adj, comparison, test) 
+
+head(deseq2_results)
+```
+
+```{r}
+# Merge results by gene
+comparison_df <- deseq2_results %>%
+  rename(logFC_DESeq2 = avg_log2FC, padj_DESeq2 = p_val_adj) %>%
+  inner_join(edgeR_results %>% 
+               select(gene, logFC, PValue_adj, comparison) %>%
+               rename(logFC_edgeR = logFC, padj_edgeR = PValue_adj),
+             by = c("gene", "comparison")) %>%
+  filter(!is.na(logFC_edgeR) & !is.na(logFC_DESeq2))
+
+cat("Genes compared:", nrow(comparison_df), "\n")
+cat("Correlation of logFC:", cor(comparison_df$logFC_DESeq2, comparison_df$logFC_edgeR, use="complete"), "\n")
+cat("Correlation of -log10(p_adj):", 
+    cor(-log10(comparison_df$padj_DESeq2 + 1e-300), 
+        -log10(comparison_df$padj_edgeR + 1e-300), use="complete"), "\n")
+```
+
+```{r, fig.height=5, fig.width=10}
+# Plot comparisons
+p1 <- comparison_df %>%
+  ggplot(aes(x = logFC_DESeq2, y = logFC_edgeR)) +
+  geom_point(alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "LogFC: DESeq2 vs edgeR", x = "DESeq2 logFC", y = "edgeR logFC") +
+  theme_bw()
+
+p2 <- comparison_df %>%
+  ggplot(aes(x = -log10(padj_DESeq2 + 1e-300), y = -log10(padj_edgeR + 1e-300))) +
+  geom_point(alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "-log10(padj): DESeq2 vs edgeR", x = "DESeq2 -log10(padj)", y = "edgeR -log10(padj)") +
+  theme_bw()
+
+p1 | p2
+```
+
