@@ -155,6 +155,7 @@ tbl_for_filtering_misplaced_less1percent_cells %>%
        theme(text = element_text(size = 18),
              legend.position = "none")
 
+
 ```
 
 ```{r, warning=FALSE, message=FALSE, fig.width=10, fig.height=3}
