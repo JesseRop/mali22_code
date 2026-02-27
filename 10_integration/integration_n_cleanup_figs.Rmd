@@ -1,0 +1,423 @@
+---
+title: "Stage DE figs"
+date: "2024-01-05"
+author: "Jesse Rop"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: hide
+    df_print: paged
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  # library(sctransform)
+  # library(rgl)
+  library(ggrepel)
+  # library(ggpubr)
+  library(dplyr) 
+  library(stringr)
+  library(purrr)
+  library(readr)
+  library(tibble)
+  library(ggplot2)
+  # library(ggnewscale)
+  library(tidyr)
+  library(cowplot)
+  # library(scDblFinder)
+  library(SeuratData)
+  library(SeuratDisk)
+  # library(scmap)
+  library(SingleCellExperiment)
+  library(pheatmap)
+  library(plotly)
+  # library(Hmisc)
+  # library(rmarkdown)
+  library(RColorBrewer)
+  # library(MAST)
+  library(ggvenn)
+  # library("biomaRt")
+  library(conflicted)
+  # library(SoupX)
+  library(MetBrewer)
+  # library(dreamlet)
+  # library(muscat)
+  # library(ExperimentHub)
+  # library(zenith)
+  library(scater)
+  library(slingshot)
+  library(harmony)
+  library(ggforce)
+  # library(miloR)
+  library(scater)
+  library(scran)
+  library(patchwork)
+  # library(scRNAseq)
+  library(scuttle)
+  library(irlba)
+  library(BiocParallel)
+  library(tradeSeq)
+  library(ComplexHeatmap)
+  library(circlize)
+  library(readxl)
+  library(ggh4x)
+  library(EnhancedVolcano)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+  conflict_prefer("rename", "dplyr")
+  conflicts_prefer(dplyr::count)
+  conflicts_prefer(base::as.data.frame)
+  conflicts_prefer(base::as.factor)
+  
+})
+```
+
+
+```{r setup}
+sample_set = "Mali2"
+
+# knitr::opts_knit$set(root.dir = paste0("/Users/jr35/Google Drive/My Drive/PHD_documents/malaria_phd/", sample_set))
+knitr::opts_knit$set(root.dir = paste0("/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/", sample_set))
+```
+
+
+#  integration of all MSC
+
+### Common functions
+
+#### Source commong functions, varriables and tables
+```{r}
+##Boxplot labeling function
+source("../multipurpose_scripts_lnk/seurat_sce/seu_sce_common_fns.R")
+source("../multipurpose_scripts_lnk/plotting_common_fns.R")
+source("/nfs/users/nfs_j/jr35/Mali2/mali22_code/pf_common_vars.R")
+```
+
+
+```{r}
+# read_dir <- "data/processed/Pf/m2_all/scvi2seu/"
+read_dir_stage_DE_markers <- "data/processed/Pf/m2_all/stage_DE_markers/"
+read_dir_integration <- "data/processed/Pf/m2_all/integration/"
+
+read_dir_scvi2seu <- "data/processed/Pf/m2_all/scvi2seu/"
+
+```
+
+#####!!! DE below in seurat. Already done using scvi. Not sure which one to go with
+```{r, message=FALSE, warning=FALSE}
+# Generated in '' 
+# Original umap with asx dbts etc
+
+# all_jcC_seu_scvi_noM55 <- readRDS("data/processed/Pf/m2_all/scvi2seu/all_jcC_seu_scvino_M55.RDS")
+# all_jcC_seu_scvi_noM55 <- readRDS(paste0(read_dir_scvi2seu, 'all_jcC_seu_scvino_M55.RDS'))
+
+```
+
+## Integrated object with all the cells including poor QC
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# # Generated in 'm2_scvi_to_seurat.Rmd' 
+all_jcC_seu_scvi_no_M55_umap_mdata <- readRDS(paste0(read_dir_scvi2seu, "all_jcC_seu_scvi_no_M55_umap_mdata_3.RDS"))
+```
+
+
+```{r}
+all_jcC_seu_scvi_no_M55_umap_mdata_clnVariables <- all_jcC_seu_scvi_no_M55_umap_mdata %>% 
+  mutate(donor = str_remove_all(orig.ident, "SC|.mrna"),
+         bcode_don = paste0(donor, "_", bcode),
+         # across(donor, ~factor(str_remove(., "C$"), levels = don_order)),
+         stage_fld = str_replace_all(stage_fld, c("Mid trophozoite" = "Early trophozoite", ".*schizont" = "Schizont", "Gametocyte \\(developing\\)" = "Early ring")),
+         across(stage_fld, ~factor(., levels = stg_refnd_lvls)),
+         stage = stage_fld,
+         leiden = factor(leiden)#,
+         # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocyte")) 
+         # stage_ag = ifelse(str_detect(stage, "ale"), "Gametocyte", "Asexual")
+  )  
+
+```
+
+
+
+
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+scvi_umap_cols <- c("#E69F00", "#56B4E9", "#009E73", "#f7f1a0", "#0072B2", 
+                    "#D55E00", "#CC79A7", "#845422", "#882255", "#117733", 
+                    "#88CCEE", "#DDCC77", "#AA4499", "#44AA99", "#8d97f4", "#8d97f4") %>% set_names(c(0:15))
+
+green_shades <- c("#D9F0A3", "#ADDD8E", "#41AB5D", "#45AB8D", "#238443", "#005A32", "#009E73") %>% set_names(c(15, 10,9,4,2,8, 14))
+medium_purple_shades <- c("#8A66D2", "#6A4DBA", "#8d97f4") %>% set_names(c(0, 6, 11))
+deep_purple_shades <- c("#F5DEB3","#E3C58F", "#C6A15B", "#A67C00", "#8B5A2B", "#845422") %>% set_names(c(1, 5,7,12,13,16)) 
+femLE <- c("#CC79A7") %>% set_names(c(3))
+# femLE <- c("#7cf4ec") %>% set_names(c(3))
+
+leiden_cols <- c(green_shades, medium_purple_shades, deep_purple_shades, femLE)
+```
+
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=11, fig.height=3.2}
+umap_col_plot_fn <- function(dset = asx_gns_mdata_umap, col_nm = "Stage", clstr_labl = "leiden", group_by_var = "leiden", dim1 = "umap_1", dim2 = "umap_2", pt_size = 0.01, clustr_cols = leiden_cols, is_continuous = "no") {
+  
+  cluster_centers <- dset %>%
+    group_by(!!rlang::sym(clstr_labl)) %>%
+    dplyr::summarize(umap_cntr_1 = median(!!rlang::sym(dim1)), umap_cntr_2 = median(!!rlang::sym(dim2)))
+  
+  dset %>%
+    # group_by(!!!rlang::syms(grp_var)) %>%
+    # arrange(!!rlang::sym(gene)) %>%
+    ggplot(aes(x = !!rlang::sym(dim1), y = !!rlang::sym(dim2), colour = !!rlang::sym(group_by_var))) +
+    geom_point(size = pt_size) +
+    geom_text(data = cluster_centers,      # Add labels at centers
+              aes(x = umap_cntr_1, y = umap_cntr_2, label = !!rlang::sym(clstr_labl)), 
+              color = "black", 
+              fontface = "bold",
+              size = 9) +
+    {if(is_continuous == "yes") {
+      scale_color_distiller(direction = 1) 
+    } else {
+      scale_color_manual(values = clustr_cols)
+    }} +
+    # facet_nested_wrap(vars(!!!rlang::syms(grp_var)), nrow = row_num) +
+    labs(x = "UMAP 1", y = "UMAP 2") +
+    theme_classic() +
+    theme(text = element_text(size = 18),
+          legend.position = "bottom",
+          axis.text = element_blank(),
+          axis.ticks = element_blank()) +
+    guides(colour = guide_colorbar(title = col_nm, direction = "horizontal"))
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=3.8}
+umap_col_plot_fn(dset = all_jcC_seu_scvi_no_M55_umap_mdata_clnVariables) 
+```
+
+
+## Plot the misplaced clusters/stages
+```{r, eval=T}
+## Generated in 'all_integrated_scvi_object_cleanup_2remove_misplaced_clusters.Rmd'
+all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells_umap_mdata <- readRDS(paste0(read_dir_integration, 'all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells_umap_mdata.RDS'))
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=5, fig.height=5}
+stg_misplaced_sizes = c(1,1,1,0.1) %>% set_names(c("Asexual", "Female", "Male", "Other"))
+
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T,  fig.width=6, fig.height=4.2}
+
+all_jcC_seu_scvi_stg_noM55_afm_cln_w_cluster_misplaced_cells_umap_mdata %>%
+  mutate(misplaced_stage = factor(str_replace(str_remove(underrepd_less1percent_misplaced_clusters_stages, " misplaced"), "Not", "Other"), levels = stg_refnd_lvls)) %>% 
+  arrange(desc(misplaced_stage)) %>% 
+  ggplot(aes(x = umap_1, y = umap_2, colour = misplaced_stage, size = misplaced_stage)) + 
+  geom_point() +
+  scale_color_manual(values = sp_fld_colors)+
+  scale_size_manual(values = stg_misplaced_sizes)+ 
+  # labs(x = "UMAP 1", y = "UMAP 2") +
+  theme_classic() +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),,
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold")) +
+  guides(colour = guide_legend(title = "Stage", title.position = "top", nrow = 1, override.aes = list(size = 4)),
+         size = "none")
+
+```
+
+
+#### Plot the cluster with activated female +asexual doublet like cells
+
+```{r}
+# read the overal object with activated+asex doublet annotation - generated in 'scvi_leiden_clusters_doublet_investigations.Rmd'
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata <- readRDS(paste0(read_dir_integration, "all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata.RDS"))
+
+```
+
+
+
+```{r, message=FALSE,  fig.width=6, fig.height=4.4}
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata  %>% 
+  ggplot(aes(x = umap_1, y = umap_2, colour = asex_markers_avg_exp_sk21)) + 
+  geom_point(size = 0.1) +
+  scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "Spectral")))+
+  theme_classic() +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),,
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold"))+
+  guides(colour = guide_colorbar(title = "Asexual markers avg expression", title.position = "top", barwidth = unit(13.5, "cm")))#+
+            #coord_fixed()
+
+
+```
+
+
+```{r, results='asis', message=FALSE, fig.width=10, fig.height=3}
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata %>%
+  filter(stage_asx_c != "Asexual") %>%
+  ggplot(aes(x = factor(leiden), color = fem_asx_dblt_sum, y = asex_markers_avg_exp_sk21)) +
+  geom_sina(size = 0.01)
+
+```
+
+```{r, results='asis', message=FALSE, fig.width=10, fig.height=3}
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata %>%
+  filter(!is.na(fem_asx_dblt_sum)) %>%
+  ggplot(aes(x = factor(leiden), color = fem_asx_dblt_sum, y = asex_markers_avg_exp_sk21)) +
+  geom_sina(size = 0.01)
+
+```
+
+
+
+```{r, message=FALSE, fig.width=5, fig.height=5}
+stg_af_dlt_sizes = c(0.5,0.5,0.1) %>% set_names(c("Yes", "No", "Other"))
+stg_af_dlt_cols = c("#C5D4FDFF",  "#048988FF",  "#DCDCDC") %>% set_names(c("Yes", "No", "Other"))
+
+```
+
+```{r, message=FALSE,  fig.width=6, fig.height=4.2}
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata %>%
+  mutate(likely_af_doublet = factor(str_to_sentence(ifelse(is.na(fem_asx_dblt_sum), "Other", fem_asx_dblt_sum)), levels = c("Yes", "No", "Other"))) %>% 
+  arrange(desc(likely_af_doublet)) %>% 
+  ggplot(aes(x = umap_1, y = umap_2, colour = likely_af_doublet, size = likely_af_doublet)) + 
+  geom_point() +
+  scale_color_manual(values = stg_af_dlt_cols)+
+  scale_size_manual(values = stg_af_dlt_sizes)+ 
+  # labs(x = "UMAP 1", y = "UMAP 2") +
+  theme_classic() +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),,
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold")) +
+  guides(colour = guide_legend(title = "Likely doublet", title.position = "top", nrow = 1, override.aes = list(size = 4)),
+         size = "none")
+
+
+```
+
+
+
+```{r, message=FALSE, fig.width=1.5, fig.height=2}
+all_jcC_seu_scvi_stg_noM55_ActivAsexDbts_umap_mdata %>%
+  # filter(leiden == "8") %>%
+  filter(!is.na(fem_asx_dblt_sum)) %>%
+  mutate(likely_af_doublet = factor(str_to_sentence(fem_asx_dblt_sum), levels = c("Yes", "No", "Other"))) %>% 
+  ggplot(aes(x = likely_af_doublet, color = likely_af_doublet, y = asex_markers_avg_exp_sk21)) +
+  geom_boxplot(outlier.shape = NA)+
+  scale_color_manual(values = stg_af_dlt_cols)+
+  geom_sina(size = 0.01) +
+  labs(x = "Likely doublet", y = "Avg expression") +
+  theme_classic()+
+  theme(text = element_text(size = 17.5, face = "bold"),
+        legend.position = "none",
+        axis.title.x = element_blank())
+
+```
+
+## Plot the clean integrated object after removing cells above
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# # Generated in 'm2_scvi_to_seurat.Rmd' 
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata <- readRDS(paste0(read_dir_integration, "all_jcC_seu_scvi_noM55_afm_cln_umap_mdata.RDS"))
+```
+
+
+```{r}
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables <- all_jcC_seu_scvi_noM55_afm_cln_umap_mdata[["all"]] %>% 
+  mutate(donor = str_remove_all(orig.ident, "SC|.mrna"),
+         bcode_don = paste0(donor, "_", bcode),
+         # across(donor, ~factor(str_remove(., "C$"), levels = don_order)),
+         stage_fld = str_replace_all(stage_fld, c("Mid trophozoite" = "Early trophozoite", ".*schizont" = "Schizont", "Gametocyte \\(developing\\)" = "Early ring")),
+         across(stage_fld, ~factor(., levels = stg_refnd_lvls)),
+         stage = stage_fld,
+         leiden = factor(leiden)#,
+         # stage_ag = ifelse(stage_c == "Asexual", "Asexual", "Gametocyte")) 
+         # stage_ag = ifelse(str_detect(stage, "ale"), "Gametocyte", "Asexual")
+  )  
+
+```
+
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=5}
+## Modify the stage colour mapping variable and stage levels to allow mapping to short-form stage labels
+sp_fld_colors2_short_form <- sp_fld_colors2
+names(sp_fld_colors2_short_form) <- str_replace_all(names(sp_fld_colors2_short_form), "arly |ate ", ".")
+
+stg_refnd_lvls_short_form <- str_replace_all(stg_refnd_lvls, "arly |ate ", ".")
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=5}
+## Abbreviate the stage variable for easy plotting
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables_abbrevt <- all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables %>%
+  mutate(across(stage, ~str_replace_all(., "arly |ate ", ".")),
+         across(stage, ~str_replace(., "Schizont", "E.ring")),
+         across(stage, ~droplevels(factor(., levels = stg_refnd_lvls_short_form)))) 
+```
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=6, fig.height=5}
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables_abbrevt %>%
+  umap_col_plot_fn(dset = ., group_by_var = "stage", clustr_cols = sp_fld_colors2_short_form) +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold")) +
+  guides(colour = guide_legend(title = "Stage", title.position = "top", nrow = 3, override.aes = list(size = 4)))
+```
+
+
+
+```{r, message=FALSE, warning=FALSE, eval=T, fig.width=5.5, fig.height=6.5}
+
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables_abbrevt %>%
+  ggplot(aes(x = umap_1, y = umap_2, colour = stage)) + 
+  scale_color_manual(values = sp_fld_colors2_short_form)+
+  geom_point(size = 0.2) +
+  # labs(x = "UMAP 1", y = "UMAP 2") +
+  theme_classic() +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),,
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold")) +
+  guides(colour = guide_legend(title = "Stage", title.position = "top", nrow = 4, override.aes = list(size = 4)))
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width=5.5, fig.height=6.5}
+all_jcC_seu_scvi_noM55_afm_cln_umap_mdata_clnVariables_abbrevt %>%
+  umap_col_plot_fn(dset = ., group_by_var = "stage", clustr_cols = sp_fld_colors2_short_form) +
+  theme(text = element_text(size = 25),
+        legend.position = "bottom",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),,
+        axis.title = element_blank(),
+        legend.title = element_text(size = 25, face = "bold")) +
+  guides(colour = guide_legend(title = "Stage", title.position = "top", nrow = 4, override.aes = list(size = 4)))
+```
+
