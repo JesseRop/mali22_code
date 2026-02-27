@@ -70,6 +70,7 @@ suppressPackageStartupMessages({
   conflicts_prefer(dplyr::count)
   conflicts_prefer(base::as.data.frame)
   conflicts_prefer(base::as.factor)
+  conflicts_prefer(dplyr::desc)
   
 })
 ```
@@ -96,6 +97,10 @@ source("../multipurpose_scripts_lnk/plotting_common_fns.R")
 source("mali22_code_lnk/pf_common_vars.R")
 ```
 
+```{r}
+save_dir <- "data/processed/Pf/m2_all/asymptomatic_vs_symptomatic"
+
+```
 
 ```{r setup}
 
@@ -112,6 +117,7 @@ read in files
 clean objects all donors
 ```{r}
 # msc_w_cln_strns <- readRDS("data/processed/Pf/m2_all/msc_w_cln_strns.RDS")
+
 ```
 
 ```{r, eval=T}
@@ -181,14 +187,15 @@ v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% glimpse
 
 ```{r}
 ## add haemoglobin type
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
-  rownames_to_column("bcode") %>% 
-  left_join(., mrc_sk21_summary_mxd, by = "donor") %>%
-  # mutate(Symptomatic = coalesce(Symptomatic.x, Symptomatic.y), Hb_Type = coalesce(Hb_Type.x, Hb_Type.y)) %>% 
-  # select(bcode, Symptomatic, Hb_Type) %>% 
-  select(bcode,  Hb_Type) %>% 
-  column_to_rownames("bcode") %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
+# v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt@meta.data %>% 
+#   rownames_to_column("bcode") %>% 
+#   left_join(., mrc_sk21_summary_mxd, by = "donor") %>%
+#   # mutate(Symptomatic = coalesce(Symptomatic.x, Symptomatic.y), Hb_Type = coalesce(Hb_Type.x, Hb_Type.y)) %>% 
+#   # select(bcode, Symptomatic, Hb_Type) %>% 
+#   select(bcode,  Hb_Type) %>% 
+#   column_to_rownames("bcode") %>% 
+#   AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt, .)
+v3_m2_asex_harmony_ss_res_fld_pt_mxdSp<-v3_m2_asex_harmony_ss_res_fld_pt
 ```
 
 
@@ -211,14 +218,14 @@ donor_mdata_slct <- readRDS("data/processed/Pf/m2_all/donor_mdata_slct.RDS")
 add metadata
 
 ```{r, fig.width=15, fig.height=5}
-v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data  %>%
-  rownames_to_column("bcode") %>% 
-  mutate(donor_nm = str_remove_all(donor, "_SLO|_MACS")) %>%
-  select(bcode, donor_nm) %>%
-  left_join(., donor_mdata_slct, by=c("donor_nm"="short_name"), relationship = "many-to-one") %>%
-  select(bcode, any_of(colnames(donor_mdata_slct))) %>% 
-  column_to_rownames("bcode") %>% 
-  AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, .)
+# v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp@meta.data  %>%
+#   rownames_to_column("bcode") %>% 
+#   mutate(donor_nm = str_remove_all(donor, "_SLO|_MACS")) %>%
+#   select(bcode, donor_nm) %>%
+#   left_join(., donor_mdata_slct, by=c("donor_nm"="short_name"), relationship = "many-to-one") %>%
+#   select(bcode, any_of(colnames(donor_mdata_slct))) %>% 
+#   column_to_rownames("bcode") %>% 
+#   AddMetaData(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, .)
 
 ```
 
@@ -259,7 +266,7 @@ v3_m2_asex_harmony_ss_res_fld_pt_mxdSp <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp
 
 Visualize all cells including mixed infections
 ```{r, fig.width=3, fig.height=3.5}
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, split.by = "dset", reduction = "umap.harmony_pc_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp, split.by = "dset", reduction = "umap.harmony_PC_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
   theme(legend.position = "none", 
         axis.text = element_blank(), 
         plot.title  = element_blank())+
@@ -279,7 +286,7 @@ v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier <- v3_m2_asex_harmony_ss_res_fl
 
 Visualize all cells including mixed infections
 ```{r, fig.width=3, fig.height=3.5}
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier, split.by = "dset", reduction = "umap.harmony_pc_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier, split.by = "dset", reduction = "umap.harmony_PC_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
   theme(legend.position = "none", 
         axis.text = element_blank(), 
         plot.title  = element_blank())+
@@ -289,7 +296,7 @@ DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier, split.by = "dset", red
 
 
 ```{r, fig.width=7.5, fig.height=2}
-tbl_all_umap <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier[,v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier$dset != "Lab"]@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier@meta.data %>% rownames_to_column("bcode")) 
+tbl_all_umap <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier[,v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier$dset != "Lab"]@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., v3_m2_asex_harmony_ss_res_fld_pt_mxdSp_noOutlier@meta.data %>% rownames_to_column("bcode")) 
 
 ```
 
@@ -300,9 +307,9 @@ knitr::opts_chunk$set(dpi=300)
 ```{r, fig.width=10, fig.height=1.8, dpi=500}
 
 tbl_all_umap %>%
-  mutate(across(donor, ~str_remove_all(., "SC|_SLO"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|_SLO|C"))) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = stage)) +
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = stage)) +
   geom_point(size = 0.1) +
   scale_color_manual(values = sp_fld_colors) +
   ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
@@ -337,7 +344,7 @@ same as above without fever
 ```{r, fig.width=14, fig.height=4}
 tbl <- sympt_fev_tbl1 %>%
   count(condition, donor, StrainDon) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   group_by(condition, donor) %>%
   add_count(name = "strn_n") %>% 
   ungroup() %>%
@@ -393,7 +400,7 @@ v3_m2_asex_harmony_ss_res_fld_pt_pf <- v3_m2_asex_harmony_ss_res_fld_pt_mxdSp[,!
 
 Visualize all cells
 ```{r, fig.width=3, fig.height=3.5}
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, split.by = "dset", reduction = "umap.harmony_pc_man", group.by = "StageFL_ND", pt.size = 0.3) + scale_color_manual(values = sp_fld_colors)+
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, split.by = "dset", reduction = "umap.harmony_PC_man", group.by = "StageFL_ND", pt.size = 0.3) + scale_color_manual(values = sp_fld_colors)+
   theme(legend.position = "none", 
         axis.text = element_blank(), 
         plot.title  = element_blank(),
@@ -404,7 +411,7 @@ DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, split.by = "dset", reduction = "uma
 ```
 
 ```{r, fig.width=1.5, fig.height=3}
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_pc_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_PC_man", group.by = "StageFL_ND", pt.size = 0.1) + scale_color_manual(values = sp_fld_colors)+
   theme(legend.position = "none", 
         axis.text = element_blank(), 
         plot.title  = element_blank())+
@@ -430,38 +437,229 @@ m2_asex_harmony_tr <- m2_asex_harmony_tr@meta.data %>% mutate(across(c(donor,Str
 m2_asex_harmony_tr <- m2_asex_harmony_tr[,m2_asex_harmony_tr@meta.data %>% rownames_to_column('bcode') %>% add_count(StrainDon, name="strn_n") %>% filter(strn_n>=20) %>% pull(bcode)]
 ```
 
-###################### PSEUDOTIME CHUNKING START - SEU  ############################################
-
-## pseudotime chunks used for all the DE methods below and can be used for DEseq2 above as well
-### Calculate pseudotime chunks
 ```{r}
-##Generate pseudotime chunks categories with range of highest and lowest pseudotime values and breaks numbers to ensure balanced representation of cells and drop the cells without strain information
-cat_n<-3
+m2_asex_harmony_tr_list <- list(m2_asex_harmony_tr)
+```
 
-##Remove those without pseudotime
-m2_asex_harmony_tr_pt_chunks <- m2_asex_harmony_tr[,!is.na(m2_asex_harmony_tr@meta.data[,'pseudotime'])]
+#############START - BALANCE CELLS PSEUDOTIME CHUNKING START Calculate pseudotime chunks and downsample within chunks #############
 
-      # print(sce_obj)
-m2_asex_harmony_tr_pt_chunks@meta.data[,c('PT_grp_unbal', 'PT_grp')] <- m2_asex_harmony_tr_pt_chunks@meta.data[,c( "pseudotime"), drop=F] %>%
-        data.frame() %>% 
-        mutate(PT_grp_unbal = cut(!!rlang::sym("pseudotime"),  
-                               breaks = c(-Inf, seq(min(!!rlang::sym("pseudotime")),  max(!!rlang::sym("pseudotime")), round((max(!!rlang::sym("pseudotime")) - min(!!rlang::sym("pseudotime")))/cat_n, 2)), Inf)),
-               pt_rank = dense_rank(!!rlang::sym("pseudotime")),
-               PT_grp = cut(pt_rank,  
-                               breaks = c(-Inf, seq(min(pt_rank),  max(pt_rank), round((max(pt_rank) - min(pt_rank))/cat_n, 2)), Inf))
-               ) %>%
-  mutate(ptime_grp_rnk = dense_rank(factor(PT_grp_unbal)),
-         ptime_bal_grp_rnk = dense_rank(factor(PT_grp)),
-         PT_grp_unbal = paste0("PT.", ptime_grp_rnk-1),
-         PT_grp = paste0("PT.", ptime_bal_grp_rnk-1)
-         ) %>%
-        dplyr::select(PT_grp_unbal, PT_grp)
+```{r, warning=FALSE, message=FALSE}
+## Calculate pseudotime chunks
+## Name these  pseudotime chunks as downsampling_xxx since they are for downsampling
+
+bal_df_asex_symptoDE <- map(m2_asex_harmony_tr_list, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "slingPseudotime_1", chunk_num = 20, p_cat_nm = "downsampling_ptime_cat", p_bal_cat_nm = "downsampling_ptime_bal_cat"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Calculate pseudotime chunks
+m2_asex_harmony_tr_list <- map2(m2_asex_harmony_tr_list, bal_df_asex_symptoDE, ~AddMetaData(.x, .y) )
+```
+
+```{r}
+## subset where field parasites are for slingshot
+map(m2_asex_harmony_tr_list, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_cat" ))
+map(m2_asex_harmony_tr_list, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat" ))
+```
+
+
+```{r}
+# Colours for plotting pseudotime chunks
+ptc_cols <- c("#068B4CFF", "#4FB0C0FF", "#74DC09FF", "#3377ff", "#E769ACFF", 
+"#8A1708FF", "#048461FF", "#3BDF3FFF", "#5559B5FF", "#557406FF", 
+"#2A158CFF", "#B48606FF", "#CA2F4DFF", "#E75FFDFF", "#E35655FF", 
+"#42CFC3FF", "#1BA0B9FF", "#D481E8FF", "#958FEBFF", "#4A7406FF", 
+"#540B9CFF", "#341B4DFA") %>% set_names(paste0("PT.", 1:22))
+```
+
+```{r}
+map(m2_asex_harmony_tr_list, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "downsampling_ptime_bal_cat", cols = ptc_cols, label = T ) +
+  theme(legend.position = "none"))
+```
+
+```{r}
+# imap(m2_asex_harmony_tr_list, ~saveRDS(.x, paste0(save_dir, "afm_leiden_w_donors_pt_downsampling_chunks_", .y, ".RDS")))
+```
+
+
+```{r}
+# Count the donors with atleast 2 strains each with atleast 100 cells
+# don_100n <- imap(afm_leiden_w_donors_pt, ~.x@meta.data %>% count(orig.ident, StrainDon) %>% filter(n>100) %>% group_by(orig.ident) %>% filter(n_distinct(StrainDon) > 1) %>% pull(orig.ident) %>% unique() %>% str_remove(., ".mrna"))
+# don_100n <- imap(m2_asex_harmony_tr_list, ~.x@meta.data %>% count(orig.ident, StrainDon) %>% pull(orig.ident) %>% unique() %>% str_remove(., ".mrna"))
+```
+
+
+```{r}
+## Get only the asexuals
+# m2_asex_seu <- map(msc_w_cln_strns[c("MSC49", "MSC60")], ~.x[,.x@meta.data$stage %in% c("Early trophozoite", "Late ring")] %>% AddMetaData(., ))
+# dons_bal_sset <- c("M49_", "M60_", "M33_", "M66_", "M55_", "M49_|M55_")
+# dons_bal_sset <- c("M49_", "M60_", "M33_", "M66_")
+# dons_bal_sset <- c("M49C_", "M66C_")
+
+# dons_bal_sset_nms <- str_remove_all(str_replace_all(dons_bal_sset, "M", "MSC"), "_$|C_$|\\|")
+# dons_bal_sset_nms <- don_100n
+
+# Retain donors with atleast 2 strains each with atleast 100 cells for each stage
+# m2_afm_seu <- map2(afm_leiden_w_donors_pt, dons_bal_sset_nms, ~.x[, str_detect(.x@meta.data$orig.ident, paste(.y, collapse = "|")) & !str_detect(.x@meta.data$StrainDon, "Negative|Doublet")])
+# m2_afm_seu <- map2(m2_asex_harmony_tr_list, dons_bal_sset_nms, ~.x[, str_detect(.x@meta.data$orig.ident, paste(.y, collapse = "|"))])
+```
+
+### Balance (subsample) the strain cells within pseudotime chunks
+
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(989778)
+# ds_grp <- rep('StrainDon', length(dons_bal_sset_nms))
+
+# balanced_cells_tbl <- map2(m2_afm_seu, ds_grp, ~balanced_cells_fn(sc_df = .x@colData, dsample_condtn = .y , ptime_strategy = c("donor", "ptime_bal_cat"), multpl = 1, don_yes_no = "no"))
+balanced_cells_tbl_sympto_DE <- map(m2_asex_harmony_tr_list, ~balanced_cells_fn(sc_df = .x@meta.data, dsample_condtn = c("condition") , ptime_strategy = c("downsampling_ptime_bal_cat"), multpl = 1, don_yes_no = "yes"))
+```
+
+
+
+
+```{r, warning=FALSE, message=FALSE}
+######################### !!!!!NOTE - Unbalanced alternative to increase power replacing balanced with unbalanced - switch to return balanced or viceversa 
+# m2_afm_bal_seu <- m2_afm_seu
+m2_asex_bal_symptoDE <- map2(m2_asex_harmony_tr_list, balanced_cells_tbl_sympto_DE, ~.x[, .y$cell_bc])
+
+```
+
+```{r}
+m2_asex_bal_symptoDE[[1]]@meta.data %>% data.frame() %>% dplyr::count(downsampling_ptime_bal_cat, condition, donor)
+m2_asex_bal_symptoDE[[1]]@meta.data %>% data.frame() %>% dplyr::count(downsampling_ptime_bal_cat, condition)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Calculate pseudotime chunks for DE
+bal_df2_sympto_DE <- map(m2_asex_bal_symptoDE, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "slingPseudotime_1", chunk_num = 10, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Add pseudotime chunks to metadata
+m2_asex_bal_symptoDE <- map2(m2_asex_bal_symptoDE, bal_df2_sympto_DE, ~AddMetaData(.x, .y) )
 
 ```
 
 
 ```{r}
-DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_pc_man", group.by = "PT_grp")
+m2_asex_bal_symptoDE[[1]]@meta.data %>% count(ptime_bal_cat, condition, donor)
+```
+
+```{r}
+map(m2_asex_bal_symptoDE, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_cat" , label = T ))
+map(m2_asex_bal_symptoDE, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_bal_cat" , label = T))
+# go()
+```
+
+```{r}
+## Subset to remove within each pseudotime chunk any strain with less than 10 cells to ensure there are no pseudotime chunks where some strains are overwhelmingly underrepresented
+m2_asex_bal_symptoDE <- map(m2_asex_bal_symptoDE, ~.x[, .x@meta.data %>% 
+                                               rownames_to_column('bcode') %>% 
+                                               group_by(ptime_bal_cat, condition, donor) %>% 
+                                               # filter(n() >=20) %>%
+                                               filter(n() >=10) %>%
+                                               group_by(ptime_bal_cat, condition) %>% 
+                                               filter(n_distinct(donor) > 1) %>%
+                                               # filter(n() >=100) %>% 
+                                               pull(bcode)]
+)
+
+
+```
+
+```{r}
+m2_asex_bal_symptoDE[[1]]@meta.data %>% count(ptime_bal_cat, condition, donor) %>% group_by(condition, ptime_bal_cat) %>% mutate(dons = n_distinct(donor))
+
+```
+
+```{r, fig.width=14, fig.height=3}
+map(m2_asex_bal_symptoDE, ~.x@meta.data %>% 
+  count( condition, ptime_bal_cat,  donor) %>% 
+  mutate(across(donor, ~str_remove_all(., "SC|SLO|C|_"))) %>% 
+  group_by( condition, ptime_bal_cat) %>% 
+  mutate(strn_n = n_distinct(donor)) %>% 
+  filter(strn_n >1) %>%
+  ggplot(aes(x = donor, y = n)) +
+  geom_col() +
+  # geom_col(position = position_dodge2()) + #width=0.4, position = position_dodge(width=0.5) 
+  geom_text(aes(label=n), hjust=-0.05, vjust= 0.5, position = position_dodge(width = .9), size = 5, show.legend = F, fontface ='bold', angle = 90)+
+  scale_y_continuous(expand = expansion(mult = c(0.01, 0.45))) +
+  facet_nested_wrap(vars(condition, ptime_bal_cat), nrow = 1, scales = "free_x") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 90),
+        strip.text = element_text(size = 14),
+        text = element_text(size = 14)) 
+)
+```
+
+```{r}
+map(m2_asex_bal_symptoDE, ~DimPlot(.x, reduction = "umap.harmony_PC_man", group.by = "ptime_bal_cat" , label = T ))
+
+```
+###################### END - BALANCE CELLS PSEUDOTIME CHUNKING START  Calculate pseudotime chunks and downsample within chunks  ############################################
+
+
+###################### PSEUDOTIME CHUNKING START - SEU  ############################################
+
+## pseudotime chunks used for all the DE methods below and can be used for DEseq2 above as well
+### Calculate pseudotime chunks
+
+```{r}
+m2_asex_bal_symptoDE[[1]]$ptime_bal_cat10 <- m2_asex_bal_symptoDE[[1]]$ptime_bal_cat
+```
+
+```{r, warning=FALSE, message=FALSE}
+## Calculate pseudotime chunks for DE
+bal_df2_sympto_DE_coarse <- map(m2_asex_bal_symptoDE, ~ptime_chunk_calc_df_fn(sc_df = .x@meta.data, ptime = "slingPseudotime_1", chunk_num = 3, p_cat_nm = "ptime_cat", p_bal_cat_nm = "ptime_bal_cat"))
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+## Add pseudotime chunks to metadata
+m2_asex_bal_symptoDE <- map2(m2_asex_bal_symptoDE, bal_df2_sympto_DE_coarse, ~AddMetaData(.x, .y) )
+
+```
+
+```{r}
+m2_asex_harmony_tr_pt_chunks <- m2_asex_bal_symptoDE[[1]]
+m2_asex_harmony_tr_pt_chunks$PT_grp <- m2_asex_harmony_tr_pt_chunks$ptime_bal_cat
+m2_asex_harmony_tr_pt_chunks$PT_grp_unbal <- m2_asex_harmony_tr_pt_chunks$ptime_cat
+
+```
+
+```{r}
+# ##Generate pseudotime chunks categories with range of highest and lowest pseudotime values and breaks numbers to ensure balanced representation of cells and drop the cells without strain information
+# cat_n<-3
+# 
+# ##Remove those without pseudotime
+# m2_asex_harmony_tr_pt_chunks <- m2_asex_harmony_tr[,!is.na(m2_asex_harmony_tr@meta.data[,'pseudotime'])]
+# 
+#       # print(sce_obj)
+# m2_asex_harmony_tr_pt_chunks@meta.data[,c('PT_grp_unbal', 'PT_grp')] <- m2_asex_harmony_tr_pt_chunks@meta.data[,c( "pseudotime"), drop=F] %>%
+#         data.frame() %>% 
+#         mutate(PT_grp_unbal = cut(!!rlang::sym("pseudotime"),  
+#                                breaks = c(-Inf, seq(min(!!rlang::sym("pseudotime")),  max(!!rlang::sym("pseudotime")), round((max(!!rlang::sym("pseudotime")) - min(!!rlang::sym("pseudotime")))/cat_n, 2)), Inf)),
+#                pt_rank = dense_rank(!!rlang::sym("pseudotime")),
+#                PT_grp = cut(pt_rank,  
+#                                breaks = c(-Inf, seq(min(pt_rank),  max(pt_rank), round((max(pt_rank) - min(pt_rank))/cat_n, 2)), Inf))
+#                ) %>%
+#   mutate(ptime_grp_rnk = dense_rank(factor(PT_grp_unbal)),
+#          ptime_bal_grp_rnk = dense_rank(factor(PT_grp)),
+#          PT_grp_unbal = paste0("PT.", ptime_grp_rnk-1),
+#          PT_grp = paste0("PT.", ptime_bal_grp_rnk-1)
+#          ) %>%
+#         dplyr::select(PT_grp_unbal, PT_grp)
+
+```
+
+
+```{r}
+DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_PC_man", group.by = "PT_grp")
 ```
 
 
@@ -470,17 +668,33 @@ m2_asex_harmony_tr_pt_chunks@meta.data[,c("PT_grp", "donor")] %>% as.data.frame(
 ```
 
 ```{r}
-DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_pc_man", group.by = "PT_grp_unbal")
+DimPlot(m2_asex_harmony_tr_pt_chunks, reduction = "umap.harmony_PC_man", group.by = "PT_grp_unbal")
 ```
 
 ```{r}
 m2_asex_harmony_tr_pt_chunks@meta.data[,c("PT_grp_unbal", "donor")] %>% as.data.frame() %>% dplyr::count(PT_grp_unbal)
 ```
 
+
 ```{r}
 # m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp_unbal %in% c("PT.3", "PT.4", "PT.5", "PT.6", "PT.7")]
-m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp %in% c("PT.1", "PT.2", "PT.3")]
+# m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp %in% c("PT.1", "PT.2", "PT.3")]
+m2_asex_harmony_tr_pt_sset <- m2_asex_harmony_tr_pt_chunks[,m2_asex_harmony_tr_pt_chunks$PT_grp %in% c("PT.2", "PT.3", "PT.4")]
+
 ```
+
+```{r}
+m2_asex_harmony_tr_pt_sset$PT_grp <- str_replace_all(m2_asex_harmony_tr_pt_sset$PT_grp, c("PT.2" = "PT.1", "PT.3" = "PT.2", "PT.4" = "PT.3"))
+
+```
+
+```{r}
+## Save DESeq2 for plotting
+# saveRDS(m2_asex_harmony_tr_list, paste0(save_dir, "m2_asex_harmony_tr_list.RDS"))
+saveRDS(m2_asex_harmony_tr_pt_sset, paste0(save_dir, "m2_asex_harmony_tr_pt_sset.RDS"))
+
+```
+
 
 ```{r}
 m2_asex_harmony_tr_pt_sset@meta.data[,c("PT_grp", "donor")] %>% as.data.frame() %>% dplyr::count(donor, PT_grp)%>% group_by(donor) %>% mutate(prop = round(n/sum(n), digits = 2))
@@ -488,14 +702,14 @@ m2_asex_harmony_tr_pt_sset@meta.data[,c("PT_grp", "donor")] %>% as.data.frame() 
 
 Find markers for clusters
 ```{r}
-DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", label = T)
+DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", label = T)
 
 m2_asex_harmony_tr_pt_sset_hi_res <- FindClusters(m2_asex_harmony_tr_pt_sset, resolution = 1.5, verbose = F)
 ```
 
 ```{r}
 
-DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_pc_man", label = T, pt.size = 1)
+DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_PC_man", label = T, pt.size = 1)
 
 ```
 
@@ -582,9 +796,9 @@ map(c(0:(length(unique(seu_markers$cluster))-1)), ~seu_markers %>% filter(cluste
 
 ```{r}
 
-DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_pc_man", cells.highlight = colnames(m2_asex_harmony_tr_pt_sset_hi_res[,m2_asex_harmony_tr_pt_sset_hi_res$seurat_clusters == 1]))
+DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_PC_man", cells.highlight = colnames(m2_asex_harmony_tr_pt_sset_hi_res[,m2_asex_harmony_tr_pt_sset_hi_res$seurat_clusters == 1]))
 
-DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_pc_man", cells.highlight = colnames(m2_asex_harmony_tr_pt_sset_hi_res[,m2_asex_harmony_tr_pt_sset_hi_res$seurat_clusters %in% c(8,15,20,23)]))
+DimPlot(m2_asex_harmony_tr_pt_sset_hi_res, reduction = "umap.harmony_PC_man", cells.highlight = colnames(m2_asex_harmony_tr_pt_sset_hi_res[,m2_asex_harmony_tr_pt_sset_hi_res$seurat_clusters %in% c(8,15,20,23)]))
 ```
 
 
@@ -607,7 +821,7 @@ map(paste0("PT.", c(1:3)), ~pt_markers %>% filter(cluster %in% .x) %>% filter(p_
 
 
 ```{r, results="asis", fig.width= 4.2, fig.height=3.2}
-DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", group.by = "stage", split.by = "condition", pt.size = 0.1)+
+DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", group.by = "stage", split.by = "condition", pt.size = 0.1)+
   scale_color_manual(values = sp_fld_colors)+
   theme(axis.text=element_blank(), 
         axis.title=element_blank(),
@@ -623,7 +837,7 @@ DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", group.by 
 ```
 
 ```{r, results="asis", fig.width= 2, fig.height=2.5}
-DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", group.by = "PT_grp", label = T)+
+DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", group.by = "PT_grp", label = T)+
   theme(axis.text=element_blank(), 
         axis.title=element_blank(),
         # legend.position = "bottom",
@@ -636,7 +850,7 @@ DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", group.by 
 ```
 
 ```{r, fig.width=7.5, fig.height=2}
-tbl_umap <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) 
+tbl_umap <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) 
 
 ```
 
@@ -644,9 +858,9 @@ tbl_umap <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embed
 ```{r, fig.width=7.5, fig.height=2}
 
 tbl_umap %>%
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = stage)) +
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = stage)) +
   geom_point(size = 0.1) +
   scale_color_manual(values = sp_fld_colors) +
   ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
@@ -747,8 +961,8 @@ sympt_fev_tbl  %>%
 ```{r, fig.width=8, fig.height=3}
 sympt_fev_tbl %>%
   count(condition, donor, StrainDon) %>% 
-  # mutate(across(donor, ~str_remove(., "SC")), across(StrainDon, ~str_remove(., "M.*_"))) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  # mutate(across(donor, ~str_remove_all(., "SC|C")), across(StrainDon, ~str_remove(., "M.*_"))) %>% 
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   rename(c('Counts' =n, 'Strain' = StrainDon))  %>%
   ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
   geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
@@ -776,7 +990,7 @@ ggplot(data, aes(x = category, y = value, fill = group)) +
 ```{r, fig.width=8, fig.height=3}
 sympt_fev_tbl %>%
   count(condition, fever, donor, StrainDon) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   rename(c('Counts' =n, 'Strain' = StrainDon))  %>%
   ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
   geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
@@ -792,7 +1006,7 @@ sympt_fev_tbl %>%
 ```{r, fig.width=9, fig.height=3}
 tbl <- sympt_fev_tbl %>%
   count(condition, fever, donor, StrainDon) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   group_by(condition, fever, donor) %>%
   add_count(name = "strn_n") %>% 
   ungroup() %>%
@@ -820,7 +1034,7 @@ same as above without fever
 ```{r, fig.width=9, fig.height=2.7}
 tbl <- sympt_fev_tbl %>%
   count(condition, donor, StrainDon) %>% 
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   group_by(condition, donor) %>%
   add_count(name = "strn_n") %>% 
   ungroup() %>%
@@ -1545,7 +1759,7 @@ pmap(list(list("stage.sympt", "stage.sympt.fever", "stage.fever", "stage.hb"), l
     gns <- .x %>% filter(p_val_adj < 0.05) %>% pull(gene_id)
     stg <- .y
     # map(gns, ~VlnPlot(m2_asex_harmony_tr_pt_sset, features = .x, idents = c(paste0(stg, grp[1]), paste0(stg, grp[2])), group.by = grp_condtn, ncol = 1) + labs(title= paste0(.x, grp)) )
-    map(gns, ~FeaturePlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == stg],  reduction = "umap.harmony_pc_man", features = .x, split.by = grp_condtn, order = T))
+    map(gns, ~FeaturePlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == stg],  reduction = "umap.harmony_PC_man", features = .x, split.by = grp_condtn, order = T))
     })
 })
 ```
@@ -1553,18 +1767,18 @@ pmap(list(list("stage.sympt", "stage.sympt.fever", "stage.fever", "stage.hb"), l
 
 
 ```{r, fig.width=10, fig.height=5}
-DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", group.by = c("condition", "PT_grp"), ncol = 2)
-DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.1"], reduction = "umap.harmony_pc_man", split.by = c("condition"), ncol = 2)
-DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.2"], reduction = "umap.harmony_pc_man", split.by = c("condition"), ncol = 2)
-DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.3"], reduction = "umap.harmony_pc_man", split.by = c("condition"), ncol = 2)
+DimPlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", group.by = c("condition", "PT_grp"), ncol = 2)
+DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.1"], reduction = "umap.harmony_PC_man", split.by = c("condition"), ncol = 2)
+DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.2"], reduction = "umap.harmony_PC_man", split.by = c("condition"), ncol = 2)
+DimPlot(m2_asex_harmony_tr_pt_sset[,m2_asex_harmony_tr_pt_sset$PT_grp == "PT.3"], reduction = "umap.harmony_PC_man", split.by = c("condition"), ncol = 2)
 
 ```
 
 
 
 ```{r, fig.width=10, fig.height=5}
-FeaturePlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_pc_man", features = "PF3D7-0114500", split.by = c("condition"), ncol = 2, order = T)
-FeaturePlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_pc_man", features = "PF3D7-1240400", split.by = c("condition"), ncol = 2, order = T)
+FeaturePlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_PC_man", features = "PF3D7-0114500", split.by = c("condition"), ncol = 2, order = T)
+FeaturePlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_PC_man", features = "PF3D7-1240400", split.by = c("condition"), ncol = 2, order = T)
 ```
 
 
@@ -1574,7 +1788,7 @@ key_gns_exp <- FetchData(object = m2_asex_harmony_tr_pt_sset, vars = c('PF3D7-12
 ```
 
 ```{r, fig.width=7.5, fig.height=2}
-tbl_umap_gn <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) %>%  left_join(., key_gns_exp %>% rownames_to_column("bcode"))
+tbl_umap_gn <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) %>%  left_join(., key_gns_exp %>% rownames_to_column("bcode"))
 
 ```
 
@@ -1583,10 +1797,10 @@ tbl_umap_gn <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.em
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 tbl_umap_gn %>%
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   arrange(`PF3D7-1240400`) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = `PF3D7-1240400`))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = `PF3D7-1240400`))+
   geom_point(size = 0.1) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
@@ -1605,10 +1819,10 @@ tbl_umap_gn %>%
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 tbl_umap_gn %>%
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   arrange(`PF3D7-1240400`) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = `PF3D7-1240400`))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = `PF3D7-1240400`))+
   geom_point(size = 0.1) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
@@ -1626,10 +1840,10 @@ tbl_umap_gn %>%
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 tbl_umap_gn %>%
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   arrange(`PF3D7-1107800`) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = `PF3D7-1107800`))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = `PF3D7-1107800`))+
   geom_point(size = 0.1) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested_wrap(vars(condition, donor),  nrow = 1, scales = "free_x") +
@@ -1648,7 +1862,7 @@ tbl_umap_gn %>%
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 tbl_umap_gn %>%
-  mutate(across(donor, ~str_remove(., "SC"))) %>%
+  mutate(across(donor, ~str_remove_all(., "SC|C"))) %>%
   arrange(`PF3D7-1107800`) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
   ggplot(., aes(x = donor, y = `PF3D7-1107800`))+
@@ -1669,11 +1883,11 @@ tbl_umap_gn %>%
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 # tbl_umap_gn %>%ds <- DESeqDataSetFromMatrix(counts
-#   mutate(across(donor, ~str_remove(., "SC")),
+#   mutate(across(donor, ~str_remove_all(., "SC|C")),
 #          across(Hb_Type, ~factor(.x, levels = c("HbC", "HbS", "HbN")))) %>%
 #   arrange(`PF3D7-1229300`) %>%
 #   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-#   ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = `PF3D7-1229300`))+
+#   ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = `PF3D7-1229300`))+
 #   geom_point(size = 0.1) +
 #   scale_color_distiller( direction = 1) +
 #   ggh4x::facet_nested_wrap(vars(Hb_Type, donor),  nrow = 1, scales = "free_x") +
@@ -1691,11 +1905,11 @@ tbl_umap_gn %>%
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 tbl_umap_gn %>%
-  mutate(across(donor, ~str_remove(., "SC")),
+  mutate(across(donor, ~str_remove_all(., "SC|C")),
          across(Hb_Type, ~factor(.x, levels = c("HbC", "HbS", "HbN")))) %>%
   arrange(`PF3D7-1229300`) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = `PF3D7-1229300`))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = `PF3D7-1229300`))+
   geom_point(size = 0.1) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested_wrap(vars(Hb_Type, donor),  nrow = 1, scales = "free_x") +
@@ -1713,13 +1927,13 @@ tbl_umap_gn %>%
 
 tbl_umap_gn %>% 
   pivot_longer(cols = starts_with("PF3D7-"), names_to = "Gene", values_to = "Expression") %>%
-  mutate(across(donor, ~str_remove(., "SC")),
+  mutate(across(donor, ~str_remove_all(., "SC|C")),
          across(Hb_Type, ~factor(.x, levels = c("HbC", "HbS", "HbN")))) %>%
   filter(Gene %in% c("PF3D7-1229200", "PF3D7-1229300")) %>%
   group_by(Gene) %>%
   arrange(Expression, .by_group = T) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = Expression))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Expression))+
   geom_point(size = 0.1) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested(Gene ~ Hb_Type+ donor, scales = "free_x") +
@@ -1903,7 +2117,7 @@ m49_gns_exp <- FetchData(object = m2_asex_harmony_tr_pt_sset, vars = c('PF3D7-04
 
 
 ```{r, fig.width=7.5, fig.height=2}
-m49_umap_gns <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) %>%  left_join(., m49_gns_exp %>% rownames_to_column("bcode"))
+m49_umap_gns <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>% rownames_to_column("bcode") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data %>% rownames_to_column("bcode")) %>%  left_join(., m49_gns_exp %>% rownames_to_column("bcode"))
 
 ```
 
@@ -1911,14 +2125,14 @@ m49_umap_gns <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.e
 # custom_colors <- colorRampPalette(c("lightgrey", "blue"))(100)
 
 m49_umap_gns %>% 
-  filter(donor == "MSC49") %>%
+  filter(donor == "MSC49C") %>%
   pivot_longer(cols = starts_with("PF"), names_to = "Vars", values_to = "Expression") %>%
-  mutate(across(donor, ~str_remove(., "SC")),
+  mutate(across(donor, ~str_remove_all(., "SC|C")),
          # across(strain, ~factor(.x, levels = c("SC1", "SC2")))
          ) %>%
   arrange(Vars,Strain_DN,Expression) %>%
   # ggplot(., aes(x = weave_factors(Strain, donor), y = Counts, fill = donor)) +
-  ggplot(., aes(x = umapharmonypcman_1, y = umapharmonypcman_2, colour = Expression))+
+  ggplot(., aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, colour = Expression))+
   geom_point(size = 0.3) +
   scale_color_distiller( direction = 1) +
   ggh4x::facet_nested_wrap(vars(Vars, Strain_DN),  nrow = 1, scales = "free_x") +
@@ -1935,7 +2149,7 @@ m49_umap_gns %>%
 ```{r, results="asis", fig.width= 20, fig.height=2.8}
 FetchData(object = m2_asex_harmony_tr_pt_sset, vars = 'PF3D7-1240400', slot = "data") 
 
-FeaturePlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_pc_man", features = "PF3D7-0114500", split.by = c("donor"), order = T)+
+FeaturePlot(m2_asex_harmony_tr_pt_sset, reduction = "umap.harmony_PC_man", features = "PF3D7-0114500", split.by = c("donor"), order = T)+
   # scale_color_manual(values = sp_fld_colors)+
   theme(axis.text=element_blank(), 
         axis.title=element_blank(),
@@ -1964,7 +2178,7 @@ DotPlot(m2_asex_harmony_tr_pt_sset, features = c( "PF3D7-1229300"), group.by = c
 
 
 ```{r, fig.width=14, fig.height=3}
-DimPlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_pc_man", split.by = c("donor"), order = T, group.by = "condition") + theme(legend.position = "bottom", axis.text = element_blank(), axis.ticks = element_blank())
+DimPlot(m2_asex_harmony_tr_pt_sset,  reduction = "umap.harmony_PC_man", split.by = c("donor"), order = T, group.by = "condition") + theme(legend.position = "bottom", axis.text = element_blank(), axis.ticks = element_blank())
 ```
 
 
@@ -1991,12 +2205,12 @@ fld_clusters_cutoff <- v3_m2_asex_harmony_ss_res_fld_pt_pf[,v3_m2_asex_harmony_s
 
 ```{r}
 ## Retained
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf[,v3_m2_asex_harmony_ss_res_fld_pt_pf@meta.data$harmony_clusters_ss %in% fld_clusters_cutoff], reduction = "umap.harmony_pc_man", split.by = "dset", label = T)
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf[,v3_m2_asex_harmony_ss_res_fld_pt_pf@meta.data$harmony_clusters_ss %in% fld_clusters_cutoff], reduction = "umap.harmony_PC_man", split.by = "dset", label = T)
 ```
 
 ```{r}
 ## Removed
-# DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf[,!(v3_m2_asex_harmony_ss_res_fld_pt_pf@meta.data$harmony_clusters_ss %in% fld_clusters_cutoff)], reduction = "umap.harmony_pc_man", split.by = "dset", label = T)
+# DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf[,!(v3_m2_asex_harmony_ss_res_fld_pt_pf@meta.data$harmony_clusters_ss %in% fld_clusters_cutoff)], reduction = "umap.harmony_PC_man", split.by = "dset", label = T)
 ```
 
 
@@ -2007,7 +2221,7 @@ DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf[,v3_m2_asex_harmony_ss_res_fld_pt_pf
 
 
 ```{r, fig.width=8, fig.height=5}
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf,  reduction = "umap.harmony_pc_man", split.by = c("condition"))
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf,  reduction = "umap.harmony_PC_man", split.by = c("condition"))
 ```
 
 ## Trajectory inference of integrated object
@@ -2015,23 +2229,23 @@ Adjust to get appropriate clustering so as to input into slingshot
 ```{r}
 ## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
 
-DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_pc_man", label = T)
+DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_PC_man", label = T)
 # msc_gam_combi_noLE <- FindClusters(msc_gam_combi_noLE, resolution = 0.32, verbose = F)
 
 ```
 
 ```{r}
 ## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
-# DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_pc_man", group.by = "harmony_clusters_ss", pt.size = 0.5, dims = c(1,2), label = T)
+# DimPlot(v3_m2_asex_harmony_ss_res_fld_pt_pf, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", pt.size = 0.5, dims = c(1,2), label = T)
 
 ```
 
 !! Plotting
 ```{r, results="asis", fig.width= 7, fig.height=5}
 
-# umap_meta_df <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data[,c("stage", "StageFL", "pseudotime", "pseudotime_fld_only", "orig.ident", "donor", "StrainDon", "condition", "dset", "harmony_clusters", "harmony_clusters_ss")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% mutate(across(donor, ~str_remove(., "SC"))) %>% left_join(., m2_asex_harmony_tr_pt_sset@reductions$integrated.harmony@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc")) #%>% 
+# umap_meta_df <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data[,c("stage", "StageFL", "pseudotime", "pseudotime_fld_only", "orig.ident", "donor", "StrainDon", "condition", "dset", "harmony_clusters", "harmony_clusters_ss")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% mutate(across(donor, ~str_remove_all(., "SC|C"))) %>% left_join(., m2_asex_harmony_tr_pt_sset@reductions$integrated.harmony@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc")) #%>% 
 
-umap_meta_df <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data[,c("stage", "StageFL", "pseudotime", "pseudotime_fld_only", "orig.ident", "donor", "StrainDon", "condition", "dset", "harmony_pc_man_clusters", "harmony_clusters_ss")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% mutate(across(donor, ~str_remove(., "SC"))) %>% left_join(., m2_asex_harmony_tr_pt_sset@reductions$integrated.harmony@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc")) #%>% 
+umap_meta_df <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_PC_man@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc") %>% left_join(., m2_asex_harmony_tr_pt_sset@meta.data[,c("stage", "StageFL", "pseudotime", "pseudotime_fld_only", "orig.ident", "donor", "StrainDon", "condition", "dset", "harmony_PC_man_clusters", "harmony_clusters_ss")] %>% as.data.frame() %>% rownames_to_column("cell_bc"), by = "cell_bc") %>% mutate(across(donor, ~str_remove_all(., "SC|C"))) %>% left_join(., m2_asex_harmony_tr_pt_sset@reductions$integrated.harmony@cell.embeddings %>% as.data.frame() %>%rownames_to_column("cell_bc")) #%>% 
 # mutate(across(strain_dset, ~factor(., levels = rev(strain_dset_lvls_don)))) %>% arrange(strain_dset
 
 ```
@@ -2040,7 +2254,7 @@ umap_meta_df <- m2_asex_harmony_tr_pt_sset@reductions$umap.harmony_pc_man@cell.e
 
 map(c("pseudotime", "pseudotime_fld_only"), ~{
   pt = .x
-  map(c("harmony_", "umapharmonypcman_"), ~{
+  map(c("harmony_", "umapharmonyPCman_"), ~{
   umap_meta_df %>% 
   ggplot(aes(x = !!rlang::sym(paste0(.x, "1")), y =!!rlang::sym(paste0(.x, "2")), color = !!rlang::sym(pt))) + geom_point(size=0.5) + 
   scale_color_distiller(name="Pseudotime", direction = 1, palette = "Blues") + 
@@ -2163,7 +2377,7 @@ ggplot(umap_meta_df, aes(x = harmony_1, y =harmony_2, col = condition)) +
   geom_point() +
   scale_color_brewer(type = "qual")
 
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y =umapharmonypcman_2, col = condition)) +
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y =umapharmonyPCman_2, col = condition)) +
   geom_point() +
   scale_color_brewer(type = "qual")
 
@@ -2179,7 +2393,7 @@ toy_dataset %>% glimpse()
 ```
 
 ```{r, fig.width=7.5, fig.height=4}
-p <- ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y =umapharmonypcman_2, col = condition)) +
+p <- ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y =umapharmonyPCman_2, col = condition)) +
   geom_point(alpha = .5) +
   # geom_point(data = toy_dataset$mst, size = 2) +
   # geom_path(data = toy_dataset$mst, aes(group = lineages), size = 1.5) +
@@ -2195,7 +2409,7 @@ p
 
 ```{r}
 
-scores <- imbalance_score(Object = umap_meta_df %>% select(umapharmonypcman_1, umapharmonypcman_2) %>% as.matrix(),
+scores <- imbalance_score(Object = umap_meta_df %>% select(umapharmonyPCman_1, umapharmonyPCman_2) %>% as.matrix(),
                           conditions = umap_meta_df$condition)
 
 umap_meta_df$scores <- scores$scores
@@ -2204,7 +2418,7 @@ umap_meta_df$scaled_scores <- scores$scaled_scores
 
 
 ```{r}
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = scores)) +
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, col = scores)) +
   geom_point() +
   scale_color_viridis_c(option = "C")
 
@@ -2212,41 +2426,42 @@ ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = s
 
 
 ```{r, fig.width=7.5, fig.height=4}
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = scaled_scores)) +
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, col = scaled_scores)) +
   geom_point() +
   scale_color_viridis_c(option = "C")
 ```
 
 
 ```{r, fig.width=7.5, fig.height=4}
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = harmony_clusters_ss)) +
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, col = harmony_clusters_ss)) +
   geom_point() 
 ```
 
 ```{r}
 
-rd <- as.matrix(umap_meta_df[, c("umapharmonypcman_1", "umapharmonypcman_2")])
-# sds <- slingshot(rd, umap_meta_df$harmony_pc_man_clusters)
-sds <- slingshot(rd, umap_meta_df$harmony_clusters_ss, end.clus = "3")
+rd <- as.matrix(umap_meta_df[, c("umapharmonyPCman_1", "umapharmonyPCman_2")])
+# sds <- slingshot(rd, umap_meta_df$harmony_PC_man_clusters)
+# sds <- slingshot(rd, umap_meta_df$harmony_clusters_ss, end.clus = "3")
+sds <- slingshot(rd, umap_meta_df$harmony_clusters_ss, end.clus = "2")
 
 
 ```
 
-```{r, eval=T}
+```{r, eval=F}
 
 ## Takes ~1m30s to run
 top_res <- topologyTest(sds = sds, conditions = df$condition)
 ```
 
-```{r, fig.width=7.5, fig.height=4, eval=T}
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = harmony_clusters_ss)) +
+```{r, fig.width=7.5, fig.height=4, eval=F}
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, col = harmony_clusters_ss)) +
   geom_point()
 top_res <- topologyTest(sds = sds, conditions = df$conditions)
 ```
 
 
 ```{r, fig.width=7.5, fig.height=4}
-ggplot(umap_meta_df, aes(x = umapharmonypcman_1, y = umapharmonypcman_2, col = harmony_clusters_ss)) +
+ggplot(umap_meta_df, aes(x = umapharmonyPCman_1, y = umapharmonyPCman_2, col = harmony_clusters_ss)) +
   geom_point() +
   geom_path(data =  slingCurves(sds, as.df = TRUE) %>% arrange(Order),
             aes(group = Lineage), col = "black", size = 2)
@@ -4342,7 +4557,7 @@ VlnPlot(harmony_int, features = "PF3D7-1101300", idents = c("Female_Yes", "Femal
 
 
 ```{r, fig.width=10, fig.height=5}
-FeaturePlot(harmony_int[,harmony_int$StageFL == "Female"],  reduction = "umap.harmony_pc_man", features = "PF3D7-1101300", split.by = c("condition"), ncol = 2, order = T)
+FeaturePlot(harmony_int[,harmony_int$StageFL == "Female"],  reduction = "umap.harmony_PC_man", features = "PF3D7-1101300", split.by = c("condition"), ncol = 2, order = T)
 
 ```
 
