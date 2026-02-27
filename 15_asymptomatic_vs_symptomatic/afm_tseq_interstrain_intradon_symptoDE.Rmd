@@ -1990,3 +1990,1310 @@ msc_bal_umap_gns[["f.MSC48C"]] %>%
 ```{r, results="asis", eval=T}
 gogo()
 ```
+
+## Symptomatic VS asymptomatic
+
+### Balance symptomatic and asymptomatic
+
+
+Remove lab and MSC12 and those lacking symptomatic condition
+```{r}
+
+fm_tr_sce_pt_chunks_sshot_no_dbt <- fm_tr_sce_pt_chunks_sshot[, !is.na(fm_tr_sce_pt_chunks_sshot@colData$StrainDon) & !str_detect(fm_tr_sce_pt_chunks_sshot@colData$StrainDon, "Negative|Doublet")]
+```
+
+
+```{r}
+
+fm_tr_sce_pt_chunks_sshot_no_dbt@colData[, c("Symptomatic", "dset", "donor")] %>%
+  as.data.frame() %>%
+  dplyr::count(Symptomatic, dset, donor)
+```
+
+```{r}
+## Get only the asexuals
+# fm_seu <- map(msc_w_cln_strns[c("MSC49C", "MSC60")], ~.x[,.x@meta.data$stage %in% c("Early trophozoite", "Late ring")] %>% AddMetaData(., ))
+
+fm_tr_sce_pt_chunks_sshot_no_dbt <- fm_tr_sce_pt_chunks_sshot[, !is.na(fm_tr_sce_pt_chunks_sshot@colData$StrainDon) & !str_detect(fm_tr_sce_pt_chunks_sshot@colData$StrainDon, "Negative|Doublet")]
+```
+
+### Balance (subsample) the strain cells within pseudotime chunks
+```{r}
+##Subsample the cells within pseudotime chunks calculated above to ensure balanced representation of field and lab cells along trajectories 
+
+##Declaring the variables to group by for the different datasets 
+# grps <- c('ptime_cat', 'ptime_cat', 'ptime_cat')
+# grps2 <- list(c('ptime_cat', 'lf_strain'), c('ptime_cat', 'lf_strain'), c('ptime_cat', 'lf_strain'))
+
+
+##- Asexual stages retaining pseudotime by stage groups containing MSC14 field cells and grouping by pseudotime chunk and stage : then sampling within pseudotime and stage group with sample size equal to the minimum dataset between field and lab for each stage within each pseudotime group
+##- Gams retaining pseudotime groups containing MSC14 field cells and grouping by pseudotime chunk only : then sampling within pseudotime group with sample size equal to the minimum dataset between field and lab
+
+##Tabulate balanced cells
+set.seed(3783822)
+
+##Remove lab cells - can be included in future if necessary by uncommenting line below 'filter(strain_dset != 'lab') %>%'
+
+## get the group to downsample by
+ds_grp <- c(rep('Symptomatic', 1))
+
+##Revert order in filter https://stackoverflow.com/questions/70951525/filter-dataframe-within-a-group-with-one-column-meeting-an-and-condition-in-r
+# balanced_cells_tbl_str <- list(msc14_sub_sce_unbal_ptchunks, grps, grps2)  %>%
+balanced_cells_tbl_str <- list(list(fm_tr_sce_pt_chunks_sshot_no_dbt), ds_grp)  %>%
+  pmap(~..1@colData[,c('StrainDon', 'ptime_cat', 'ptime_bal_cat', 'Symptomatic', 'donor')] %>% 
+    as.data.frame() %>% 
+    rownames_to_column('cell_bc') %>% 
+    group_by(across(all_of(c('ptime_bal_cat', ..2)))) %>% 
+    mutate(cnt  = sum(!is.na(!!rlang::sym(..2)))) %>% 
+             group_by(across(all_of(c('ptime_bal_cat')))) %>% 
+             mutate(max_cnt = max(cnt)) %>% 
+             mutate(max2_cnt = max(cnt[cnt != max_cnt], na.rm = TRUE)) %>%
+             group_by(ptime_bal_cat, Symptomatic) %>% 
+             mutate(samp = sample(n()))%>%
+             filter(samp <= max2_cnt) %>%
+             ungroup() #%>%
+             # mutate(across(ptime_bal_cat, droplevels))
+  )
+
+balanced_cells_cnts_str <- balanced_cells_tbl_str %>%
+  map(. %>% dplyr::count(ptime_bal_cat,  Symptomatic, max2_cnt, cnt))
+
+balanced_cells_tbl_str %>%
+  map(. %>% dplyr::count(ptime_bal_cat,Symptomatic))
+
+##Get balanced cells
+
+# set.seed(989778)
+balanced_cells_str <- balanced_cells_tbl_str %>% 
+  map(. %>% dplyr::select(cell_bc, ptime_bal_cat))
+
+##Subset the balanced cells for the 3 objects
+fm_sympto_bal_sce <- pmap(list(list(fm_tr_sce_pt_chunks_sshot_no_dbt), balanced_cells_str), ~..1[,..2$cell_bc])
+
+
+```
+
+### Retain cells with strains having more than 10 in each stage
+```{r}
+##Remove groups with less than 10
+# fm_sce_bal <- map(fm_sce_bal, ~.x[,.x@colData[, 'StrainDon', drop = F] %>% data.frame()  %>% rownames_to_column('bcode') %>% group_by(StrainDon) %>% filter(n() >=20) %>% pull(bcode)])
+# 
+# map(fm_sce_bal, ~table(.x@colData[, 'StrainDon']) )
+
+```
+
+```{r, results="asis", eval=T}
+balanced_cells_tbl_str[[1]] %>% count(ptime_bal_cat, Symptomatic)
+```
+
+
+
+```{r, results="asis", fig.width=5, fig.height=3.5}
+library("ggpubr")
+tbl = map(fm_sympto_bal_sce, ~umap_meta_df[umap_meta_df$cell_bc %in% colnames(.x),])
+
+map(tbl, ~.x%>%
+  ggplot(., aes(x = slingPseudotime_1, col=Symptomatic, fill=Symptomatic)) + 
+  geom_density(aes(y = ..count..*0.3), size=2, bw = 0.3, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  dens_thme +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+)
+
+map(tbl, ~.x%>%
+  ggboxplot(., y = "slingPseudotime_1",x="Symptomatic", col="Symptomatic") + 
+  stat_compare_means(method = "wilcox.test") +gbox_theme
+)
+  
+
+
+```
+
+#### Put subseted objects into a list and calculate metrics need for plotting and tradeseq input
+```{r}
+lins = rep(1,1)
+# lins_m = rep(c(1,2),4)
+
+fm_sympto_bal_sds <- map(fm_sympto_bal_sce, ~SlingshotDataSet(.x))
+fm_sympto_bal_ptime <- pmap(list(fm_sympto_bal_sce, lins),  ~slingPseudotime(..1)[,..2] )
+fm_sympto_bal_cw <- pmap(list(fm_sympto_bal_sce,  lins),  ~slingCurveWeights(..1)[,..2] )
+
+```
+
+
+```{r}
+## Batch design correction for tradeseq
+u_don <- model.matrix(~  donor, fm_sympto_bal_sce[[1]]@colData[, c("donor", "Symptomatic")] %>% data.frame())
+
+# ## tradeseq manual example - Batch design correction for tradeseq
+# counts <- as.matrix(countMatrix)
+# 
+# batch <- factor(rep(c("A", "B"), each = ncol(counts)/2))
+# U <- model.matrix(~batch)
+# sceBatch <- fitGAM(counts = counts,
+#                    U = U,
+#                    sds = crv, 
+#                    nknots = 6, 
+#                    verbose = FALSE)
+```
+
+
+```{r}
+## create directory
+system(paste0("mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/"))
+
+
+saveRDS(fm_sympto_bal_sce[[1]], '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_sce.RDS')
+
+saveRDS(fm_sympto_bal_ptime[[1]], '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_ptime.RDS')
+
+saveRDS(fm_sympto_bal_cw[[1]], '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_cw.RDS')
+
+```
+
+
+```{r}
+## plot balanced symptomatic vs assymptomatic by pseudotime
+v3_afm_harmony_ss_res_fld_pt_bal <- v3_afm_harmony_ss_res_fld_pt[,colnames(fm_sympto_bal_sce[[1]])]
+v3_afm_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- fm_sympto_bal_sce[[1]]$slingPseudotime_1
+v3_afm_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- fm_sympto_bal_sce[[1]]$ptime_cat
+
+```
+
+```{r}
+## plot balanced symptomatic vs assymptomatic by pseudotime
+v3_afm_harmony_ss_res_fld_pt_bal@meta.data$sympto <- ifelse(v3_afm_harmony_ss_res_fld_pt_bal@meta.data$Symptomatic == "Yes", "Symptomatic", "Asymptomatic")
+
+map(v3_afm_harmony_ss_res_fld_pt_bal, ~FeaturePlot(.x, reduction = "umap.harmony_PC_man", features = "pseudotime", pt.size = 0.5, dims = c(1,2), split.by = "sympto"))
+
+```
+
+```{r}
+## plot balanced symptomatic vs assymptomatic by pseudotime
+v3_afm_harmony_ss_res_fld_pt_bal <- v3_afm_harmony_ss_res_fld_pt[,colnames(fm_sympto_bal_sce[[1]])]
+v3_afm_harmony_ss_res_fld_pt_bal@meta.data$pseudotime <- fm_sympto_bal_sce[[1]]$slingPseudotime_1
+v3_afm_harmony_ss_res_fld_pt_bal@meta.data$ptime_cat <- fm_sympto_bal_sce[[1]]$ptime_cat
+
+DimPlot(v3_afm_harmony_ss_res_fld_pt_bal, reduction = "umap.harmony_PC_man", group.by = "ptime_cat", pt.size = 0.5, dims = c(1,2), label = T, split.by = "Symptomatic")
+
+```
+
+```{r, results="asis", eval=T}
+gogo()
+## Tradeseq script
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_nf.R --condtn "Symptomatic" --knots "4" --gns_cut "5"  --resume
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_sce_ts <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_sce_ts.RDS")
+fm_sympto_bal_sce_de <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_sce_de.RDS")
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_sce_de %>% arrange(desc(waldStat))
+```
+
+```{r}
+##NOTE!!! replace the conditional test file with the newly generated one which applied 7 clusters
+##Ajusting the global and pairwise pvalues - old p values discarded
+fm_sympto_bal_sce_de <- fm_sympto_bal_sce_de %>%
+                             mutate(across(starts_with('pvalue'), ~p.adjust(., "fdr"))) %>%
+                             arrange(desc(waldStat)) %>%
+                             rownames_to_column('gene_id')
+
+```
+
+
+```{r}
+
+fm_sympto_bal_sce_de <- left_join(fm_sympto_bal_sce_de, Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene, Ka_Ks, `Transcript Product Description`, TM_domains, `Computed GO Functions`), by = 'gene_id') %>% 
+        mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene))
+
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_sce_de %>% arrange(pvalue)
+```
+
+#### smoothers for select genes that are differentially expressed between strains {.tabset}
+
+
+```{r, results='asis', warning=F, message=F}
+
+tde_smooth_plt(tde_obj_lst = list(fm_sympto_bal_sce_ts),
+               cond_obj_lst = list(fm_sympto_bal_sce_de),
+               pw_comp= 'waldStat',
+               n_gns = c(1:20)
+)
+
+```
+
+
+```{r, results='asis', warning=F, message=F, fig.width=6, fig.height=6}
+
+tseq_de_hmap(tseq = fm_sympto_bal_sce_ts, de_tbl= fm_sympto_bal_sce_de, pnts = 30, rnames = T, comp_grps = "Symptomatic", Pv = 1e-20)
+
+```
+
+### accounting for batch
+
+```{r, results="asis", eval=T}
+balanced_cells_tbl_str[[1]] #%>% count(Symptomatic, donor)
+```
+
+
+#### Put subseted objects into a list and calculate metrics need for plotting and tradeseq input
+
+
+```{r}
+## Batch design correction for tradeseq
+fm_sympto_bal_u_don <- model.matrix(~  donor, fm_sympto_bal_sce[[1]]@colData[, c("donor", "Symptomatic")] %>% data.frame())
+
+# ## tradeseq manual example - Batch design correction for tradeseq
+# counts <- as.matrix(countMatrix)
+# 
+# batch <- factor(rep(c("A", "B"), each = ncol(counts)/2))
+# U <- model.matrix(~batch)
+# sceBatch <- fitGAM(counts = counts,
+#                    U = U,
+#                    sds = crv, 
+#                    nknots = 6, 
+#                    verbose = FALSE)
+```
+
+
+```{r}
+## create directory
+saveRDS(fm_sympto_bal_u_don, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_udon.RDS')
+
+```
+
+
+
+```{r, results="asis", eval=F}
+# fm_bal_ts_de  <- fitGAM(counts = counts(fm_sympto_bal_sce[[1]]), 
+#                     pseudotime = fm_sympto_bal_ptime[[1]], 
+#                     cellWeights = fm_sympto_bal_cw[[1]], 
+#                     nknots =4,
+#                     genes = rownames(fm_sympto_bal_sce[[1]])[rowSums(counts(fm_sympto_bal_sce[[1]]) != 0) > 5],
+#                     conditions = factor(SummarizedExperiment::colData(fm_sympto_bal_sce[[1]])[, "Symptomatic"]), 
+#                     verbose = T, 
+#                     parallel = T,
+#                     U = fm_sympto_bal_u_don
+#                     )
+## Tradeseq script
+# nextflow run submsn_tseq.nf --sce_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_{sce,ptime,cw}.RDS" --condtn "Symptomatic" --knots "4" --gns_cut "5"  --resume
+```
+
+
+
+```{r, results="asis", eval=T}
+gogo()
+## Tradeseq script
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq_batch.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_nf.R --condtn "Symptomatic" --knots "4" --gns_cut "5"  --resume
+
+# nextflow run ../mali22_code_lnk/nf_scripts/submsn_tseq.nf --w_dir "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal" --scrpt /nfs/users/nfs_j/jr35/multipurpose_scripts/tradeseq_batch_nf.R --condtn "Symptomatic" --knots "4" --gns_cut "5"  --resume
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_batch_ts <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_batch_ts.RDS")
+fm_sympto_bal_batch_de <- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_sympto_bal_batch_de.RDS")
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_batch_de %>% arrange(desc(waldStat))
+```
+
+```{r}
+##NOTE!!! replace the conditional test file with the newly generated one which applied 7 clusters
+##Ajusting the global and pairwise pvalues - old p values discarded
+fm_sympto_bal_batch_de <- fm_sympto_bal_batch_de %>%
+                             mutate(across(starts_with('pvalue'), ~p.adjust(., "fdr"))) %>%
+                             arrange(desc(waldStat)) %>%
+                             rownames_to_column('gene_id')
+
+```
+
+
+```{r}
+
+fm_sympto_bal_batch_de <- left_join(fm_sympto_bal_batch_de, Pf3D7_genes_plasmoDB %>% dplyr::select(gene_id, Gene, Ka_Ks, `Transcript Product Description`, TM_domains, `Computed GO Functions`), by = 'gene_id') %>% 
+        mutate(Gene = case_when(is.na(Gene) ~ gene_id, T ~ Gene))
+
+```
+
+
+```{r, results="asis", eval=T}
+fm_sympto_bal_batch_de %>% arrange(pvalue)
+```
+
+#### smoothers for select genes that are differentially expressed between strains {.tabset}
+
+
+```{r, results='asis', warning=F, message=F}
+
+tde_smooth_plt(tde_obj_lst = list(fm_sympto_bal_batch_ts),
+               cond_obj_lst = list(fm_sympto_bal_batch_de),
+               pw_comp= 'waldStat',
+               n_gns = c(1:20)
+)
+
+```
+
+
+```{r, results='asis', warning=F, message=F, fig.width=6, fig.height=6}
+
+tseq_de_hmap(tseq = fm_sympto_bal_batch_ts, de_tbl= fm_sympto_bal_batch_de, pnts = 30, rnames = T, comp_grps = "Symptomatic", Pv = 0.05)
+
+```
+
+
+trial with batch
+
+```{r, results="asis"}
+## Save for tradeseq
+summary(fm_tr_sce_pt_chunks_sshot@colData$slingPseudotime_1)
+fm_tr_sce_pt_chunks_3 <- fm_tr_sce_pt_chunks_sshot[,fm_tr_sce_pt_chunks_sshot@colData$slingPseudotime_1 > 13 & fm_tr_sce_pt_chunks_sshot@colData$slingPseudotime_1 < 14 ]
+```
+
+```{r}
+set.seed(5656)
+bcodes <- fm_tr_sce_pt_chunks_3@colData[,c('Symptomatic', 'donor')]%>%
+    as.data.frame()  %>% 
+  filter(str_detect(donor, "MSC")) %>% 
+    rownames_to_column('cell_bc') %>% 
+    group_by(Symptomatic, donor) %>% 
+    mutate(samp = sample(n())) %>%
+    filter(samp <= 5) %>%
+  ungroup() %>%
+  pull(cell_bc)
+    
+fm_tr_sce_pt_chunks_3_sample <- fm_tr_sce_pt_chunks_3[,bcodes]
+```
+
+```{r}
+## Batch design correction for tradeseq
+u_don <- model.matrix(~  donor, fm_tr_sce_pt_chunks_3_sample@colData[, c("donor", "Symptomatic")] %>% data.frame())
+
+# ## tradeseq manual example - Batch design correction for tradeseq
+# counts <- as.matrix(countMatrix)
+# 
+# batch <- factor(rep(c("A", "B"), each = ncol(counts)/2))
+# U <- model.matrix(~batch)
+# sceBatch <- fitGAM(counts = counts,
+#                    U = U,
+#                    sds = crv, 
+#                    nknots = 6, 
+#                    verbose = FALSE)
+```
+
+```{r}
+fm_tr_sce_pt_chunks_3_sample_sds <- SlingshotDataSet(fm_tr_sce_pt_chunks_3_sample)
+fm_tr_sce_pt_chunks_3_sample_ptime <- slingPseudotime(fm_tr_sce_pt_chunks_3_sample)[,1]
+fm_tr_sce_pt_chunks_3_sample_cw <- slingCurveWeights(fm_tr_sce_pt_chunks_3_sample)[,1]
+
+```
+
+
+```{r}
+## create directory
+system(paste0("mkdir -p /lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/"))
+
+
+saveRDS(fm_tr_sce_pt_chunks_3_sample, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_obj.RDS')
+
+saveRDS(fm_tr_sce_pt_chunks_3_sample_ptime, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_ptime.RDS')
+
+saveRDS(fm_tr_sce_pt_chunks_3_sample_cw, '/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_cw.RDS')
+
+```
+
+
+```{r, results="asis", eval=T}
+gogo()
+## Tradeseq script
+# nextflow run submsn_tseq.nf --params.sce_obj "/lustre/scratch126/tol/teams/lawniczak/users/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/symptos/jr35/phd/Mali2/data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_*{obj,ptime,cw}.RDS" --params.condtn "Symptomatic" --params.knots "4" --params.gns_cut "5"  --resume
+```
+
+
+```{r, results="asis", eval=T}
+fm_tr_sce_pt_chunks_3_sample_obj_ts<- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_obj_ts.RDS")
+fm_tr_sce_pt_chunks_3_sample_obj_de<- readRDS("data/processed/Pf/pseudotime_tradeseq_ip/sympto/fm_tr_sce_pt_chunks_3_sample_obj_de.RDS")
+```
+
+
+
+```{r}
+gogogo()
+```
+
+```{r}
+m48_wc <- str_remove(colnames(v3_afm_harmony_ss_res_fld_pt[,v3_afm_harmony_ss_res_fld_pt@meta.data$harmony_clusters_asex == "2" & v3_afm_harmony_ss_res_fld_pt@meta.data$donor == "MSC48"]), "M48_")
+```
+
+```{r}
+DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = m48_wc)
+
+```
+
+```{r}
+m49_wc <- str_remove(colnames(v3_afm_harmony_ss_res_fld_pt[,v3_afm_harmony_ss_res_fld_pt@meta.data$harmony_clusters_asex == "2" & v3_afm_harmony_ss_res_fld_pt@meta.data$donor == "MSC49"]), "M49_")
+
+```
+
+```{r}
+DimPlot(msc_w_cln_strns[["MSC49"]], cells.highlight = m49_wc)
+
+```
+
+```{r}
+msc49 <- msc_w_cln_strns[["MSC49"]]@meta.data %>% rownames_to_column("bcode") %>% mutate(w_clst_stgs = case_when(bcode %in% m49_wc ~ "wrd_asex", T ~ stage)) %>% column_to_rownames("bcode") %>% select(w_clst_stgs) %>% AddMetaData(msc_w_cln_strns[["MSC49"]], .) 
+
+# m49_asex <- msc_w_cln_strns[["MSC49"]][,msc_w_cln_strns[["MSC49"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+# 
+# 
+# m49_asex <- m49_asex@meta.data %>% rownames_to_column("bcode") %>% mutate(w_clst = case_when(bcode %in% m49_wc ~ "wrd_clstr", T ~ "other_clstr")) %>% column_to_rownames("bcode") %>% select(w_clst) %>% AddMetaData(m49_asex, .)
+# 
+# DimPlot(m49_asex, group.by = "w_clst")
+# 
+
+```
+
+```{r}
+VlnPlot(msc49, features = "PF3D7-0204800", group.by = "w_clst_stgs")
+VlnPlot(msc49, features = "PF3D7-0204900", group.by = "w_clst_stgs")
+```
+
+
+```{r}
+VlnPlot(msc49, features = "PF3D7-0406200", group.by = "w_clst_stgs")
+```
+
+```{r}
+
+m49_asex <- msc_w_cln_strns[["MSC49"]][,msc_w_cln_strns[["MSC49"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+m49_asex <- m49_asex@meta.data %>% rownames_to_column("bcode") %>% mutate(w_clst = case_when(bcode %in% m49_wc ~ "wrd_clstr", T ~ "other_clstr")) %>% column_to_rownames("bcode") %>% select(w_clst) %>% AddMetaData(m49_asex, .)
+
+DimPlot(m49_asex, group.by = "w_clst")
+
+
+```
+
+
+```{r}
+Idents(m49_asex) <- "w_clst"
+# w_markrs <- FindMarkers(m49_asex, ident.1 = )
+
+m49_afm_seu <- m49_asex
+
+m49_afm_seu[["RNA"]]$data <- as(object = m49_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+all.markers <- FindAllMarkers(object = m49_afm_seu, test.use = "MAST")
+head(all.markers, 10)
+
+```
+
+
+```{r}
+
+m48_asex <- msc_w_cln_strns[["MSC48"]][,msc_w_cln_strns[["MSC48"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+m48_asex <- m48_asex@meta.data %>% rownames_to_column("bcode") %>% mutate(w_clst = case_when(bcode %in% m48_wc ~ "wrd_clstr", T ~ "other_clstr")) %>% column_to_rownames("bcode") %>% select(w_clst) %>% AddMetaData(m48_asex, .)
+DimPlot(m48_asex, group.by = "w_clst")
+
+
+```
+
+```{r}
+Idents(m48_asex) <- "w_clst"
+# w_markrs <- FindMarkers(m48_asex, ident.1 = )
+
+m48_afm_seu <- m48_asex
+
+m48_afm_seu[["RNA"]]$data <- as(object = m48_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+w48_all.markers <- FindMarkers(object = m48_afm_seu, test.use = "MAST", ident.1 = "wrd_clstr", ident.2 = "other_clstr")
+head(w48_all.markers, 10)
+
+```
+
+```{r}
+m48_afm_seu@meta.data %>% count(StrainDon)
+m49_afm_seu@meta.data %>% count(StrainDon)
+
+```
+
+
+```{r}
+m48_afm_seu <- m48_afm_seu[, !str_detect(m48_afm_seu@meta.data$StrainDon, "Negative|Doublet")]
+
+m49_afm_seu <- m49_afm_seu[, !str_detect(m49_afm_seu@meta.data$StrainDon, "Negative|Doublet") ]
+```
+
+```{r}
+Idents(m48_afm_seu) <- "StrainDon"
+
+m48_afm_seu@meta.data %>% count(StrainDon)
+m48_strn_d_markers <- FindMarkers(object = m48_afm_seu, test.use = "MAST", ident.1 = "M48_SC2", ident.2 = "M48_SC4")
+m48_strn_d_markers_df <- m48_strn_d_markers %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m48_strn_d_markers_df %>% filter(p_val_adj < 0.05)
+
+# PF3D7_1016300 PF3D7_1127000 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8527989/
+# PF3D7_1127000 https://elifesciences.org/reviewed-preprints/95879
+# PF3D7_1223900 https://www.biorxiv.org/content/10.1101/2023.02.13.528367v1.full
+# PF3D7_1324900 https://www.sciencedirect.com/science/article/pii/S2213716523001376
+```
+
+
+```{r}
+Idents(m49_afm_seu) <- "StrainDon"
+
+m49_afm_seu@meta.data %>% count(StrainDon)
+m49_strn_d_markers <- FindMarkers(object = m49_afm_seu, test.use = "MAST", ident.1 = "M49_SC1", ident.2 = "M49_SC5")
+m49_strn_d_markers_antd <- m49_strn_d_markers  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+
+m49_strn_d_markers_antd %>% filter(p_val_adj < 1e-20)
+
+## vps3 extracellular vessicle content https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8764524/
+## ΔHsp70x - virulence cytoadhesion - dispensable 
+##VAR_PF3D7-1041300: Mapping immune variation and var gene switching in naive hosts infected with Plasmodium falciparum - PMC.html
+##CBP2 ΔGEXP07 parasites have a growth advantage compared to wild-type parasites https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7078486/
+##CBP2 ΔGEXP07 parasites have a growth advantage compared to wild-type parasites https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7078486/
+## MAHRP2 interacts with pfemp1 rers cleft  https://www.nature.com/articles/ncomms16044, https://journals.asm.org/doi/10.1128/msphere.00755-21
+```
+
+
+```{r}
+m33_afm_seu <- msc_w_cln_strns[["MSC33"]][,msc_w_cln_strns[["MSC33"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+m33_afm_seu <- m33_afm_seu[, str_detect(m33_afm_seu@meta.data$StrainDon, "SC2|SC5|SC6|SC7")]
+
+m33_afm_seu[["RNA"]]$data <- as(object = m33_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+
+Idents(m33_afm_seu) <- "StrainDon"
+
+m33_afm_seu@meta.data %>% count(StrainDon)
+m33_strn_d_markers <- FindAllMarkers(object = m33_afm_seu, test.use = "MAST")
+m33_strn_d_markers_df <- m33_strn_d_markers  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m33_strn_d_markers_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+```{r}
+m55_afm_seu <- msc_w_cln_strns[["MSC55"]][,msc_w_cln_strns[["MSC55"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+
+m55_afm_seu[["RNA"]]$data <- as(object = m55_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+
+Idents(m55_afm_seu) <- "StrainDon"
+
+m55_afm_seu@meta.data %>% count(StrainDon)
+m55_strn_d_markers <- FindMarkers(object = m55_afm_seu, test.use = "MAST", ident.1 = "M55_SC6", ident.2 = "M55_SC8")
+m55_strn_d_markers_df <- m55_strn_d_markers  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m55_strn_d_markers_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+
+```{r}
+m60_afm_seu <- msc_w_cln_strns[["MSC60"]][,msc_w_cln_strns[["MSC60"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+
+m60_afm_seu[["RNA"]]$data <- as(object = m60_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+
+Idents(m60_afm_seu) <- "StrainDon"
+
+m60_afm_seu@meta.data %>% count(StrainDon)
+m60_strn_d_markers <- FindMarkers(object = m60_afm_seu, test.use = "MAST", ident.1 = "M60_SC3", ident.2 = "M60_SC7")
+m60_strn_d_markers_df <- m60_strn_d_markers  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m60_strn_d_markers_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+
+```{r}
+
+# m60_strn_d_markers_ds <- FindMarkers(object = m60_afm_seu, test.use = "MAST", ident.1 = "M60_SC3", ident.2 = "M60_SC7", max.cells.per.ident = 90)
+# m60_strn_d_markers_ds_df <- m60_strn_d_markers_ds  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+# m60_strn_d_markers_ds_df %>% filter(p_val_adj < 0.05)
+```
+
+```{r}
+m66_afm_seu <- msc_w_cln_strns[["f.MSC66C"]][,msc_w_cln_strns[["f.MSC66C"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+
+m66_afm_seu[["RNA"]]$data <- as(object = m66_afm_seu[["RNA"]]$data, Class = "dgCMatrix")
+
+Idents(m66_afm_seu) <- "StrainDon"
+
+m66_afm_seu@meta.data %>% count(StrainDon)
+m66_strn_d_markers1 <- FindMarkers(object = m66_afm_seu, test.use = "MAST", ident.1 = "M66_SC5", ident.2 = "M66_SC8")
+m66_strn_d_markers1_df <- m66_strn_d_markers1 %>% rownames_to_column("gene")  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m66_strn_d_markers1_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+
+```{r}
+Idents(m66_afm_seu) <- "StrainDon"
+
+m66_afm_seu@meta.data %>% count(StrainDon)
+m66_strn_d_markers2 <- FindMarkers(object = m66_afm_seu, test.use = "MAST", ident.1 = "M66_SC7", ident.2 = "M66_SC8")
+m66_strn_d_markers2_df <- m66_strn_d_markers2 %>% rownames_to_column("gene")  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m66_strn_d_markers2_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+
+```{r}
+Idents(m66_afm_seu) <- "StrainDon"
+
+m66_afm_seu@meta.data %>% count(StrainDon)
+m66_strn_d_markers3 <- FindMarkers(object = m66_afm_seu, test.use = "MAST", ident.1 = "M66_SC5", ident.2 = "M66_SC7")
+m66_strn_d_markers3_df <- m66_strn_d_markers3 %>% rownames_to_column("gene")  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m66_strn_d_markers3_df %>% filter(p_val_adj < 1e-5)
+
+```
+
+
+```{r}
+m14_afm_seu <- msc_qcd_anotd[["MSC14"]][,msc_qcd_anotd[["MSC14"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+
+m14_afm_seu@meta.data %>% count(strain_qcd)
+
+```
+
+```{r}
+
+Idents(m14_afm_seu) <- "strain_qcd"
+
+m14_strn_d_markers <- FindMarkers(object = m14_afm_seu, test.use = "MAST", ident.1 = "SC1", ident.2 = "SC2")
+m14_strn_d_markers_df <- m14_strn_d_markers %>% rownames_to_column("gene")  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m14_strn_d_markers_df %>% filter(p_val_adj < 0.05)
+
+```
+
+
+```{r}
+m14_strn_d_markers2 <- FindMarkers(object = m14_afm_seu, test.use = "MAST", ident.1 = "SC1", ident.2 = "SC6")
+m14_strn_d_markers2_df <- m14_strn_d_markers2 %>% rownames_to_column("gene")  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+m14_strn_d_markers2_df %>% filter(p_val_adj < 0.05)
+
+```
+
+```{r}
+# M48, M49, M60
+ggvenn(list("M48" = m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M49" = m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M60" = m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)))
+
+```
+
+
+```{r, fig.height=3.8, fig.width=3.8}
+# M48, M49, M60
+ggvenn(list("M48" = m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M49" = m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M60" = m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)),
+       show_percentage = F,
+       text_size = 6)
+
+```
+
+```{r}
+# M48, M49, M60
+ggvenn(list("M48" = m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M49" = m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M60" = m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M14" = m14_strn_d_markers2_df %>% filter(p_val_adj < 0.05) %>% pull(gene)))
+
+```
+
+
+```{r}
+# M48, M49, M60
+ggvenn(list("M48" = m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M49" = m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M60" = m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene),
+            "M14" = m14_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)))
+
+```
+
+```{r}
+# M48, M49, M60
+m48_g <- m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)
+m49_g <- m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene)
+m60_g <- m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)
+
+
+m48_m60_g_ovlp <- m48_g[m48_g %in% m60_g]
+m49_m60_g_ovlp <- m49_g[m49_g %in% m60_g]
+
+```
+
+```{r}
+# M48, M49, M60
+m49_m60_g_ovlp <- m49_g[m49_g %in% m60_g]
+
+m49_strn_d_markers_antd %>% filter(gene %in% m49_m60_g_ovlp) %>% mutate(don = "M49") %>% bind_rows(., m60_strn_d_markers_df %>% filter(gene %in% m49_m60_g_ovlp) %>% mutate(don = "M60")) %>% ggplot(aes(x = avg_log2FC, y = Gene, fill = don)) + geom_col(position = position_dodge2()) 
+```
+```{r, fig.height=5.5, fig.width=4}
+# M48, M49, M60
+m49_m60_g_ovlp <- m49_g[m49_g %in% m60_g]
+
+m49_strn_d_markers_antd %>% filter(gene %in% m49_m60_g_ovlp) %>% mutate(don = "M49") %>% bind_rows(., m60_strn_d_markers_df %>% filter(gene %in% m49_m60_g_ovlp) %>% mutate(don = "M60")) %>% ggplot(aes(x = avg_log2FC, y = Gene, fill = don)) + geom_col() 
+```
+
+
+```{r}
+# M48, M49, M60
+m48_g <- m48_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)
+m49_g <- m49_strn_d_markers_antd %>% filter(p_val_adj < 0.05) %>% pull(gene)
+m60_g <- m60_strn_d_markers_df %>% filter(p_val_adj < 0.05) %>% pull(gene)
+
+
+m48_m60_g_ovlp <- m48_g[m48_g %in% m60_g]
+m49_m60_g_ovlp <- m49_g[m49_g %in% m60_g]
+m48_m49_g_ovlp <- m48_g[m48_g %in% m49_g]
+
+```
+
+```{r, fig.width=4, fig.height=2}
+# M48, M49, M60
+
+m49_strn_d_markers_antd %>% filter(gene %in% m48_m49_g_ovlp) %>% mutate(don = "M49") %>% bind_rows(., m48_strn_d_markers_df %>% filter(gene %in% m48_m49_g_ovlp) %>% mutate(don = "M48")) %>% ggplot(aes(x = avg_log2FC, y = Gene, fill = don)) + geom_col() 
+```
+```{r}
+# M48, M49, M60
+
+m49_strn_d_markers_antd %>% filter(gene %in% m48_m49_g_ovlp) %>% mutate(don = "M49") %>% bind_rows(., m48_strn_d_markers_df %>% filter(gene %in% m48_m49_g_ovlp) %>% mutate(don = "M48")) %>% ggplot(aes(x = avg_log2FC, y = Gene, fill = don)) + geom_col() 
+```
+
+```{r}
+Idents(m48_asex) <- "StrainDon"
+w48_markrs <- FindAllMarkers(m48_asex)
+
+```
+
+```{r}
+m48_asex <- msc_w_cln_strns[["MSC48"]][,msc_w_cln_strns[["MSC48"]]@meta.data$stage %in% c("Early trophozoite", "Late ring")]
+
+```
+
+```{r}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+map(v3_afm_harmony_ss_res_fld_pt, ~FeaturePlot(.x, features = "scf_class_rand_dbt_prop", reduction = "umap.harmony_PC_man", order = T))
+
+```
+
+
+```{r, fig.width=15, fig.height=3}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+FeaturePlot(harmony_int, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), reduction = "umap.harmony_PC_man", order = T, ncol = 5)
+
+```
+
+
+```{r, fig.width=15, fig.height=3}
+## 
+VlnPlot(v3_afm_harmony_ss_res_fld_pt, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5)
+
+```
+```{r, fig.width=6, fig.height=3}
+## 
+VlnPlot(v3_afm_harmony_ss_res_fld_pt, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "stage", pt.size = 0)
+
+```
+
+```{r, fig.width=18, fig.height=3}
+## 
+VlnPlot(v3_afm_harmony_ss_res_fld_pt, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, split.by = "StrainDon", pt.size = 0)
+
+```
+
+```{r, fig.width=6, fig.height=3}
+## 
+map(v3_afm_harmony_ss_res_fld_pt, ~DimPlot(.x,  split.by = "dset", reduction = "umap.harmony_PC_man", dims = c(2,3)))
+
+```
+
+```{r, fig.width=6, fig.height=3}
+## 
+map(v3_afm_harmony_ss_res_fld_pt, ~DimPlot(.x,  split.by = "dset", reduction = "umap.harmony_PC_man", dims = c(2,3)))
+
+```
+
+```{r, fig.width=15, fig.height=3}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+FeaturePlot(harmony_int, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), reduction = "umap.harmony_PC_man", order = T, ncol = 5)
+
+```
+
+
+
+```{r, fig.width=18, fig.height=6}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+VlnPlot(harmony_int[, harmony_int@meta.data$StagePrelimC == "Asexual"], features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5, pt.size = 0, group.by = "harmony_clusters")
+
+```
+
+```{r, fig.width=12, fig.height=6}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+FeaturePlot(harmony_int[, harmony_int@meta.data$StagePrelimC == "Asexual"], features = c("PF3D7-0204800", "PF3D7-0204900"), order = T, ncol = 2, pt.size = 1, reduction = "umap.harmony_PC_man")
+
+```
+
+```{r, fig.width=18, fig.height=6}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+harmony_int <- harmony_int@meta.data %>% rownames_to_column('bcode') %>% mutate(wd_cluster = case_when(bcode %in% cbs ~ "weird_afm", T ~ stage)) %>% select(bcode, wd_cluster) %>% column_to_rownames('bcode') %>% AddMetaData(harmony_int, .)
+
+
+```
+
+```{r, fig.width=18, fig.height=6}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+VlnPlot(harmony_int[, harmony_int@meta.data$StagePrelimC == "Asexual"], features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5, pt.size = 0, group.by = "wd_cluster")
+VlnPlot(harmony_int, features = c("PF3D7-0204800", "PF3D7-0204900", "PF3D7-0113000", "PF3D7-0316600", "PF3D7-0220000"), ncol = 5, pt.size = 0, group.by = "wd_cluster")
+
+```
+
+
+```{r, fig.width=12, fig.height=6}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+DotPlot(harmony_int, features = c("PF3D7-0204800", "PF3D7-0204900"), group.by = "stage")
+
+```
+
+
+
+## Assess distribution of strains over pseudotime
+
+```{r, results="asis", fig.width=5, fig.height=3.5}
+library("ggpubr")
+
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M49_SC1", "M49_SC5")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M49_SC1", "M49_SC5")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl%>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.3), size=2, bw = 0.3, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  dens_thme +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") + 
+  stat_compare_means(method = "wilcox.test") +gbox_theme
+  
+
+
+```
+
+
+
+```{r, results="asis", fig.width=5, fig.height=3.5}
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M60_SC3", "M60_SC7")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M60_SC3", "M60_SC7")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl %>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.3), size=2, bw = 0.3, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") + stat_compare_means(method = "wilcox.test")+gbox_theme
+
+
+```
+
+
+```{r, results="asis", fig.width=5, fig.height=3.5}
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M48_SC2", "M48_SC4")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M48_SC2", "M48_SC4")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl %>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.48), size=2, bw = 0.48, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") + stat_compare_means(method = "wilcox.test")+gbox_theme
+
+
+```
+
+
+```{r, results="asis", fig.width=5, fig.height=4}
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M55_SC6", "M55_SC8")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M55_SC6", "M55_SC8")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl%>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.48), size=2, bw = 0.48, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") + stat_compare_means(method = "wilcox.test")+gbox_theme
+
+```
+
+
+```{r, results="asis", fig.width=5, fig.height=4}
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M66_SC5", "M66_SC7")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M66_SC5", "M66_SC7", "M66_SC8")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl%>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.48), size=2, bw = 0.48, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") +stat_compare_means(method = "anova", aes(label = ..p.signif..))+gbox_theme
+
+```
+
+
+```{r, results="asis"}
+smpl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M33_SC6", "M33_SC7")) %>% 
+  count(StrainDon) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(StrainDon %in% c("M33_SC2","M33_SC5", "M33_SC6", "M33_SC7")) %>% 
+  group_by(StrainDon) %>% 
+  slice_sample(n = smpl) 
+
+tbl%>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.48), size=2, bw = 0.48, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="StrainDon", col="StrainDon") +stat_compare_means(method = "kruskal.test", aes(label = ..p.signif..))+gbox_theme
+
+```
+
+```{r, results="asis"}
+smpl = umap_meta_df %>% 
+  filter(!is.na(Symptomatic)) %>% 
+  count(Symptomatic) %>% pull(n) %>% min()
+
+tbl = umap_meta_df %>% 
+  filter(!is.na(Symptomatic)) %>% 
+  group_by(Symptomatic) %>% 
+  slice_sample(n = smpl) 
+
+tbl%>%
+  ggplot(., aes(x = slingPseudotime_1, col=Symptomatic, fill=Symptomatic)) + 
+  geom_density(aes(y = ..count..*0.48), size=2, bw = 0.48, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+tbl %>% 
+  ggboxplot(., y = "slingPseudotime_1",x="Symptomatic", col="Symptomatic") +stat_compare_means(method = "wilcox.test")
+
+
+```
+
+
+
+## MAST DE of interesting clusters and also for strains
+
+
+```{r}
+## Adjusting resolution to find the optimum for slingshot trajectory inference to avoid error  "values must be length 150, but FUN(X[[1]]) result is length 38689"
+# DimPlot(v3_afm_harmony_ss_res_fld_pt, reduction = "umap.harmony_PC_man", group.by = "harmony_clusters_ss", pt.size = 0.5, dims = c(1,2), label = T)
+
+```
+
+```{r, fig.width=30, fig.height=6}
+# FeaturePlot(v3_afm_harmony_ss_res_fld_pt, features = "PF3D7-0925700", reduction = "umap.harmony_PC_man", split.by = "donor", pt.size = 2, ncol = 7)
+```
+
+```{r}
+## Weird cluster 2 markers
+# v3_afm_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor)
+
+```
+
+
+```{r}
+## Weird cluster 2 markers
+# v3_afm_harmony_ss_res_fld_pt@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
+
+```
+
+
+```{r}
+## Weird cluster 2 markers
+# v3_afm_harmony_ss_res_fld_pt@meta.data %>% filter(donor %in% c("MSC48", "MSC49")) %>% count(harmony_clusters_asex, StrainDon) %>% arrange(desc(n))
+
+```
+
+
+
+```{r}
+## Weird cluster 2 markers
+# v3_afm_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & str_detect(StrainDon, "Doublet|Negative")) %>% count(donor, Symptomatic, StrainDon)
+# 
+```
+
+
+```{r}
+## Weird cluster 2 markers
+# v3_afm_harmony_ss_res_fld_pt@meta.data %>% filter(dset != "Lab" & !(str_detect(StrainDon, "Doublet|Negative"))) %>% count(donor, Symptomatic, StrainDon) %>% filter(n>20) %>% group_by(donor) %>% filter(n() > 1 )
+
+```
+
+
+
+```{r}
+m49_afm_seu_pt <- m49_afm_seu %>% AddMetaData(., umap_meta_df %>% filter(orig.ident == "MSC49.mrna") %>% mutate(across(cell_bc, ~str_remove(., "M[0-9]*_")))%>% select(cell_bc, slingPseudotime_1) %>% column_to_rownames("cell_bc") %>% filter(!is.na(slingPseudotime_1)))
+
+m49_afm_seu_pt <- m49_afm_seu_pt[,!is.na(m49_afm_seu_pt@meta.data$slingPseudotime_1)]
+
+Idents(m49_afm_seu_pt) <- "StrainDon"
+
+m49_afm_seu_pt@meta.data %>% count(StrainDon)
+m49_strn_d_markers_pt <- FindMarkers(object = m49_afm_seu_pt, test.use = "MAST", ident.1 = "M49_SC1", ident.2 = "M49_SC5", latent.vars = "slingPseudotime_1")
+m49_strn_d_markers_antd_pt <- m49_strn_d_markers_pt  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+
+m49_strn_d_markers_antd_pt %>% filter(p_val_adj < 1e-20)
+
+## vps3 extracellular vessicle content https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8764524/
+## ΔHsp70x - virulence cytoadhesion - dispensable 
+##VAR_PF3D7-1041300: Mapping immune variation and var gene switching in naive hosts infected with Plasmodium falciparum - PMC.html
+##CBP2 ΔGEXP07 parasites have a growth advantage compared to wild-type parasites https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7078486/
+##CBP2 ΔGEXP07 parasites have a growth advantage compared to wild-type parasites https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7078486/
+## MAHRP2 interacts with pfemp1 rers cleft  https://www.nature.com/articles/ncomms16044, https://journals.asm.org/doi/10.1128/msphere.00755-21
+```
+
+
+```{r}
+m60_afm_seu_pt <- m60_afm_seu %>% AddMetaData(., umap_meta_df %>% filter(orig.ident == "MSC60.mrna") %>% mutate(across(cell_bc, ~str_remove(., "M[0-9]*_")))%>% select(cell_bc, slingPseudotime_1) %>% column_to_rownames("cell_bc") %>% filter(!is.na(slingPseudotime_1)))
+
+m60_afm_seu_pt <- m60_afm_seu_pt[,!is.na(m60_afm_seu_pt@meta.data$slingPseudotime_1)]
+
+Idents(m60_afm_seu_pt) <- "StrainDon"
+
+m60_afm_seu_pt@meta.data %>% count(StrainDon)
+m60_strn_d_markers_pt <- FindMarkers(object = m60_afm_seu_pt, test.use = "MAST", ident.1 = "M60_SC3", ident.2 = "M60_SC7", latent.vars = "slingPseudotime_1")
+m60_strn_d_markers_antd_pt <- m60_strn_d_markers_pt  %>% rownames_to_column("gene") %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene), by = c("gene"="gene_id"))
+
+m60_strn_d_markers_antd_pt %>% filter(p_val_adj < 1e-5)
+
+```
+
+```{r, results="asis"}
+plt = umap_meta_df %>% 
+  filter(StrainDon %in% c("M60_SC1", "M60_SC5")) %>%
+  ggplot(., aes(x = slingPseudotime_1, col=StrainDon, fill=StrainDon)) + 
+  geom_density(aes(y = ..count..*0.18), size=2, bw = 0.18, alpha=.2)+
+  # geom_freqpoly()+
+  theme_classic()+
+  theme(axis.text=element_text(size=26),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        axis.title=element_text(size=30,face="bold"), 
+        legend.text = element_text(size = 26) ,
+        legend.title = element_text(size = 28, face = "bold"),
+        # legend.box.margin = margin(t = 0, r = 4.1, b = 0, l = 0, unit = "cm"),#######
+        # legend.position="bottom",
+        # legend.direction="vertical"
+  ) +
+  labs(x = "Pseudotime", y="Counts") +
+  guides(color = guide_legend(override.aes = list(size = 4), title.position = "top"))
+
+print(plt)
+
+```
+
+Explore particular clusters 
+
+
+```{r}
+## Weird cluster 2 markers
+Idents(v3_afm_harmony_ss_res_fld_pt) <- "harmony_clusters_asex"
+cl2_markrs <- FindMarkers(v3_afm_harmony_ss_res_fld_pt, ident.1 = "2")
+
+```
+
+```{r}
+## Weird cluster 2 markers
+cl2_markrs %>% rownames_to_column('gene_id')  %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
+
+## PF3D7-0204900 https://www.sciencedirect.com/science/article/pii/S0006291X20321744#abs0010
+## PF3D7-0204900 https://academic.oup.com/femsre/article/30/4/596/2367720
+## Possible copy number variant since they are in the same location in the genome
+
+## GARP - antigarp induces pf death and present in relatively resistant individuals https://pubmed.ncbi.nlm.nih.gov/32427965/
+## GARP high expression in K13580Y mutant as well as pfemp1 - https://www.biorxiv.org/content/biorxiv/early/2023/12/06/2023.12.06.570387.full.pdf 
+
+## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
+
+## FNT Drug target - due to its housekeeping role in lactate efflux during the intraerythrocytic stage https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8428694/
+
+## PfA-M17 essential gene and drug target (compound 3) implicated in the final stage of hemoglobin digestion - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9470162/ https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1010926 
+
+##PF3D7-1223900 Contained in drug resistance gene duplication https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7774857/ https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-019-0708-9, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9948948/
+
+```
+
+```{r}
+## Expression of AF1 genes in unique cluster - https://www.biorxiv.org/content/10.1101/2024.01.20.576496v1.full.pdf
+cl2_markrs %>% rownames_to_column('gene_id') %>% mutate(across(gene_id, ~str_replace(., "-", "_"))) %>% filter(gene_id %in% c("PF3D7_1035500", "PF3D7_1035600", "PF3D7_1035400", "PF3D7_1035300", "PF3D7_0930300", "PF3D7_0207600", "PF3D7_0207500", "PF3D7_1149200", "PF3D7_0401800", "PF3D7_1370300", "PF3D7_1149000", "PF3D7_0935900", "PF3D7_0936000", "PF3D7_1039000", "PF3D7_1149300", "PF3D7_0424400", "PF3D7_0830800", "PF3D7_1477600", "PF3D7_0935800")) %>% mutate(across(gene_id, ~str_replace(., "_", "-"))) %>% left_join(Pf3D7_genes_plasmoDB%>% select(gene_id, Gene,`Genomic Location (Gene)`))
+
+```
+
+```{r}
+## Weird cluster 2 markers
+map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, donor))
+map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(seurat_clusters, donor, Symptomatic))
+```
+
+```{r}
+## Weird cluster 2 markers
+harmony_int <- readRDS("data/processed/Pf/m2_all/harmony_int.RDS")
+```
+
+```{r}
+## Weird cluster 2 markers
+harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
+map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor))
+```
+
+
+```{r}
+## Weird cluster 2 markers
+harmony_int@meta.data %>% filter(harmony_clusters == "2") %>% count(harmony_clusters, seurat_clusters, donor)
+map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% count(harmony_clusters_asex, seurat_clusters, donor, Strain_DN) %>% arrange(desc(n)))
+```
+
+```{r}
+## Weird cluster 2 markers
+cbs<- map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames())
+
+harmony_int@meta.data %>% rownames_to_column("bcode") %>% filter(bcode %in% cbs) %>% count(harmony_clusters, seurat_clusters, donor) %>% arrange(desc(n))
+
+```
+
+```{r}
+
+DimPlot(harmony_int[,harmony_int@meta.data$StagePrelimC == "Asexual"], reduction = "umap.harmony_PC_man", cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F)
+map(v3_afm_harmony_ss_res_fld_pt, ~DimPlot(.x, reduction = "umap.harmony_PC_man",cells.highlight = cbs, pt.size = 0.5, dims = c(1,2), label = F))
+
+cbs_49 <- map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2" & donor == "MSC49") %>% rownames() %>% str_remove(., "M49_"))
+DimPlot(msc_w_cln_strns[["MSC49"]], cells.highlight = cbs_49, pt.size = 0.5, dims = c(1,2), label = F)
+
+cbs_48 <- map(v3_afm_harmony_ss_res_fld_pt, ~.x@meta.data %>% filter(harmony_clusters_asex == "2") %>% rownames() %>% str_remove(., "M48_"))
+DimPlot(msc_w_cln_strns[["MSC48"]], cells.highlight = cbs_48, pt.size = 0.5, dims = c(1,2), label = F)
+
+```
+
